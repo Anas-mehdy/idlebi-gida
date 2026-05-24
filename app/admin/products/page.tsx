@@ -58,6 +58,10 @@ export default function AdminProducts() {
   const [selectedFilterCategory, setSelectedFilterCategory] = useState('all');
   const fileInputRef = useRef<HTMLInputElement>(null);
 
+  const filteredDisplayProducts = selectedFilterCategory === 'all'
+    ? products
+    : products.filter((p) => p.category_id === selectedFilterCategory);
+
   const fetchData = async () => {
     try {
       setLoading(true);
@@ -330,17 +334,12 @@ export default function AdminProducts() {
     }
   };
 
-  // Filter products for display
-  const filteredDisplayProducts = products.filter(p => 
-    selectedFilterCategory === 'all' || p.category_id === selectedFilterCategory
-  );
-
   return (
     <div className="space-y-6">
       {/* Warning */}
       {usingMockData && (
-        <div className="bg-amber-500/10 border border-amber-500/20 text-amber-300 px-4 py-3 rounded-2xl text-xs flex items-center gap-2.5 shadow-sm">
-          <AlertCircle className="w-5 h-5 shrink-0 text-amber-400" />
+        <div className="bg-amber-500/10 border border-amber-500/20 text-amber-800 px-4 py-3 rounded-2xl text-xs flex items-center gap-2.5 shadow-sm">
+          <AlertCircle className="w-5 h-5 shrink-0 text-amber-600" />
           <span>وضع العرض التجريبي نشط. لإمكانية تخزين الصور حياً يرجى إعداد Supabase Storage ودلو `product-images`.</span>
         </div>
       )}
@@ -348,12 +347,12 @@ export default function AdminProducts() {
       {/* Header Info */}
       <div className="flex items-center justify-between gap-4">
         <div>
-          <h1 className="text-xl font-bold text-white">إدارة المنتجات</h1>
-          <p className="text-xs text-slate-400 mt-1">تعديل وإضافة السلع الغذائية وتحديد أسعارها بالليرة التركية وتحميل صورها مباشرة</p>
+          <h1 className="text-xl font-bold text-slate-800">إدارة المنتجات</h1>
+          <p className="text-xs text-slate-500 mt-1">تعديل وإضافة السلع الغذائية وتحديد أسعارها بالليرة التركية وتحميل صورها مباشرة</p>
         </div>
         <button
           onClick={fetchData}
-          className="p-2.5 bg-slate-900 border border-slate-800 hover:border-slate-700 text-slate-400 hover:text-white rounded-xl transition-all cursor-pointer"
+          className="p-2.5 bg-white border border-slate-200 hover:border-slate-350 text-slate-600 hover:text-slate-900 rounded-xl transition-all cursor-pointer shadow-sm"
           title="تحديث البيانات"
         >
           <RefreshCw className="w-4 h-4" />
@@ -362,30 +361,30 @@ export default function AdminProducts() {
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 items-start">
         {/* Create Form */}
-        <div className="bg-slate-900 border border-slate-800 rounded-3xl p-5 space-y-4">
-          <div className="flex items-center gap-2.5 pb-2.5 border-b border-slate-800">
-            <ShoppingBag className="w-5 h-5 text-emerald-400" />
-            <h2 className="text-sm font-bold text-white">إضافة منتج جديد</h2>
+        <div className="bg-white border border-slate-200 rounded-3xl p-5 space-y-4 shadow-sm">
+          <div className="flex items-center gap-2.5 pb-2.5 border-b border-slate-100">
+            <ShoppingBag className="w-5 h-5 text-emerald-600" />
+            <h2 className="text-sm font-bold text-slate-800">إضافة منتج جديد</h2>
           </div>
 
           <form onSubmit={handleAddProduct} className="space-y-4">
             {/* Product Name */}
             <div className="space-y-1.5">
-              <label className="block text-xs font-bold text-slate-400">اسم المنتج</label>
+              <label className="block text-xs font-bold text-slate-600">اسم المنتج</label>
               <input
                 type="text"
                 required
                 value={name}
                 onChange={(e) => setName(e.target.value)}
                 placeholder="اسم السلعة (مثال: قهوة تركي 250 غ)"
-                className="w-full bg-slate-950 border border-slate-800 outline-none rounded-xl px-4 py-3 text-sm text-white placeholder-slate-500 focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500 transition-all text-right"
+                className="w-full bg-slate-50 border border-slate-200 outline-none rounded-xl px-4 py-3 text-sm text-slate-850 placeholder-slate-400 focus:bg-white focus:border-[#128C7E] focus:ring-1 focus:ring-[#128C7E] transition-all text-right"
                 disabled={submitting}
               />
             </div>
 
             {/* Product Price */}
             <div className="space-y-1.5">
-              <label className="block text-xs font-bold text-slate-400">السعر (بالليرة التركية TL)</label>
+              <label className="block text-xs font-bold text-slate-600">السعر (بالليرة التركية TL)</label>
               <input
                 type="number"
                 step="0.01"
@@ -394,24 +393,24 @@ export default function AdminProducts() {
                 value={price}
                 onChange={(e) => setPrice(e.target.value)}
                 placeholder="0.00"
-                className="w-full bg-slate-950 border border-slate-800 outline-none rounded-xl px-4 py-3 text-sm text-white placeholder-slate-500 focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500 transition-all text-right"
+                className="w-full bg-slate-50 border border-slate-200 outline-none rounded-xl px-4 py-3 text-sm text-slate-850 placeholder-slate-400 focus:bg-white focus:border-[#128C7E] focus:ring-1 focus:ring-[#128C7E] transition-all text-right"
                 disabled={submitting}
               />
             </div>
 
             {/* Category selection */}
             <div className="space-y-1.5">
-              <label className="block text-xs font-bold text-slate-400">قسم تصنيف المنتج</label>
+              <label className="block text-xs font-bold text-slate-600">قسم تصنيف المنتج</label>
               <select
                 required
                 value={categoryId}
                 onChange={(e) => setCategoryId(e.target.value)}
-                className="w-full bg-slate-950 border border-slate-800 outline-none rounded-xl px-4 py-3 text-sm text-white focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500 transition-all text-right cursor-pointer"
+                className="w-full bg-slate-50 border border-slate-200 outline-none rounded-xl px-4 py-3 text-sm text-slate-850 focus:bg-white focus:border-[#128C7E] focus:ring-1 focus:ring-[#128C7E] transition-all text-right cursor-pointer"
                 disabled={submitting}
               >
-                <option value="" disabled className="text-slate-650">اختر القسم المناسب...</option>
+                <option value="" disabled className="text-slate-400">اختر القسم المناسب...</option>
                 {categories.map((cat) => (
-                  <option key={cat.id} value={cat.id} className="text-white bg-slate-950">
+                  <option key={cat.id} value={cat.id} className="text-slate-800 bg-white">
                     {cat.name}
                   </option>
                 ))}
@@ -420,10 +419,10 @@ export default function AdminProducts() {
 
             {/* Image Upload */}
             <div className="space-y-1.5">
-              <label className="block text-xs font-bold text-slate-400">صورة المنتج</label>
+              <label className="block text-xs font-bold text-slate-600">صورة المنتج</label>
               <div 
                 onClick={() => !submitting && fileInputRef.current?.click()}
-                className="w-full bg-slate-950 border border-dashed border-slate-800 hover:border-slate-700 rounded-xl p-4 flex flex-col items-center justify-center gap-2 cursor-pointer transition-all min-h-32 relative overflow-hidden"
+                className="w-full bg-slate-50 border border-dashed border-slate-200 hover:border-slate-350 rounded-xl p-4 flex flex-col items-center justify-center gap-2 cursor-pointer transition-all min-h-32 relative overflow-hidden"
               >
                 <input
                   type="file"
@@ -435,7 +434,7 @@ export default function AdminProducts() {
                 />
                 
                 {imagePreview ? (
-                  <div className="absolute inset-0 w-full h-full flex items-center justify-center bg-slate-950">
+                  <div className="absolute inset-0 w-full h-full flex items-center justify-center bg-white">
                     <img 
                       src={imagePreview} 
                       alt="Preview" 
@@ -448,16 +447,16 @@ export default function AdminProducts() {
                   </div>
                 ) : (
                   <>
-                    <ImageIcon className="w-8 h-8 text-slate-500" />
-                    <span className="text-xs font-bold text-slate-400">انقر لتحميل صورة المنتج</span>
-                    <span className="text-[10px] text-slate-500">صيغ JPG, PNG (حد أقصى 2 ميجا)</span>
+                    <ImageIcon className="w-8 h-8 text-slate-400" />
+                    <span className="text-xs font-bold text-slate-500">انقر لتحميل صورة المنتج</span>
+                    <span className="text-[10px] text-slate-400">صيغ JPG, PNG (حد أقصى 2 ميجا)</span>
                   </>
                 )}
               </div>
             </div>
 
             {errorMsg && (
-              <div className="bg-rose-500/10 border border-rose-500/20 text-rose-300 p-3 rounded-xl text-xs font-semibold leading-relaxed">
+              <div className="bg-rose-500/10 border border-rose-500/20 text-rose-800 p-3 rounded-xl text-xs font-semibold leading-relaxed">
                 {errorMsg}
               </div>
             )}
@@ -465,7 +464,8 @@ export default function AdminProducts() {
             <button
               type="submit"
               disabled={submitting || !name.trim() || !price || !categoryId}
-              className="w-full bg-emerald-500 hover:bg-emerald-600 disabled:bg-slate-850 disabled:text-slate-500 text-slate-950 font-bold py-3 px-4 rounded-xl text-sm flex items-center justify-center gap-1.5 transition-all shadow-md cursor-pointer"
+              className="w-full bg-emerald-650 hover:bg-emerald-700 disabled:bg-slate-100 disabled:text-slate-400 text-white font-bold py-3 px-4 rounded-xl text-sm flex items-center justify-center gap-1.5 transition-all shadow-md cursor-pointer"
+              style={{ backgroundColor: '#128C7E' }}
             >
               {submitting ? (
                 <Loader2 className="w-4 h-4 animate-spin" />
@@ -478,20 +478,20 @@ export default function AdminProducts() {
         </div>
 
         {/* Products Table/List */}
-        <div className="bg-slate-900 border border-slate-800 rounded-3xl p-5 lg:col-span-2 space-y-4">
-          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 pb-3.5 border-b border-slate-800">
+        <div className="bg-white border border-slate-200 rounded-3xl p-5 lg:col-span-2 space-y-4 shadow-sm">
+          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 pb-3.5 border-b border-slate-100">
             <div className="flex items-center gap-2.5">
-              <ShoppingBag className="w-5 h-5 text-emerald-400" />
-              <h2 className="text-sm font-bold text-white">المنتجات المتوفرة حالياً ({filteredDisplayProducts.length})</h2>
+              <ShoppingBag className="w-5 h-5 text-emerald-600" />
+              <h2 className="text-sm font-bold text-slate-800">المنتجات المتوفرة حالياً ({filteredDisplayProducts.length})</h2>
             </div>
             
             {/* Category Filter Dropdown */}
             <div className="flex items-center gap-2">
-              <span className="text-xs text-slate-400 font-bold">عرض القسم:</span>
+              <span className="text-xs text-slate-500 font-bold">عرض القسم:</span>
               <select
                 value={selectedFilterCategory}
                 onChange={(e) => setSelectedFilterCategory(e.target.value)}
-                className="bg-slate-950 border border-slate-850 outline-none rounded-xl px-3 py-1.5 text-xs text-white cursor-pointer focus:border-emerald-500 transition-colors"
+                className="bg-slate-50 border border-slate-200 outline-none rounded-xl px-3 py-1.5 text-xs text-slate-800 cursor-pointer focus:border-emerald-600 transition-colors"
               >
                 <option value="all">كل الأقسام</option>
                 {categories.map((c) => (
@@ -503,21 +503,21 @@ export default function AdminProducts() {
 
           {loading ? (
             <div className="py-12 text-center text-slate-500 flex flex-col items-center justify-center gap-3">
-              <Loader2 className="w-8 h-8 animate-spin text-emerald-500" />
+              <Loader2 className="w-8 h-8 animate-spin text-emerald-600" />
               <p className="text-xs font-bold">جاري تحميل المنتجات من المستودع...</p>
             </div>
           ) : filteredDisplayProducts.length > 0 ? (
             <div className="overflow-x-auto no-scrollbar">
               <table className="w-full text-right border-collapse">
                 <thead>
-                  <tr className="border-b border-slate-800 text-xs font-bold text-slate-400">
+                  <tr className="border-b border-slate-200 text-xs font-bold text-slate-500">
                     <th className="pb-3 text-right">المنتج</th>
                     <th className="pb-3 text-right">القسم</th>
                     <th className="pb-3 text-right">السعر</th>
                     <th className="pb-3 text-center w-16">إجراء</th>
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-slate-800/60">
+                <tbody className="divide-y divide-slate-100">
                   {filteredDisplayProducts.map((product, index) => (
                     <tr 
                       key={product.id}
@@ -526,38 +526,38 @@ export default function AdminProducts() {
                       onDragOver={(e) => handleDragOver(e, product.id)}
                       onDragEnd={handleDragEnd}
                       onDrop={(e) => handleDrop(e, product.id)}
-                      className={`align-middle transition-all cursor-grab active:cursor-grabbing hover:bg-slate-850/20 ${
-                        draggingId === product.id ? 'opacity-40 bg-slate-800/50' : ''
+                      className={`align-middle transition-all cursor-grab active:cursor-grabbing hover:bg-slate-50/50 ${
+                        draggingId === product.id ? 'opacity-40 bg-slate-100' : ''
                       } ${
-                        dragOverId === product.id ? 'border-b-2 border-emerald-500 bg-emerald-500/5' : 'border-b border-slate-800/40'
+                        dragOverId === product.id ? 'border-b-2 border-emerald-500 bg-emerald-500/5' : 'border-b border-slate-100'
                       }`}
                     >
                       <td className="py-3">
                         <div className="flex items-center gap-2">
-                          <span className="text-slate-600 hover:text-slate-400 cursor-grab active:cursor-grabbing shrink-0 p-1" title="اسحب لإعادة الترتيب">
+                          <span className="text-slate-400 hover:text-slate-600 cursor-grab active:cursor-grabbing shrink-0 p-1" title="اسحب لإعادة الترتيب">
                             <GripVertical className="w-4 h-4" />
                           </span>
-                          <div className="w-10 h-10 bg-slate-950 border border-slate-800 rounded-lg overflow-hidden shrink-0 flex items-center justify-center text-xs text-emerald-400 font-bold">
+                          <div className="w-10 h-10 bg-slate-50 border border-slate-200 rounded-lg overflow-hidden shrink-0 flex items-center justify-center text-xs text-emerald-600 font-bold">
                             {product.image_url ? (
                               <img src={product.image_url} alt={product.name} className="w-full h-full object-cover" />
                             ) : (
                               product.name.charAt(0)
                             )}
                           </div>
-                          <span className="text-sm font-bold text-slate-200 line-clamp-1">{product.name}</span>
+                          <span className="text-sm font-bold text-slate-800 line-clamp-1">{product.name}</span>
                         </div>
                       </td>
-                      <td className="py-3 text-sm text-slate-400">
+                      <td className="py-3 text-sm text-slate-600">
                         {product.categories?.name || 'بدون قسم'}
                       </td>
-                      <td className="py-3 text-sm font-extrabold text-emerald-400 whitespace-nowrap">
+                      <td className="py-3 text-sm font-extrabold text-emerald-600 whitespace-nowrap">
                         {Number(product.price).toFixed(2)} TL
                       </td>
                       <td className="py-3 text-center">
                         <button
                           onClick={() => handleDeleteProduct(product.id, product.name, product.image_url)}
                           disabled={deletingId === product.id}
-                          className="p-1.5 bg-slate-950 hover:bg-rose-500/10 border border-slate-850 hover:border-rose-500/20 text-slate-400 hover:text-rose-400 rounded-lg transition-all cursor-pointer"
+                          className="p-1.5 bg-slate-50 hover:bg-rose-50 border border-slate-200 hover:border-rose-200 text-slate-500 hover:text-rose-600 rounded-lg transition-all cursor-pointer"
                         >
                           {deletingId === product.id ? (
                             <Loader2 className="w-3.5 h-3.5 animate-spin" />
@@ -573,8 +573,8 @@ export default function AdminProducts() {
             </div>
           ) : (
             <div className="text-center py-16 space-y-2">
-              <ShoppingBag className="w-12 h-12 text-slate-700 mx-auto" />
-              <h3 className="text-sm font-bold text-slate-400">
+              <ShoppingBag className="w-12 h-12 text-slate-400 mx-auto" />
+              <h3 className="text-sm font-bold text-slate-700">
                 {selectedFilterCategory === 'all' ? 'لا يوجد منتجات معروضة بعد' : 'لا يوجد منتجات في هذا القسم حالياً'}
               </h3>
               <p className="text-xs text-slate-500">

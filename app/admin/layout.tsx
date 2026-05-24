@@ -76,9 +76,9 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
 
   if (checkingAuth) {
     return (
-      <div className="flex-1 flex items-center justify-center min-h-screen bg-slate-900 font-sans text-emerald-400">
+      <div className="flex-1 flex items-center justify-center min-h-screen bg-slate-50 font-sans text-emerald-600">
         <div className="text-center space-y-3">
-          <div className="w-12 h-12 border-4 border-emerald-500 border-t-transparent rounded-full animate-spin mx-auto" />
+          <div className="w-12 h-12 border-4 border-emerald-600 border-t-transparent rounded-full animate-spin mx-auto" />
           <p className="text-sm font-bold">جاري التحقق من الصلاحيات...</p>
         </div>
       </div>
@@ -86,36 +86,36 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
   }
 
   return (
-    <div className="flex-grow flex min-h-screen bg-slate-950 text-slate-200 font-sans text-right">
+    <div className="flex-grow flex min-h-screen bg-slate-50 text-slate-800 font-sans text-right">
       
       {/* Mobile Sidebar Overlay */}
       {sidebarOpen && (
         <div 
-          className="fixed inset-0 bg-black/60 z-40 lg:hidden backdrop-blur-sm"
+          className="fixed inset-0 bg-black/40 z-40 lg:hidden backdrop-blur-sm"
           onClick={() => setSidebarOpen(false)}
         />
       )}
 
       {/* Sidebar navigation */}
       <aside 
-        className={`fixed top-0 bottom-0 right-0 w-64 bg-slate-900 border-l border-slate-800 z-50 transition-transform duration-300 lg:translate-x-0 lg:static flex flex-col ${
+        className={`fixed top-0 bottom-0 right-0 w-64 bg-white border-l border-slate-200 z-50 transition-transform duration-300 lg:translate-x-0 lg:static flex flex-col ${
           sidebarOpen ? 'translate-x-0' : 'translate-x-full'
         }`}
       >
         {/* Brand header */}
-        <div className="p-5 border-b border-slate-800 flex items-center justify-between">
+        <div className="p-5 border-b border-slate-100 flex items-center justify-between">
           <div className="flex items-center gap-3">
-            <div className="bg-emerald-500/10 p-2 rounded-xl text-emerald-400 border border-emerald-500/20">
+            <div className="bg-emerald-500/10 p-2 rounded-xl text-emerald-600 border border-emerald-500/20">
               <Store className="w-5 h-5" />
             </div>
             <div>
-              <h2 className="text-md font-bold text-white leading-none">idelbi gida</h2>
-              <span className="text-[10px] text-emerald-400 font-medium">لوحة الإدارة</span>
+              <h2 className="text-md font-bold text-slate-900 leading-none">idelbi gida</h2>
+              <span className="text-[10px] text-emerald-600 font-medium">لوحة الإدارة</span>
             </div>
           </div>
           <button 
             onClick={() => setSidebarOpen(false)}
-            className="lg:hidden text-slate-400 hover:text-white p-1 rounded-lg"
+            className="lg:hidden text-slate-500 hover:text-slate-800 p-1 rounded-lg"
           >
             <X className="w-5 h-5" />
           </button>
@@ -133,11 +133,11 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
                 onClick={() => setSidebarOpen(false)}
                 className={`flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-semibold transition-all ${
                   isActive
-                    ? 'bg-emerald-500 text-slate-950 shadow-lg shadow-emerald-500/10'
-                    : 'text-slate-400 hover:bg-slate-800 hover:text-white'
+                    ? 'bg-emerald-600 text-white shadow-md shadow-emerald-600/10'
+                    : 'text-slate-600 hover:bg-slate-50 hover:text-slate-900'
                 }`}
               >
-                <Icon className={`w-5 h-5 ${isActive ? 'text-slate-950' : 'text-slate-400'}`} />
+                <Icon className={`w-5 h-5 ${isActive ? 'text-white' : 'text-slate-500'}`} />
                 <span>{link.label}</span>
               </Link>
             );
@@ -145,17 +145,17 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
         </nav>
 
         {/* Sidebar Footer */}
-        <div className="p-4 border-t border-slate-800 space-y-3">
-          <div className="flex items-center gap-3 px-3 py-2 bg-slate-850 rounded-xl border border-slate-800/80">
-            <User className="w-4.5 h-4.5 text-slate-400" />
+        <div className="p-4 border-t border-slate-100 space-y-3">
+          <div className="flex items-center gap-3 px-3 py-2 bg-slate-50 rounded-xl border border-slate-200">
+            <User className="w-4.5 h-4.5 text-slate-500" />
             <div className="min-w-0 flex-1">
-              <p className="text-xs font-bold text-white truncate">{adminEmail}</p>
-              <p className="text-[9px] text-slate-400">حساب المشرف</p>
+              <p className="text-xs font-bold text-slate-800 truncate">{adminEmail}</p>
+              <p className="text-[9px] text-slate-500">حساب المشرف</p>
             </div>
           </div>
           <button
             onClick={handleLogout}
-            className="w-full flex items-center justify-center gap-2.5 px-4 py-2.5 rounded-xl text-xs font-bold text-rose-400 hover:bg-rose-500/10 border border-transparent hover:border-rose-500/20 transition-all cursor-pointer"
+            className="w-full flex items-center justify-center gap-2.5 px-4 py-2.5 rounded-xl text-xs font-bold text-rose-600 hover:bg-rose-500/10 border border-transparent hover:border-rose-500/20 transition-all cursor-pointer"
           >
             <LogOut className="w-4 h-4" />
             <span>تسجيل الخروج</span>
@@ -166,10 +166,10 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
       {/* Main content layout wrapper */}
       <div className="flex-1 flex flex-col min-w-0">
         {/* Top Header */}
-        <header className="bg-slate-900 border-b border-slate-800 h-16 flex items-center justify-between px-6 shrink-0 lg:justify-end">
+        <header className="bg-white border-b border-slate-200 h-16 flex items-center justify-between px-6 shrink-0 lg:justify-end">
           <button
             onClick={() => setSidebarOpen(true)}
-            className="lg:hidden p-2 rounded-xl text-slate-400 hover:text-white hover:bg-slate-800 transition-colors"
+            className="lg:hidden p-2 rounded-xl text-slate-500 hover:text-slate-850 hover:bg-slate-50 transition-colors"
           >
             <Menu className="w-5 h-5" />
           </button>
@@ -177,7 +177,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
           <Link
             href="/"
             target="_blank"
-            className="text-xs font-bold text-emerald-400 hover:text-white bg-emerald-500/5 hover:bg-emerald-500/10 border border-emerald-500/20 px-3.5 py-1.5 rounded-lg transition-all flex items-center gap-2"
+            className="text-xs font-bold text-emerald-600 hover:text-white bg-emerald-500/5 hover:bg-emerald-600 border border-emerald-600/20 px-3.5 py-1.5 rounded-lg transition-all flex items-center gap-2"
           >
             <Store className="w-4 h-4" />
             <span>معاينة المتجر العام</span>

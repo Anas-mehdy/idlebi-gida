@@ -205,8 +205,8 @@ export default function AdminStatistics() {
     <div className="space-y-6">
       {/* Offline Demo Banner */}
       {usingMockData && (
-        <div className="bg-amber-500/10 border border-amber-500/20 text-amber-300 px-4 py-3 rounded-2xl text-xs flex items-center gap-2.5 shadow-sm">
-          <AlertCircle className="w-5 h-5 shrink-0 text-amber-400" />
+        <div className="bg-amber-50 border border-amber-200 text-amber-800 px-4 py-3 rounded-2xl text-xs flex items-center gap-2.5 shadow-sm">
+          <AlertCircle className="w-5 h-5 shrink-0 text-amber-600" />
           <span>وضع العرض التجريبي للمحفوظات نشط. يمكنك اختبار الفلاتر الزمنية والبحث عن المحلات لمشاهدة تحديث المؤشرات تلقائياً.</span>
         </div>
       )}
@@ -214,12 +214,12 @@ export default function AdminStatistics() {
       {/* Header Info */}
       <div className="flex items-center justify-between gap-4">
         <div>
-          <h1 className="text-xl font-bold text-white">إحصائيات وأرشيف المبيعات</h1>
-          <p className="text-xs text-slate-400 mt-1">تتبع المبيعات الإجمالية، فحص الفواتير المؤرشفة، وفلترة طلبيات الزبائن حسب الاسم والتاريخ</p>
+          <h1 className="text-xl font-bold text-slate-800">إحصائيات وأرشيف المبيعات</h1>
+          <p className="text-xs text-slate-500 mt-1">تتبع المبيعات الإجمالية، فحص الفواتير المؤرشفة، وفلترة طلبيات الزبائن حسب الاسم والتاريخ</p>
         </div>
         <button
           onClick={fetchHistoricalOrders}
-          className="p-2.5 bg-slate-900 border border-slate-800 hover:border-slate-700 text-slate-400 hover:text-white rounded-xl transition-all cursor-pointer"
+          className="p-2.5 bg-white border border-slate-200 hover:border-slate-350 text-slate-600 hover:text-slate-900 rounded-xl transition-all cursor-pointer shadow-sm"
           title="تحديث البيانات"
         >
           <RefreshCw className="w-4 h-4" />
@@ -227,14 +227,14 @@ export default function AdminStatistics() {
       </div>
 
       {/* Dynamic Filters Form Bar */}
-      <div className="bg-slate-900 border border-slate-800 rounded-3xl p-5">
+      <div className="bg-white border border-slate-200 rounded-3xl p-5 shadow-sm">
         <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4 items-end">
           
           {/* Customer Search input */}
           <div className="space-y-1.5">
-            <label className="block text-xs font-bold text-slate-400">بحث باسم المشتري / المحل</label>
+            <label className="block text-xs font-bold text-slate-600">بحث باسم المشتري / المحل</label>
             <div className="relative">
-              <span className="absolute inset-y-0 right-3 flex items-center text-slate-500">
+              <span className="absolute inset-y-0 right-3 flex items-center text-slate-400">
                 <Search className="w-4 h-4" />
               </span>
               <input
@@ -242,16 +242,16 @@ export default function AdminStatistics() {
                 placeholder="ابحث عن زبون..."
                 value={customerFilter}
                 onChange={(e) => setCustomerFilter(e.target.value)}
-                className="w-full bg-slate-950 border border-slate-850 outline-none rounded-xl pr-9 pl-4 py-2.5 text-xs text-white placeholder-slate-550 focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500 transition-all text-right"
+                className="w-full bg-slate-50 border border-slate-250 outline-none rounded-xl pr-9 pl-4 py-2.5 text-xs text-slate-800 placeholder-slate-400 focus:bg-white focus:border-emerald-600 focus:ring-1 focus:ring-emerald-600 transition-all text-right"
               />
             </div>
           </div>
 
           {/* Date Picker Input */}
           <div className="space-y-1.5">
-            <label className="block text-xs font-bold text-slate-400">تاريخ تسليم الطلبية</label>
+            <label className="block text-xs font-bold text-slate-600">تاريخ تسليم الطلبية</label>
             <div className="relative">
-              <span className="absolute inset-y-0 right-3 flex items-center text-slate-500 pointer-events-none">
+              <span className="absolute inset-y-0 right-3 flex items-center text-slate-400 pointer-events-none">
                 <Calendar className="w-4 h-4" />
               </span>
               <input
@@ -259,7 +259,7 @@ export default function AdminStatistics() {
                 value={dateFilter}
                 onChange={(e) => setDateFilter(e.target.value)}
                 onClick={(e) => e.currentTarget.showPicker()}
-                className="w-full bg-slate-950 border border-slate-850 outline-none rounded-xl pr-9 pl-4 py-2.5 text-xs text-white focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500 transition-all text-right cursor-pointer"
+                className="w-full bg-slate-50 border border-slate-250 outline-none rounded-xl pr-9 pl-4 py-2.5 text-xs text-slate-800 focus:bg-white focus:border-emerald-600 focus:ring-1 focus:ring-emerald-600 transition-all text-right cursor-pointer"
               />
             </div>
           </div>
@@ -271,7 +271,7 @@ export default function AdminStatistics() {
                 setDateFilter('');
                 setCustomerFilter('');
               }}
-              className="h-10 bg-slate-950 hover:bg-slate-850 border border-slate-850 text-slate-400 hover:text-white rounded-xl text-xs font-bold flex items-center justify-center gap-1.5 transition-all cursor-pointer w-full sm:col-span-2 md:col-span-1"
+              className="h-10 bg-slate-55 hover:bg-slate-100 border border-slate-200 text-slate-600 hover:text-slate-900 rounded-xl text-xs font-bold flex items-center justify-center gap-1.5 transition-all cursor-pointer w-full sm:col-span-2 md:col-span-1 shadow-sm"
             >
               <X className="w-4.5 h-4.5" />
               <span>إعادة تعيين الفلاتر</span>
@@ -283,46 +283,46 @@ export default function AdminStatistics() {
 
       {/* FILTERED KPI STATS CARDS */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
-        <div className="bg-slate-900 border border-slate-800 rounded-3xl p-5 flex items-center gap-4">
-          <div className="bg-emerald-500/10 p-4 rounded-2xl text-emerald-400 border border-emerald-500/20">
-            <DollarSign className="w-6 h-6" />
+        <div className="bg-white border border-slate-200 rounded-3xl p-5 flex items-center gap-4 shadow-sm">
+          <div className="bg-emerald-50 p-4 rounded-2xl text-emerald-650 border border-emerald-200/50">
+            <DollarSign className="w-6 h-6 text-emerald-600" />
           </div>
           <div>
-            <p className="text-xs text-slate-400 font-bold">مبيعات الفلاتر الحالية</p>
-            <h3 className="text-2xl font-black text-emerald-400 mt-1">{filteredRevenue.toFixed(2)} TL</h3>
+            <p className="text-xs text-slate-500 font-bold">مبيعات الفلاتر الحالية</p>
+            <h3 className="text-2xl font-black text-emerald-600 mt-1">{filteredRevenue.toFixed(2)} TL</h3>
           </div>
         </div>
 
-        <div className="bg-slate-900 border border-slate-800 rounded-3xl p-5 flex items-center gap-4">
-          <div className="bg-emerald-500/10 p-4 rounded-2xl text-emerald-400 border border-emerald-500/20">
-            <FileText className="w-6 h-6" />
+        <div className="bg-white border border-slate-200 rounded-3xl p-5 flex items-center gap-4 shadow-sm">
+          <div className="bg-emerald-50 p-4 rounded-2xl text-emerald-650 border border-emerald-200/50">
+            <FileText className="w-6 h-6 text-emerald-600" />
           </div>
           <div>
-            <p className="text-xs text-slate-400 font-bold">فواتير سُلمت في النطاق</p>
-            <h3 className="text-2xl font-black text-white mt-1">{filteredInvoicesCount} فواتير</h3>
+            <p className="text-xs text-slate-500 font-bold">فواتير سُلمت في النطاق</p>
+            <h3 className="text-2xl font-black text-slate-800 mt-1">{filteredInvoicesCount} فواتير</h3>
           </div>
         </div>
 
-        <div className="bg-slate-900 border border-slate-800 rounded-3xl p-5 flex items-center gap-4">
-          <div className="bg-emerald-500/10 p-4 rounded-2xl text-emerald-400 border border-emerald-500/20">
-            <Users className="w-6 h-6" />
+        <div className="bg-white border border-slate-200 rounded-3xl p-5 flex items-center gap-4 shadow-sm">
+          <div className="bg-emerald-50 p-4 rounded-2xl text-emerald-650 border border-emerald-200/50">
+            <Users className="w-6 h-6 text-emerald-600" />
           </div>
           <div>
-            <p className="text-xs text-slate-400 font-bold">زبائن مميزين مخدومين</p>
-            <h3 className="text-2xl font-black text-white mt-1">{filteredUniqueClientsCount} زبائن</h3>
+            <p className="text-xs text-slate-500 font-bold">زبائن مميزين مخدومين</p>
+            <h3 className="text-2xl font-black text-slate-800 mt-1">{filteredUniqueClientsCount} زبائن</h3>
           </div>
         </div>
       </div>
 
       {/* Filtered Sales Item Aggregator */}
-      <div className="bg-slate-900 border border-slate-800 rounded-3xl p-6 space-y-5">
-        <div className="flex items-center gap-3 pb-4 border-b border-slate-800">
-          <div className="bg-blue-500/10 p-2.5 rounded-xl text-blue-400 border border-blue-500/20">
-            <ShoppingBag className="w-5 h-5" />
+      <div className="bg-white border border-slate-200 rounded-3xl p-6 space-y-5 shadow-sm">
+        <div className="flex items-center gap-3 pb-4 border-b border-slate-100">
+          <div className="bg-blue-50 p-2.5 rounded-xl text-blue-650 border border-blue-200/50">
+            <ShoppingBag className="w-5 h-5 text-blue-600" />
           </div>
           <div>
-            <h2 className="text-md font-bold text-white">إجمالي المنتجات والسلع المباعة (في الفلاتر الحالية)</h2>
-            <p className="text-[11px] text-slate-400">الكميات التراكمية المباعة من كل منتج وقيمتها المالية الإجمالية</p>
+            <h2 className="text-md font-bold text-slate-800">إجمالي المنتجات والسلع المباعة (في الفلاتر الحالية)</h2>
+            <p className="text-[11px] text-slate-500">الكميات التراكمية المباعة من كل منتج وقيمتها المالية الإجمالية</p>
           </div>
         </div>
 
@@ -331,13 +331,13 @@ export default function AdminStatistics() {
             {aggregatedSoldItems.map((item, idx) => (
               <div 
                 key={idx}
-                className="bg-slate-950 p-4 rounded-2xl border border-slate-850 flex items-center justify-between hover:border-slate-800 transition-colors"
+                className="bg-slate-50 p-4 rounded-2xl border border-slate-200 flex items-center justify-between hover:border-slate-300 transition-colors shadow-xs"
               >
                 <div className="space-y-1">
-                  <span className="text-sm font-semibold text-slate-300 block">{item.productName}</span>
-                  <span className="text-[10px] text-emerald-400/80 font-bold font-mono">الإيراد: {item.totalSales.toFixed(2)} TL</span>
+                  <span className="text-sm font-semibold text-slate-800 block">{item.productName}</span>
+                  <span className="text-[10px] text-emerald-650 font-bold font-mono">الإيراد: {item.totalSales.toFixed(2)} TL</span>
                 </div>
-                <span className="bg-slate-900 text-emerald-400 font-extrabold px-3 py-1.5 rounded-xl text-sm border border-slate-800">
+                <span className="bg-white text-emerald-600 font-extrabold px-3 py-1.5 rounded-xl text-sm border border-slate-200 shadow-sm">
                   {item.totalQty} علبة / صندوق
                 </span>
               </div>
@@ -345,28 +345,28 @@ export default function AdminStatistics() {
           </div>
         ) : (
           <div className="text-center py-10 space-y-2">
-            <ShoppingBag className="w-10 h-10 text-slate-700 mx-auto" />
-            <h3 className="text-sm font-bold text-slate-400">لا يوجد كميات مباعة</h3>
-            <p className="text-xs text-slate-500">لا تطابق الفلاتر الحالية أي طلبيات مسجلة.</p>
+            <ShoppingBag className="w-10 h-10 text-slate-400 mx-auto" />
+            <h3 className="text-sm font-bold text-slate-700">لا يوجد كميات مباعة</h3>
+            <p className="text-xs text-slate-550">لا تطابق الفلاتر الحالية أي طلبيات مسجلة.</p>
           </div>
         )}
       </div>
 
       {/* Historical Detailed Breakdown */}
-      <div className="bg-slate-900 border border-slate-800 rounded-3xl p-6 space-y-5">
-        <div className="flex items-center gap-3 pb-4 border-b border-slate-800">
-          <div className="bg-purple-500/10 p-2.5 rounded-xl text-purple-400 border border-purple-500/20">
-            <TrendingUp className="w-5 h-5" />
+      <div className="bg-white border border-slate-200 rounded-3xl p-6 space-y-5 shadow-sm">
+        <div className="flex items-center gap-3 pb-4 border-b border-slate-100">
+          <div className="bg-purple-50 p-2.5 rounded-xl text-purple-650 border border-purple-200/50">
+            <TrendingUp className="w-5 h-5 text-purple-600" />
           </div>
           <div>
-            <h2 className="text-md font-bold text-white">سجل الفواتير الفردية المستلمة</h2>
-            <p className="text-[11px] text-slate-400">تصفح الفواتير المطابقة بالتفصيل والأسعار وقت الشراء</p>
+            <h2 className="text-md font-bold text-slate-800">سجل الفواتير الفردية المستلمة</h2>
+            <p className="text-[11px] text-slate-500">تصفح الفواتير المطابقة بالتفصيل والأسعار وقت الشراء</p>
           </div>
         </div>
 
         {loading ? (
-          <div className="py-12 text-center text-slate-500 flex flex-col items-center justify-center gap-3">
-            <Loader2 className="w-8 h-8 animate-spin text-emerald-500" />
+          <div className="py-12 text-center text-slate-400 flex flex-col items-center justify-center gap-3">
+            <Loader2 className="w-8 h-8 animate-spin text-emerald-655" />
             <p className="text-xs font-bold">جاري تحميل محفوظات الفواتير...</p>
           </div>
         ) : filteredOrders.length > 0 ? (
@@ -374,19 +374,19 @@ export default function AdminStatistics() {
             {filteredOrders.map((order) => (
               <div 
                 key={order.id}
-                className="bg-slate-950 border border-slate-850 rounded-2xl p-5 space-y-4 hover:border-slate-800 transition-all"
+                className="bg-slate-50 border border-slate-200 rounded-2xl p-5 space-y-4 hover:border-slate-300 transition-all shadow-xs"
               >
                 {/* Order Header Info */}
-                <div className="flex items-center justify-between pb-3 border-b border-slate-900">
+                <div className="flex items-center justify-between pb-3 border-b border-slate-200">
                   <div>
-                    <h3 className="text-sm font-bold text-white">{order.customer_name}</h3>
-                    <div className="flex items-center gap-2 text-[10px] text-slate-400 mt-1.5">
+                    <h3 className="text-sm font-bold text-slate-800">{order.customer_name}</h3>
+                    <div className="flex items-center gap-2 text-[10px] text-slate-550 mt-1.5">
                       <span>التاريخ: {formatDate(order.created_at)}</span>
                       <span>•</span>
                       <span>الوقت: {formatTime(order.created_at)}</span>
                     </div>
                   </div>
-                  <span className="bg-slate-900 border border-slate-800 text-emerald-400 font-extrabold px-3 py-1.5 rounded-xl text-xs">
+                  <span className="bg-white border border-slate-200 text-emerald-600 font-extrabold px-3 py-1.5 rounded-xl text-xs shadow-sm">
                     {Number(order.total_price).toFixed(2)} TL
                   </span>
                 </div>
@@ -394,9 +394,9 @@ export default function AdminStatistics() {
                 {/* Item Details */}
                 <div className="space-y-2">
                   {order.order_items.map((item) => (
-                    <div key={item.id} className="flex justify-between items-center text-xs text-slate-400">
+                    <div key={item.id} className="flex justify-between items-center text-xs text-slate-655">
                       <span>• {item.products?.name || 'منتج غير متوفر'}</span>
-                      <span className="font-semibold text-slate-200">
+                      <span className="font-semibold text-slate-800">
                         {item.quantity} صندوق × {Number(item.price_at_purchase).toFixed(2)} TL
                       </span>
                     </div>
@@ -407,9 +407,9 @@ export default function AdminStatistics() {
           </div>
         ) : (
           <div className="text-center py-10 space-y-2">
-            <FileText className="w-10 h-10 text-slate-700 mx-auto" />
-            <h3 className="text-sm font-bold text-slate-400">لم نجد أي طلبيات مطابقة للبحث</h3>
-            <p className="text-xs text-slate-500">جرب تعديل التاريخ أو تصفية مدخلات اسم الزبون.</p>
+            <FileText className="w-10 h-10 text-slate-400 mx-auto" />
+            <h3 className="text-sm font-bold text-slate-700">لم نجد أي طلبيات مطابقة للبحث</h3>
+            <p className="text-xs text-slate-550">جرب تعديل التاريخ أو تصفية مدخلات اسم الزبون.</p>
           </div>
         )}
       </div>

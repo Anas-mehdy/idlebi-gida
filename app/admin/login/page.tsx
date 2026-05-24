@@ -65,30 +65,30 @@ export default function AdminLoginPage() {
   };
 
   return (
-    <div className="flex-grow flex items-center justify-center min-h-screen bg-slate-900 px-4 font-sans text-right relative overflow-hidden">
+    <div className="flex-grow flex items-center justify-center min-h-screen bg-slate-50 px-4 font-sans text-right relative overflow-hidden">
       {/* Background Decorative Gradients */}
-      <div className="absolute top-0 right-0 w-96 h-96 bg-emerald-500/10 rounded-full blur-3xl -z-10" />
-      <div className="absolute bottom-0 left-0 w-96 h-96 bg-teal-500/10 rounded-full blur-3xl -z-10" />
+      <div className="absolute top-0 right-0 w-96 h-96 bg-emerald-550/5 rounded-full blur-3xl -z-10" />
+      <div className="absolute bottom-0 left-0 w-96 h-96 bg-teal-550/5 rounded-full blur-3xl -z-10" />
 
-      <div className="w-full max-w-md bg-slate-800/80 backdrop-blur-md rounded-3xl p-6 border border-slate-700/50 shadow-2xl space-y-6">
+      <div className="w-full max-w-md bg-white rounded-3xl p-6 border border-slate-200 shadow-xl space-y-6">
         {/* Brand Header */}
         <div className="text-center space-y-2">
-          <div className="inline-flex bg-emerald-500/10 p-4 rounded-2xl text-emerald-400 border border-emerald-500/20 shadow-inner">
+          <div className="inline-flex bg-emerald-50 p-4 rounded-2xl text-emerald-600 border border-emerald-200/50 shadow-sm">
             <Lock className="w-8 h-8" />
           </div>
-          <h1 className="text-2xl font-extrabold text-white">لوحة الإدارة - idelbi gida</h1>
-          <p className="text-xs text-slate-400 font-medium">سجل الدخول لإدارة الكتالوج وتجهيز الطلبيات</p>
+          <h1 className="text-2xl font-extrabold text-slate-800">لوحة الإدارة - idelbi gida</h1>
+          <p className="text-xs text-slate-500 font-medium">سجل الدخول لإدارة الكتالوج وتجهيز الطلبيات</p>
         </div>
 
         {/* Login Form */}
         <form onSubmit={handleLogin} className="space-y-4">
           {/* Email input */}
           <div className="space-y-1.5">
-            <label className="block text-xs font-bold text-slate-400">
+            <label className="block text-xs font-bold text-slate-600">
               البريد الإلكتروني
             </label>
             <div className="relative">
-              <span className="absolute inset-y-0 right-3.5 flex items-center text-slate-500">
+              <span className="absolute inset-y-0 right-3.5 flex items-center text-slate-400">
                 <Mail className="w-4.5 h-4.5" />
               </span>
               <input
@@ -97,7 +97,7 @@ export default function AdminLoginPage() {
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
                 placeholder="admin@idelbi.com"
-                className="w-full bg-slate-900 border border-slate-700 outline-none rounded-xl pr-10 pl-4 py-3 text-sm text-white placeholder-slate-500 focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500 transition-all text-right"
+                className="w-full bg-slate-50 border border-slate-250 outline-none rounded-xl pr-10 pl-4 py-3 text-sm text-slate-800 placeholder-slate-400 focus:bg-white focus:border-emerald-600 focus:ring-1 focus:ring-emerald-600 transition-all text-right"
                 disabled={loading}
               />
             </div>
@@ -105,11 +105,11 @@ export default function AdminLoginPage() {
 
           {/* Password input */}
           <div className="space-y-1.5">
-            <label className="block text-xs font-bold text-slate-400">
+            <label className="block text-xs font-bold text-slate-600">
               كلمة المرور
             </label>
             <div className="relative">
-              <span className="absolute inset-y-0 right-3.5 flex items-center text-slate-500">
+              <span className="absolute inset-y-0 right-3.5 flex items-center text-slate-400">
                 <Lock className="w-4.5 h-4.5" />
               </span>
               <input
@@ -118,7 +118,7 @@ export default function AdminLoginPage() {
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
                 placeholder="••••••••"
-                className="w-full bg-slate-900 border border-slate-700 outline-none rounded-xl pr-10 pl-4 py-3 text-sm text-white placeholder-slate-500 focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500 transition-all text-right"
+                className="w-full bg-slate-50 border border-slate-250 outline-none rounded-xl pr-10 pl-4 py-3 text-sm text-slate-800 placeholder-slate-400 focus:bg-white focus:border-emerald-600 focus:ring-1 focus:ring-emerald-600 transition-all text-right"
                 disabled={loading}
               />
             </div>
@@ -126,8 +126,8 @@ export default function AdminLoginPage() {
 
           {/* Errors alert */}
           {errorMsg && (
-            <div className="bg-rose-500/10 border border-rose-500/20 text-rose-300 p-3.5 rounded-xl text-xs flex items-start gap-2.5 font-medium leading-relaxed">
-              <AlertCircle className="w-5 h-5 shrink-0 text-rose-400" />
+            <div className="bg-rose-50 border border-rose-200 text-rose-800 p-3.5 rounded-xl text-xs flex items-start gap-2.5 font-semibold leading-relaxed">
+              <AlertCircle className="w-5 h-5 shrink-0 text-rose-600" />
               <span>{errorMsg}</span>
             </div>
           )}
@@ -136,18 +136,18 @@ export default function AdminLoginPage() {
           <button
             type="submit"
             disabled={loading}
-            className="w-full bg-emerald-500 hover:bg-emerald-600 disabled:bg-slate-700 disabled:text-slate-400 text-slate-950 font-bold py-3.5 px-4 rounded-xl text-sm flex items-center justify-center gap-2 transition-all shadow-lg shadow-emerald-500/10 hover:shadow-emerald-500/20 active:scale-[0.98]"
+            className="w-full bg-emerald-600 hover:bg-emerald-700 disabled:bg-slate-100 disabled:text-slate-400 text-white font-bold py-3.5 px-4 rounded-xl text-sm flex items-center justify-center gap-2 transition-all shadow-md active:scale-[0.98] cursor-pointer animate-pulse"
           >
             <span>{loading ? 'جاري التحقق...' : 'تسجيل الدخول'}</span>
           </button>
         </form>
 
-        <div className="border-t border-slate-700/50 pt-4 flex items-center justify-center">
+        <div className="border-t border-slate-100 pt-4 flex items-center justify-center">
           <Link
             href="/"
-            className="text-xs font-semibold text-slate-400 hover:text-white flex items-center gap-1.5 transition-colors"
+            className="text-xs font-semibold text-slate-500 hover:text-slate-800 flex items-center gap-1.5 transition-colors"
           >
-            <ArrowRight className="w-4 h-4 text-emerald-500" />
+            <ArrowRight className="w-4 h-4 text-emerald-600" />
             <span>العودة إلى كتالوج الزبائن الرئيسي</span>
           </Link>
         </div>
