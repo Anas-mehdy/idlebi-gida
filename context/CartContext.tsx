@@ -5,14 +5,14 @@ import React, { createContext, useContext, useState, useEffect } from 'react';
 export interface CartItem {
   id: string;
   name: string;
-  price: number;
+  price: number | null;
   image_url: string | null;
   quantity: number;
 }
 
 interface CartContextType {
   cart: CartItem[];
-  addToCart: (product: { id: string; name: string; price: number; image_url: string | null }) => void;
+  addToCart: (product: { id: string; name: string; price: number | null; image_url: string | null }) => void;
   removeFromCart: (productId: string) => void;
   updateQuantity: (productId: string, quantity: number) => void;
   clearCart: () => void;
@@ -49,7 +49,7 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
     }
   }, [cart, isLoaded]);
 
-  const addToCart = (product: { id: string; name: string; price: number; image_url: string | null }) => {
+  const addToCart = (product: { id: string; name: string; price: number | null; image_url: string | null }) => {
     setCart((prevCart) => {
       const existingItem = prevCart.find((item) => item.id === product.id);
       if (existingItem) {
@@ -91,7 +91,7 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
   };
 
   const totalQuantity = cart.reduce((total, item) => total + item.quantity, 0);
-  const totalPrice = cart.reduce((total, item) => total + item.quantity * item.price, 0);
+  const totalPrice = cart.reduce((total, item) => total + item.quantity * (item.price || 0), 0);
 
   return (
     <CartContext.Provider

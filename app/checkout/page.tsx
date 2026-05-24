@@ -91,13 +91,21 @@ export default function CheckoutPage() {
       // الحساب: [Total] TL
       // الزبون: [Customer Name]
       
+      const hasUnpricedItems = cart.some(item => !item.price || Number(item.price) === 0);
       let messageLines = ['طلب جديد: idelbi gida'];
       cart.forEach((item, index) => {
         messageLines.push(`${index + 1}. ${item.name} (x${item.quantity})`);
-        messageLines.push(`${(item.price * item.quantity).toFixed(2)} TL`);
+        if (item.price !== null && item.price !== undefined && Number(item.price) > 0) {
+          messageLines.push(`${(item.price * item.quantity).toFixed(2)} TL`);
+        } else {
+          messageLines.push('السعر يحدد لاحقاً عند الطلب');
+        }
       });
       messageLines.push('-----------------------');
       messageLines.push(`الحساب: ${totalPrice.toFixed(2)} TL`);
+      if (hasUnpricedItems) {
+        messageLines.push('*(يوجد مواد يحدد سعرها عند الطلب)*');
+      }
       messageLines.push(`الزبون: ${customerName.trim()}`);
 
       const encodedText = encodeURIComponent(messageLines.join('\n'));
@@ -112,13 +120,21 @@ export default function CheckoutPage() {
       console.error('Checkout process encountered an error, falling back silently and instantly to WhatsApp:', err);
       
       // Fallback redirection to WhatsApp silently and instantly even if DB fails
+      const hasUnpricedItems = cart.some(item => !item.price || Number(item.price) === 0);
       let messageLines = ['طلب جديد: idelbi gida'];
       cart.forEach((item, index) => {
         messageLines.push(`${index + 1}. ${item.name} (x${item.quantity})`);
-        messageLines.push(`${(item.price * item.quantity).toFixed(2)} TL`);
+        if (item.price !== null && item.price !== undefined && Number(item.price) > 0) {
+          messageLines.push(`${(item.price * item.quantity).toFixed(2)} TL`);
+        } else {
+          messageLines.push('السعر يحدد لاحقاً عند الطلب');
+        }
       });
       messageLines.push('-----------------------');
       messageLines.push(`الحساب: ${totalPrice.toFixed(2)} TL`);
+      if (hasUnpricedItems) {
+        messageLines.push('*(يوجد مواد يحدد سعرها عند الطلب)*');
+      }
       messageLines.push(`الزبون: ${customerName.trim()}`);
 
       const encodedText = encodeURIComponent(messageLines.join('\n'));
@@ -188,12 +204,20 @@ export default function CheckoutPage() {
                       {item.name}
                     </p>
                     <p className="text-xs text-slate-400 mt-0.5 text-right">
-                      {item.quantity} × {item.price.toFixed(2)} TL
+                      {item.price !== null && item.price !== undefined && Number(item.price) > 0 ? (
+                        `${item.quantity} × ${Number(item.price).toFixed(2)} TL`
+                      ) : (
+                        `${item.quantity} × السعر يحدد لاحقاً عند الطلب`
+                      )}
                     </p>
                   </div>
                   <div className="flex items-center gap-3">
                     <span className="text-sm font-bold text-slate-800">
-                      {(item.price * item.quantity).toFixed(2)} TL
+                      {item.price !== null && item.price !== undefined && Number(item.price) > 0 ? (
+                        `${(Number(item.price) * item.quantity).toFixed(2)} TL`
+                      ) : (
+                        'يحدد عند الطلب'
+                      )}
                     </span>
                     <div className="flex items-center bg-slate-100 rounded-lg p-0.5 border border-slate-200/50">
                       <button
@@ -211,8 +235,11 @@ export default function CheckoutPage() {
             {/* Total Row */}
             <div className="pt-3.5 border-t border-dashed border-slate-200 flex items-center justify-between">
               <span className="text-sm font-bold text-slate-500">إجمالي الفاتورة:</span>
-              <span className="text-lg font-black text-[#128C7E]">
-                {totalPrice.toFixed(2)} TL
+              <span className="text-lg font-black text-[#128C7E] flex flex-col items-end">
+                <span>{totalPrice.toFixed(2)} TL</span>
+                {cart.some(item => !item.price || Number(item.price) === 0) && (
+                  <span className="text-[10px] text-slate-400 font-bold block mt-0.5">*(يوجد مواد يحدد سعرها عند الطلب)*</span>
+                )}
               </span>
             </div>
           </div>

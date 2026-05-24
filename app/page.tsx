@@ -15,7 +15,7 @@ interface Category {
 interface Product {
   id: string;
   name: string;
-  price: number;
+  price: number | null;
   category_id: string;
   image_url: string | null;
   is_hidden?: boolean;
@@ -230,7 +230,13 @@ export default function CatalogPage() {
                           {product.name}
                         </h3>
                         <p className="text-sm font-black text-[#128C7E] text-right">
-                          {product.price.toFixed(2)} TL
+                          {product.price !== null && product.price !== undefined && Number(product.price) > 0 ? (
+                            `${Number(product.price).toFixed(2)} TL`
+                          ) : (
+                            <span className="text-[11px] font-bold text-slate-500 bg-slate-100/80 px-2 py-0.5 rounded border border-slate-200">
+                              السعر عند الطلب
+                            </span>
+                          )}
                         </p>
                       </div>
 

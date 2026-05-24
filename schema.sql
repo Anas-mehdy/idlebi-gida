@@ -83,3 +83,8 @@ CREATE POLICY "Allow admin all settings" ON settings FOR ALL TO authenticated US
 
 -- Migration: Add is_hidden column to products table (unhide/hide feature)
 ALTER TABLE products ADD COLUMN IF NOT EXISTS is_hidden BOOLEAN DEFAULT FALSE NOT NULL;
+
+-- Migration: Make product price optional/nullable in products and order_items
+ALTER TABLE products ALTER COLUMN price DROP NOT NULL;
+ALTER TABLE order_items ALTER COLUMN price_at_purchase DROP NOT NULL;
+

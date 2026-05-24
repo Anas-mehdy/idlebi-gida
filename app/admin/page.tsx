@@ -425,7 +425,11 @@ export default function AdminDashboard() {
                         <span>{item.products?.name || 'منتج غير متوفر'}</span>
                       </div>
                       <span className="font-semibold text-slate-800">
-                        {item.quantity} صندوق × {Number(item.price_at_purchase).toFixed(2)} TL
+                        {item.price_at_purchase !== null && item.price_at_purchase !== undefined && Number(item.price_at_purchase) > 0 ? (
+                          `${item.quantity} صندوق × ${Number(item.price_at_purchase).toFixed(2)} TL`
+                        ) : (
+                          `${item.quantity} صندوق × يحدد لاحقاً`
+                        )}
                       </span>
                     </div>
                   ))}

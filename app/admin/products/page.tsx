@@ -12,7 +12,7 @@ interface Category {
 interface Product {
   id: string;
   name: string;
-  price: number;
+  price: number | null;
   category_id: string;
   image_url: string | null;
   sort_order?: number;
@@ -211,7 +211,7 @@ export default function AdminProducts() {
 
   const handleAddProduct = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!name.trim() || !price || !categoryId) return;
+    if (!name.trim() || !categoryId) return;
 
     setErrorMsg('');
     setSubmitting(true);
@@ -247,11 +247,12 @@ export default function AdminProducts() {
         }
 
         // 2. Insert product row in DB
+        const parsedPrice = price.trim() ? parseFloat(price) : null;
         const { data: newProd, error: insertError } = await supabase
           .from('products')
           .insert({
             name: name.trim(),
-            price: parseFloat(price),
+            price: parsedPrice,
             category_id: categoryId,
             image_url: finalImageUrl
           })
@@ -272,7 +273,7 @@ export default function AdminProducts() {
         const mockNewProd: Product = {
           id: Math.random().toString(),
           name: name.trim(),
-          price: parseFloat(price),
+          price: price.trim() ? parseFloat(price) : null,
           category_id: categoryId,
           image_url: imagePreview, // Use preview base64 as temporary image
           categories: matchingCat ? { name: matchingCat.name } : null
@@ -417,15 +418,16 @@ export default function AdminProducts() {
 
             {/* Product Price */}
             <div className="space-y-1.5">
-              <label className="block text-xs font-bold text-slate-600">السعر (بالليرة التركية TL)</label>
+              <label className="block text-xs font-bold text-slate-600">
+                السعر (بالليرة التركية TL) <span className="text-slate-400 font-normal">(اختياري - يترك فارغاً للسعر عند الطلب)</span>
+              </label>
               <input
                 type="number"
                 step="0.01"
                 min="0"
-                required
                 value={price}
                 onChange={(e) => setPrice(e.target.value)}
-                placeholder="0.00"
+                placeholder="يحدد عند الطلب"
                 className="w-full bg-slate-50 border border-slate-200 outline-none rounded-xl px-4 py-3 text-sm text-slate-850 placeholder-slate-400 focus:bg-white focus:border-[#128C7E] focus:ring-1 focus:ring-[#128C7E] transition-all text-right"
                 disabled={submitting}
               />
@@ -496,7 +498,7 @@ export default function AdminProducts() {
 
             <button
               type="submit"
-              disabled={submitting || !name.trim() || !price || !categoryId}
+              disabled={submitting || !name.trim() || !categoryId}
               className="w-full bg-emerald-650 hover:bg-emerald-700 disabled:bg-slate-100 disabled:text-slate-400 text-white font-bold py-3 px-4 rounded-xl text-sm flex items-center justify-center gap-1.5 transition-all shadow-md cursor-pointer"
               style={{ backgroundColor: '#128C7E' }}
             >
@@ -593,7 +595,13 @@ export default function AdminProducts() {
                         {product.categories?.name || 'بدون قسم'}
                       </td>
                       <td className="py-3 text-sm font-extrabold text-emerald-600 whitespace-nowrap">
-                        {Number(product.price).toFixed(2)} TL
+                        {product.price !== null && product.price !== undefined && Number(product.price) > 0 ? (
+                          `${Number(product.price).toFixed(2)} TL`
+                        ) : (
+                          <span className="text-[10px] font-bold text-slate-400 bg-slate-100 px-2 py-0.5 rounded-md border border-slate-200 shadow-xs select-none">
+                            يحدد عند الطلب
+                          </span>
+                        )}
                       </td>
                       <td className="py-3 text-center">
                         <div className="flex items-center justify-center gap-1.5">
