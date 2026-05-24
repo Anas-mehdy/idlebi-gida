@@ -12,6 +12,7 @@ interface OrderItem {
   price_at_purchase: number;
   products?: {
     name: string;
+    image_url?: string | null;
   } | null;
 }
 
@@ -27,6 +28,7 @@ interface Order {
 interface AggregatedItem {
   productName: string;
   totalQty: number;
+  imageUrl?: string | null;
 }
 
 const formatTime = (dateStr: string) => {
@@ -57,8 +59,8 @@ export default function AdminDashboard() {
       status: 'pending',
       created_at: new Date().toISOString(),
       order_items: [
-        { id: 'mi-1', order_id: 'm-ord1', product_id: 'p4', quantity: 10, price_at_purchase: 25.00, products: { name: 'كوكا كولا علب 330 مل' } },
-        { id: 'mi-2', order_id: 'm-ord1', product_id: 'p1', quantity: 5, price_at_purchase: 45.00, products: { name: 'بسكويت شوكولاتة أولكر 12 قطعة' } }
+        { id: 'mi-1', order_id: 'm-ord1', product_id: 'p4', quantity: 10, price_at_purchase: 25.00, products: { name: 'كوكا كولا علب 330 مل', image_url: 'https://images.unsplash.com/photo-1622483767028-3f66f32aef97?w=120&auto=format&fit=crop&q=60' } },
+        { id: 'mi-2', order_id: 'm-ord1', product_id: 'p1', quantity: 5, price_at_purchase: 45.00, products: { name: 'بسكويت شوكولاتة أولكر 12 قطعة', image_url: 'https://images.unsplash.com/photo-1590080875515-8a3a8dc5735e?w=120&auto=format&fit=crop&q=60' } }
       ]
     },
     {
@@ -68,8 +70,8 @@ export default function AdminDashboard() {
       status: 'pending',
       created_at: new Date(Date.now() - 3600000).toISOString(),
       order_items: [
-        { id: 'mi-3', order_id: 'm-ord2', product_id: 'p1', quantity: 10, price_at_purchase: 45.00, products: { name: 'بسكويت شوكولاتة أولكر 12 قطعة' } },
-        { id: 'mi-4', order_id: 'm-ord2', product_id: 'p3', quantity: 2, price_at_purchase: 85.00, products: { name: 'شاي تركي غوكسو 100 ظرف' } }
+        { id: 'mi-3', order_id: 'm-ord2', product_id: 'p1', quantity: 10, price_at_purchase: 45.00, products: { name: 'بسكويت شوكولاتة أولكر 12 قطعة', image_url: 'https://images.unsplash.com/photo-1590080875515-8a3a8dc5735e?w=120&auto=format&fit=crop&q=60' } },
+        { id: 'mi-4', order_id: 'm-ord2', product_id: 'p3', quantity: 2, price_at_purchase: 85.00, products: { name: 'شاي تركي غوكسو 100 ظرف', image_url: 'https://images.unsplash.com/photo-1576092768241-dec231879fc3?w=120&auto=format&fit=crop&q=60' } }
       ]
     }
   ];
@@ -91,7 +93,8 @@ export default function AdminDashboard() {
           order_items (
             *,
             products (
-              name
+              name,
+              image_url
             )
           )
         `)
@@ -105,7 +108,7 @@ export default function AdminDashboard() {
         ...order,
         order_items: (order.order_items || []).map((item: any) => ({
           ...item,
-          products: item.products ? { name: item.products.name } : null
+          products: item.products ? { name: item.products.name, image_url: item.products.image_url } : null
         }))
       }));
 
@@ -133,18 +136,23 @@ export default function AdminDashboard() {
     setTotalRevenueToday(revenue);
 
     // 2. Aggregate quantities needed for fulfillment (Layer 1)
-    const productAggregation: { [name: string]: number } = {};
+    const productAggregation: { [name: string]: { qty: number, imageUrl?: string | null } } = {};
     
     activeOrders.forEach((order) => {
       order.order_items.forEach((item) => {
         const productName = item.products?.name || 'منتج غير معروف';
-        productAggregation[productName] = (productAggregation[productName] || 0) + item.quantity;
+        const imgUrl = item.products?.image_url || null;
+        if (!productAggregation[productName]) {
+          productAggregation[productName] = { qty: 0, imageUrl: imgUrl };
+        }
+        productAggregation[productName].qty += item.quantity;
       });
     });
 
     const aggregatedList: AggregatedItem[] = Object.keys(productAggregation).map((name) => ({
       productName: name,
-      totalQty: productAggregation[name],
+      totalQty: productAggregation[name].qty,
+      imageUrl: productAggregation[name].imageUrl,
     }));
 
     setAggregatedItems(aggregatedList);
@@ -328,8 +336,15 @@ export default function AdminDashboard() {
                 key={idx}
                 className="bg-slate-50 p-4 rounded-2xl border border-slate-200/60 flex items-center justify-between hover:border-slate-300 transition-colors"
               >
-                <span className="text-sm font-semibold text-slate-700">{item.productName}</span>
-                <span className="bg-white text-emerald-600 font-extrabold px-3 py-1.5 rounded-xl text-sm border border-slate-200">
+                <div className="flex items-center gap-3">
+                  {item.imageUrl ? (
+                    <img src={item.imageUrl} className="w-8 h-8 rounded-lg object-cover shrink-0 border border-slate-200" alt={item.productName} />
+                  ) : (
+                    <ShoppingBag className="w-8 h-8 p-1.5 bg-white text-slate-400 border border-slate-200 rounded-lg shrink-0" />
+                  )}
+                  <span className="text-sm font-semibold text-slate-700">{item.productName}</span>
+                </div>
+                <span className="bg-white text-emerald-600 font-extrabold px-3 py-1.5 rounded-xl text-sm border border-slate-200 shrink-0">
                   {item.totalQty} علبة / صندوق
                 </span>
               </div>
@@ -401,7 +416,14 @@ export default function AdminDashboard() {
                 <div className="space-y-2">
                   {order.order_items.map((item) => (
                     <div key={item.id} className="flex justify-between items-center text-xs text-slate-600">
-                      <span>• {item.products?.name || 'منتج غير متوفر'}</span>
+                      <div className="flex items-center gap-2">
+                        {item.products?.image_url ? (
+                          <img src={item.products.image_url} className="w-6 h-6 rounded object-cover shrink-0 border border-slate-200" alt={item.products.name} />
+                        ) : (
+                          <ShoppingBag className="w-6 h-6 p-1 bg-white text-slate-400 border border-slate-200 rounded shrink-0" />
+                        )}
+                        <span>{item.products?.name || 'منتج غير متوفر'}</span>
+                      </div>
                       <span className="font-semibold text-slate-800">
                         {item.quantity} صندوق × {Number(item.price_at_purchase).toFixed(2)} TL
                       </span>
