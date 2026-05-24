@@ -125,7 +125,7 @@ export default function CatalogPage() {
               <Store className="w-6 h-6" />
             </div>
             <div>
-              <h1 className="text-xl font-bold tracking-tight">إدلب غداء</h1>
+              <h1 className="text-xl font-bold tracking-tight">idelbi gida</h1>
               <p className="text-xs text-teal-100 font-medium">تجارة المواد الغذائية بالجملة • idelbi gıda</p>
             </div>
           </div>

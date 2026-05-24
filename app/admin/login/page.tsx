@@ -76,7 +76,7 @@ export default function AdminLoginPage() {
           <div className="inline-flex bg-emerald-500/10 p-4 rounded-2xl text-emerald-400 border border-emerald-500/20 shadow-inner">
             <Lock className="w-8 h-8" />
           </div>
-          <h1 className="text-2xl font-extrabold text-white">لوحة الإدارة - إدلب غداء</h1>
+          <h1 className="text-2xl font-extrabold text-white">لوحة الإدارة - idelbi gida</h1>
           <p className="text-xs text-slate-400 font-medium">سجل الدخول لإدارة الكتالوج وتجهيز الطلبيات</p>
         </div>
 

@@ -10,8 +10,8 @@ const cairo = Cairo({
 });
 
 export const metadata: Metadata = {
-  title: "idelbi gida | إدلب غداء - الكتالوج الرقمي",
-  description: "الكتالوج الرقمي ونظام الطلب المباشر عبر واتساب لشركة إدلب غداء لتجارة المواد الغذائية بالجملة في تركيا.",
+  title: "idelbi gida - الكتالوج الرقمي",
+  description: "الكتالوج الرقمي ونظام الطلب المباشر عبر واتساب لشركة idelbi gida لتجارة المواد الغذائية بالجملة في تركيا.",
 };
 
 export default function RootLayout({

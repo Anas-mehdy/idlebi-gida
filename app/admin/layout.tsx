@@ -109,7 +109,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
               <Store className="w-5 h-5" />
             </div>
             <div>
-              <h2 className="text-md font-bold text-white leading-none">إدلب غداء</h2>
+              <h2 className="text-md font-bold text-white leading-none">idelbi gida</h2>
               <span className="text-[10px] text-emerald-400 font-medium">لوحة الإدارة</span>
             </div>
           </div>
