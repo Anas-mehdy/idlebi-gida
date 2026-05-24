@@ -1,4 +1,4 @@
-'use client';
+'use client'; // idelbi gida catalog portal
 
 import React, { useState, useEffect } from 'react';
 import Image from 'next/image';
