@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { supabase } from '@/lib/supabase';
-import { ShoppingBag, Users, CheckSquare, ClipboardList, TrendingUp, DollarSign, Clock, AlertCircle } from 'lucide-react';
+import { ShoppingBag, Users, CheckSquare, ClipboardList, TrendingUp, DollarSign, Clock, AlertCircle, Trash2 } from 'lucide-react';
 
 interface OrderItem {
   id: string;
@@ -210,6 +210,39 @@ export default function AdminDashboard() {
     }
   };
 
+  // Cancel/Delete active order
+  const handleCancelOrder = async (orderId: string, customerName: string) => {
+    const confirmAction = window.confirm(`هل أنت متأكد من إلغاء وحذف طلبية "${customerName}"؟`);
+    if (!confirmAction) return;
+
+    setIsUpdating(true);
+    try {
+      const isUrlConfigured = process.env.NEXT_PUBLIC_SUPABASE_URL && !process.env.NEXT_PUBLIC_SUPABASE_URL.includes('placeholder');
+      
+      if (isUrlConfigured) {
+        const { error } = await supabase
+          .from('orders')
+          .delete()
+          .eq('id', orderId);
+
+        if (error) throw error;
+      } else {
+        console.log('Database not connected. Bypassing state update in demo mode.');
+      }
+
+      // Remove order from active view state
+      const updatedOrders = orders.filter(o => o.id !== orderId);
+      setOrders(updatedOrders);
+      calculateStats(updatedOrders);
+      alert('تم إلغاء وحذف الطلبية بنجاح!');
+    } catch (err: any) {
+      console.error(err);
+      alert('حدث خطأ أثناء إلغاء الطلبية.');
+    } finally {
+      setIsUpdating(false);
+    }
+  };
+
   const formatTime = (dateString: string) => {
     try {
       const date = new Date(dateString);
@@ -350,6 +383,15 @@ export default function AdminDashboard() {
                     >
                       <CheckSquare className="w-3.5 h-3.5" />
                       <span>تم التسليم</span>
+                    </button>
+                    <button
+                      onClick={() => handleCancelOrder(order.id, order.customer_name)}
+                      disabled={isUpdating}
+                      className="bg-rose-500/10 hover:bg-rose-500/20 border border-rose-500/20 hover:border-rose-500/30 text-rose-450 hover:text-rose-400 font-bold px-3 py-1.5 rounded-xl text-xs flex items-center gap-1 cursor-pointer transition-colors"
+                      title="إلغاء وحذف الطلبية"
+                    >
+                      <Trash2 className="w-3.5 h-3.5" />
+                      <span>إلغاء</span>
                     </button>
                   </div>
                 </div>
