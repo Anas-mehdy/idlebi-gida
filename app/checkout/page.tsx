@@ -109,25 +109,23 @@ export default function CheckoutPage() {
       // Redirect user to WhatsApp
       window.location.href = whatsappUrl;
     } catch (err: any) {
-      console.error('Checkout process encountered an error:', err);
-      setErrorMsg('حدث خطأ أثناء حفظ الطلب. سنقوم بتوجيهك إلى واتساب لإتمام طلبك.');
+      console.error('Checkout process encountered an error, falling back silently and instantly to WhatsApp:', err);
       
-      // Fallback redirection to WhatsApp even if DB fails
-      setTimeout(() => {
-        let messageLines = ['طلب جديد: idelbi gida'];
-        cart.forEach((item, index) => {
-          messageLines.push(`${index + 1}. ${item.name} (x${item.quantity})`);
-          messageLines.push(`${(item.price * item.quantity).toFixed(2)} TL`);
-        });
-        messageLines.push('-----------------------');
-        messageLines.push(`الحساب: ${totalPrice.toFixed(2)} TL`);
-        messageLines.push(`الزبون: ${customerName.trim()}`);
+      // Fallback redirection to WhatsApp silently and instantly even if DB fails
+      let messageLines = ['طلب جديد: idelbi gida'];
+      cart.forEach((item, index) => {
+        messageLines.push(`${index + 1}. ${item.name} (x${item.quantity})`);
+        messageLines.push(`${(item.price * item.quantity).toFixed(2)} TL`);
+      });
+      messageLines.push('-----------------------');
+      messageLines.push(`الحساب: ${totalPrice.toFixed(2)} TL`);
+      messageLines.push(`الزبون: ${customerName.trim()}`);
 
-        const encodedText = encodeURIComponent(messageLines.join('\n'));
-        const whatsappUrl = `https://wa.me/${whatsappNumber}?text=${encodedText}`;
-        clearCart();
-        window.location.href = whatsappUrl;
-      }, 2500);
+      const encodedText = encodeURIComponent(messageLines.join('\n'));
+      const whatsappUrl = `https://wa.me/${whatsappNumber}?text=${encodedText}`;
+      
+      clearCart();
+      window.location.href = whatsappUrl;
     } finally {
       setIsSubmitting(false);
     }
