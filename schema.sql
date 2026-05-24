@@ -76,3 +76,10 @@ CREATE POLICY "Allow admin all order_items" ON order_items FOR ALL TO authentica
 -- Settings Policies
 CREATE POLICY "Allow public read settings" ON settings FOR SELECT USING (true);
 CREATE POLICY "Allow admin all settings" ON settings FOR ALL TO authenticated USING (true);
+
+-- ----------------------------------------------------
+-- Migrations & Alterations
+-- ----------------------------------------------------
+
+-- Migration: Add is_hidden column to products table (unhide/hide feature)
+ALTER TABLE products ADD COLUMN IF NOT EXISTS is_hidden BOOLEAN DEFAULT FALSE NOT NULL;

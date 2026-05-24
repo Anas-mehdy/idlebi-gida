@@ -18,6 +18,7 @@ interface Product {
   price: number;
   category_id: string;
   image_url: string | null;
+  is_hidden?: boolean;
 }
 
 // Fallback mock data if Supabase is not connected
@@ -97,6 +98,9 @@ export default function CatalogPage() {
 
   // Filter products by selected category and search query
   const filteredProducts = products.filter((product) => {
+    // Hide product if is_hidden is set to true
+    if (product.is_hidden === true) return false;
+    
     const matchesCategory = selectedCategory === 'all' || product.category_id === selectedCategory;
     const matchesSearch = product.name.toLowerCase().includes(searchQuery.toLowerCase());
     return matchesCategory && matchesSearch;

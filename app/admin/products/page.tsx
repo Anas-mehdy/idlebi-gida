@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect, useRef } from 'react';
 import { supabase } from '@/lib/supabase';
-import { Plus, Trash2, ShoppingBag, Loader2, Image as ImageIcon, Upload, AlertCircle, RefreshCw, GripVertical } from 'lucide-react';
+import { Plus, Trash2, ShoppingBag, Loader2, Image as ImageIcon, Upload, AlertCircle, RefreshCw, GripVertical, Eye, EyeOff } from 'lucide-react';
 
 interface Category {
   id: string;
@@ -16,6 +16,7 @@ interface Product {
   category_id: string;
   image_url: string | null;
   sort_order?: number;
+  is_hidden?: boolean;
   categories?: {
     name: string;
   } | null;
@@ -49,6 +50,7 @@ export default function AdminProducts() {
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
   const [deletingId, setDeletingId] = useState<string | null>(null);
+  const [togglingId, setTogglingId] = useState<string | null>(null);
   const [usingMockData, setUsingMockData] = useState(false);
   const [errorMsg, setErrorMsg] = useState('');
   // Drag and drop states
@@ -334,6 +336,37 @@ export default function AdminProducts() {
     }
   };
 
+  const handleToggleVisibility = async (id: string, currentHidden: boolean) => {
+    setErrorMsg('');
+    setTogglingId(id);
+
+    try {
+      const isUrlConfigured = process.env.NEXT_PUBLIC_SUPABASE_URL && !process.env.NEXT_PUBLIC_SUPABASE_URL.includes('placeholder');
+      const newHiddenState = !currentHidden;
+
+      if (isUrlConfigured) {
+        const { error } = await supabase
+          .from('products')
+          .update({ is_hidden: newHiddenState })
+          .eq('id', id);
+
+        if (error) throw error;
+      }
+
+      // Update state
+      setProducts((prev) =>
+        prev.map((prod) =>
+          prod.id === id ? { ...prod, is_hidden: newHiddenState } : prod
+        )
+      );
+    } catch (err: any) {
+      console.error(err);
+      setErrorMsg(err.message || 'حدث خطأ أثناء تعديل ظهور المنتج.');
+    } finally {
+      setTogglingId(null);
+    }
+  };
+
   return (
     <div className="space-y-6">
       {/* Warning */}
@@ -514,7 +547,7 @@ export default function AdminProducts() {
                     <th className="pb-3 text-right">المنتج</th>
                     <th className="pb-3 text-right">القسم</th>
                     <th className="pb-3 text-right">السعر</th>
-                    <th className="pb-3 text-center w-16">إجراء</th>
+                    <th className="pb-3 text-center w-28">إجراء</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-100">
@@ -530,6 +563,8 @@ export default function AdminProducts() {
                         draggingId === product.id ? 'opacity-40 bg-slate-100' : ''
                       } ${
                         dragOverId === product.id ? 'border-b-2 border-emerald-500 bg-emerald-500/5' : 'border-b border-slate-100'
+                      } ${
+                        product.is_hidden ? 'opacity-70 bg-slate-50/20' : ''
                       }`}
                     >
                       <td className="py-3">
@@ -544,7 +579,14 @@ export default function AdminProducts() {
                               product.name.charAt(0)
                             )}
                           </div>
-                          <span className="text-sm font-bold text-slate-800 line-clamp-1">{product.name}</span>
+                          <span className="text-sm font-bold text-slate-800 line-clamp-1 flex items-center gap-1.5">
+                            {product.name}
+                            {product.is_hidden && (
+                              <span className="bg-amber-50 text-amber-700 text-[10px] font-black px-1.5 py-0.5 rounded-md border border-amber-250 shrink-0">
+                                مخفي
+                              </span>
+                            )}
+                          </span>
                         </div>
                       </td>
                       <td className="py-3 text-sm text-slate-600">
@@ -554,17 +596,39 @@ export default function AdminProducts() {
                         {Number(product.price).toFixed(2)} TL
                       </td>
                       <td className="py-3 text-center">
-                        <button
-                          onClick={() => handleDeleteProduct(product.id, product.name, product.image_url)}
-                          disabled={deletingId === product.id}
-                          className="p-1.5 bg-slate-50 hover:bg-rose-50 border border-slate-200 hover:border-rose-200 text-slate-500 hover:text-rose-600 rounded-lg transition-all cursor-pointer"
-                        >
-                          {deletingId === product.id ? (
-                            <Loader2 className="w-3.5 h-3.5 animate-spin" />
-                          ) : (
-                            <Trash2 className="w-4 h-4" />
-                          )}
-                        </button>
+                        <div className="flex items-center justify-center gap-1.5">
+                          <button
+                            onClick={() => handleToggleVisibility(product.id, !!product.is_hidden)}
+                            disabled={togglingId === product.id}
+                            className={`p-1.5 border rounded-lg transition-all cursor-pointer ${
+                              product.is_hidden
+                                ? 'bg-amber-50 border-amber-250 text-amber-600 hover:bg-amber-100/50'
+                                : 'bg-slate-50 border-slate-200 text-slate-550 hover:bg-slate-100 hover:text-slate-800'
+                            }`}
+                            title={product.is_hidden ? 'إلغاء الإخفاء (إظهار للزبائن)' : 'إخفاء المنتج عن الزبائن'}
+                          >
+                            {togglingId === product.id ? (
+                              <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                            ) : product.is_hidden ? (
+                              <EyeOff className="w-4 h-4" />
+                            ) : (
+                              <Eye className="w-4 h-4" />
+                            )}
+                          </button>
+                          
+                          <button
+                            onClick={() => handleDeleteProduct(product.id, product.name, product.image_url)}
+                            disabled={deletingId === product.id}
+                            className="p-1.5 bg-slate-50 hover:bg-rose-50 border border-slate-200 hover:border-rose-200 text-slate-500 hover:text-rose-600 rounded-lg transition-all cursor-pointer"
+                            title="حذف المنتج نهائياً"
+                          >
+                            {deletingId === product.id ? (
+                              <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                            ) : (
+                              <Trash2 className="w-4 h-4" />
+                            )}
+                          </button>
+                        </div>
                       </td>
                     </tr>
                   ))}
