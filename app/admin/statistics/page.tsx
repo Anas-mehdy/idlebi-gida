@@ -288,7 +288,10 @@ export default function AdminStatistics() {
 
       {/* FILTERED KPI STATS CARDS */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
-        <div className="bg-white border border-slate-200 rounded-3xl p-5 flex items-center gap-4 shadow-sm">
+        <div 
+          className="bg-white border border-slate-200 rounded-2xl p-5 flex items-center gap-4 shadow-sm"
+          style={{ transform: 'translate3d(0, 0, 0)', backfaceVisibility: 'hidden' }}
+        >
           <div className="bg-emerald-50 p-4 rounded-2xl text-emerald-650 border border-emerald-200/50">
             <DollarSign className="w-6 h-6 text-emerald-600" />
           </div>
@@ -298,7 +301,10 @@ export default function AdminStatistics() {
           </div>
         </div>
 
-        <div className="bg-white border border-slate-200 rounded-3xl p-5 flex items-center gap-4 shadow-sm">
+        <div 
+          className="bg-white border border-slate-200 rounded-2xl p-5 flex items-center gap-4 shadow-sm"
+          style={{ transform: 'translate3d(0, 0, 0)', backfaceVisibility: 'hidden' }}
+        >
           <div className="bg-emerald-50 p-4 rounded-2xl text-emerald-650 border border-emerald-200/50">
             <FileText className="w-6 h-6 text-emerald-600" />
           </div>
@@ -308,7 +314,10 @@ export default function AdminStatistics() {
           </div>
         </div>
 
-        <div className="bg-white border border-slate-200 rounded-3xl p-5 flex items-center gap-4 shadow-sm">
+        <div 
+          className="bg-white border border-slate-200 rounded-2xl p-5 flex items-center gap-4 shadow-sm"
+          style={{ transform: 'translate3d(0, 0, 0)', backfaceVisibility: 'hidden' }}
+        >
           <div className="bg-emerald-50 p-4 rounded-2xl text-emerald-650 border border-emerald-200/50">
             <Users className="w-6 h-6 text-emerald-600" />
           </div>
