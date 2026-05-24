@@ -338,9 +338,9 @@ export default function AdminDashboard() {
               >
                 <div className="flex items-center gap-3">
                   {item.imageUrl ? (
-                    <img src={item.imageUrl} className="w-8 h-8 rounded-lg object-cover shrink-0 border border-slate-200" alt={item.productName} />
+                    <img src={item.imageUrl} className="w-12 h-12 rounded-xl object-cover shrink-0 border border-slate-205" alt={item.productName} />
                   ) : (
-                    <ShoppingBag className="w-8 h-8 p-1.5 bg-white text-slate-400 border border-slate-200 rounded-lg shrink-0" />
+                    <ShoppingBag className="w-12 h-12 p-2.5 bg-white text-slate-400 border border-slate-200 rounded-xl shrink-0" />
                   )}
                   <span className="text-sm font-semibold text-slate-700">{item.productName}</span>
                 </div>
@@ -418,9 +418,9 @@ export default function AdminDashboard() {
                     <div key={item.id} className="flex justify-between items-center text-xs text-slate-600">
                       <div className="flex items-center gap-2">
                         {item.products?.image_url ? (
-                          <img src={item.products.image_url} className="w-6 h-6 rounded object-cover shrink-0 border border-slate-200" alt={item.products.name} />
+                          <img src={item.products.image_url} className="w-10 h-10 rounded-lg object-cover shrink-0 border border-slate-200" alt={item.products.name} />
                         ) : (
-                          <ShoppingBag className="w-6 h-6 p-1 bg-white text-slate-400 border border-slate-200 rounded shrink-0" />
+                          <ShoppingBag className="w-10 h-10 p-2 bg-white text-slate-400 border border-slate-200 rounded-lg shrink-0" />
                         )}
                         <span>{item.products?.name || 'منتج غير متوفر'}</span>
                       </div>

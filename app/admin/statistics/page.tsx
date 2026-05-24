@@ -409,9 +409,9 @@ export default function AdminStatistics() {
                     <div key={item.id} className="flex justify-between items-center text-xs text-slate-655">
                       <div className="flex items-center gap-2">
                         {item.products?.image_url ? (
-                          <img src={item.products.image_url} className="w-6 h-6 rounded object-cover shrink-0 border border-slate-200" alt={item.products.name} />
+                          <img src={item.products.image_url} className="w-10 h-10 rounded-lg object-cover shrink-0 border border-slate-200" alt={item.products.name} />
                         ) : (
-                          <ShoppingBag className="w-6 h-6 p-1 bg-white text-slate-400 border border-slate-200 rounded shrink-0" />
+                          <ShoppingBag className="w-10 h-10 p-2 bg-white text-slate-400 border border-slate-200 rounded-lg shrink-0" />
                         )}
                         <span>{item.products?.name || 'منتج غير متوفر'}</span>
                       </div>
