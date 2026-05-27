@@ -199,7 +199,33 @@ export default function AdminProducts() {
 
   const handleImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
+    setErrorMsg(''); // Clear any previous error messages
+    
     if (file) {
+      // 1. Validate file size (e.g. 3MB limit)
+      const maxSizeBytes = 3 * 1024 * 1024; // 3MB
+      if (file.size > maxSizeBytes) {
+        alert("حجم الصورة كبير جداً! الحد الأقصى المسموح به هو 3 ميجابايت لضمان سرعة تحميل صفحة المتجر للزبائن. يرجى اختيار صورة أصغر أو مضغوطة.");
+        setErrorMsg("حجم الصورة المحدد أكبر من 3 ميجابايت. يرجى استخدام صورة أصغر.");
+        if (fileInputRef.current) fileInputRef.current.value = '';
+        setImageFile(null);
+        setImagePreview(null);
+        return;
+      }
+
+      // 2. Validate file type (especially for HEIC / HEIF raw formats on iPhone/Android)
+      const allowedTypes = ['image/jpeg', 'image/png', 'image/webp', 'image/gif'];
+      const fileExtension = file.name.split('.').pop()?.toLowerCase();
+      
+      if (!allowedTypes.includes(file.type) || fileExtension === 'heic' || fileExtension === 'heif') {
+        alert("صيغة الصورة غير مدعومة! يرجى اختيار صورة بصيغة JPG أو PNG أو WEBP. (صيغ الكاميرا الخام مثل HEIC / HEIF غير مدعومة مباشرة في متصفحات الويب).");
+        setErrorMsg("صيغة الصورة غير مدعومة. يرجى استخدام صيغة متوافقة مع الويب (JPG, PNG, WEBP).");
+        if (fileInputRef.current) fileInputRef.current.value = '';
+        setImageFile(null);
+        setImagePreview(null);
+        return;
+      }
+
       setImageFile(file);
       const reader = new FileReader();
       reader.onloadend = () => {
@@ -235,7 +261,8 @@ export default function AdminProducts() {
             });
 
           if (uploadError) {
-            console.error('Image upload failed, proceeding without image:', uploadError);
+            console.error('Image upload failed:', uploadError);
+            throw new Error(`فشل رفع الصورة إلى السحابة: ${uploadError.message}. يرجى محاولة استخدام صورة أخرى أو بحجم أصغر.`);
           } else {
             // Get public URL
             const { data } = supabase.storage
@@ -461,7 +488,7 @@ export default function AdminProducts() {
               >
                 <input
                   type="file"
-                  accept="image/*"
+                  accept="image/jpeg,image/png,image/webp,image/gif"
                   onChange={handleImageChange}
                   ref={fileInputRef}
                   className="hidden"
