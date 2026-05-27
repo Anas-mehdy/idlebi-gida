@@ -483,7 +483,6 @@ export default function AdminProducts() {
             <div className="space-y-1.5">
               <label className="block text-xs font-bold text-slate-600">صورة المنتج</label>
               <div 
-                onClick={() => !submitting && fileInputRef.current?.click()}
                 className="w-full bg-slate-50 border border-dashed border-slate-200 hover:border-slate-350 rounded-xl p-4 flex flex-col items-center justify-center gap-2 cursor-pointer transition-all min-h-32 relative overflow-hidden"
               >
                 <input
@@ -491,7 +490,7 @@ export default function AdminProducts() {
                   accept="image/jpeg,image/png,image/webp,image/gif"
                   onChange={handleImageChange}
                   ref={fileInputRef}
-                  className="hidden"
+                  className="absolute inset-0 opacity-0 cursor-pointer w-full h-full z-20 disabled:cursor-not-allowed"
                   disabled={submitting}
                 />
                 
