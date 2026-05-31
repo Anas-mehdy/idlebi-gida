@@ -5,7 +5,7 @@ import Image from 'next/image';
 import Link from 'next/link';
 import { supabase } from '@/lib/supabase';
 import { useCart } from '@/context/CartContext';
-import { Search, ShoppingBag, Plus, Minus, Store, MessageCircle, AlertCircle, ShoppingCart } from 'lucide-react';
+import { Search, ShoppingBag, Plus, Minus, Store, MessageCircle, AlertCircle, ShoppingCart, X, Package, Maximize2 } from 'lucide-react';
 
 interface Category {
   id: string;
@@ -49,6 +49,7 @@ export default function CatalogPage() {
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedCategory, setSelectedCategory] = useState<string>('all');
   const [usingMockData, setUsingMockData] = useState(false);
+  const [activePreviewImage, setActivePreviewImage] = useState<string | null>(null);
 
   useEffect(() => {
     async function fetchData() {
@@ -198,80 +199,147 @@ export default function CatalogPage() {
                 </div>
               ))}
             </div>
-          ) : filteredProducts.length > 0 ? (
-            <div className="space-y-3.5">
-              {filteredProducts.map((product) => {
-                const qty = getProductQuantity(product.id);
-                return (
-                  <div
-                    key={product.id}
-                    className="bg-white p-3 rounded-2xl border border-slate-100 flex gap-3.5 items-center hover:shadow-sm transition-all"
-                  >
-                    {/* Product Image */}
-                    <div className="w-20 h-20 relative bg-slate-100 rounded-xl shrink-0 overflow-hidden flex items-center justify-center border border-slate-200/50">
-                      {product.image_url ? (
-                        <img
-                          src={product.image_url}
-                          alt={product.name}
-                          className="w-full h-full object-cover"
-                          loading="lazy"
-                        />
-                      ) : (
-                        <div className="text-teal-600/80 font-bold text-lg select-none">
-                          {product.name.charAt(0)}
-                        </div>
-                      )}
+          ) : filteredProducts.length > 0 ? (() => {
+            // Group filtered products by their active categories
+            const getGroupedProducts = () => {
+              if (selectedCategory !== 'all') {
+                const cat = categories.find(c => c.id === selectedCategory);
+                const catProducts = filteredProducts.filter(p => p.category_id === selectedCategory);
+                return cat ? [{ category: cat, products: catProducts }] : [];
+              }
+              
+              return categories.map(cat => {
+                const catProducts = filteredProducts.filter(p => p.category_id === cat.id);
+                return { category: cat, products: catProducts };
+              }).filter(group => group.products.length > 0);
+            };
+
+            const groupedCategories = getGroupedProducts();
+
+            return groupedCategories.length > 0 ? (
+              <div className="space-y-7">
+                {groupedCategories.map(({ category, products: catProducts }) => (
+                  <div key={category.id} className="space-y-4">
+                    {/* Category section header */}
+                    <div className="flex items-center gap-2.5 pb-2.5 border-b border-slate-200/50">
+                      <div className="bg-[#128C7E]/10 p-2 rounded-xl text-[#128C7E] border border-[#128C7E]/10 shrink-0">
+                        <Package className="w-4.5 h-4.5" />
+                      </div>
+                      <div>
+                        <h2 className="text-sm font-black text-slate-800 leading-tight">{category.name}</h2>
+                        <p className="text-[10px] text-slate-400 font-bold leading-none mt-1">
+                          {catProducts.length} {catProducts.length === 1 ? 'منتج واحد' : catProducts.length === 2 ? 'منتجين' : 'منتجات'}
+                        </p>
+                      </div>
                     </div>
 
-                    {/* Product Info & Actions */}
-                    <div className="flex-1 min-w-0 flex flex-col justify-between self-stretch py-0.5">
-                      <div className="space-y-1">
-                        <h3 className="text-sm font-bold text-slate-800 truncate text-right">
-                          {product.name}
-                        </h3>
-                        {product.price !== null && product.price !== undefined && Number(product.price) > 0 && (
-                          <p className="text-sm font-black text-[#128C7E] text-right">
-                            {Number(product.price).toFixed(2)} TL
-                          </p>
-                        )}
-                      </div>
-
-                      {/* Quantity Selector - Minimalist & Prominent */}
-                      <div className="flex justify-end mt-2">
-                        {qty === 0 ? (
-                          <button
-                            onClick={() => addToCart(product)}
-                            className="bg-[#25D366] text-white px-5 py-1.5 rounded-full text-xs font-bold flex items-center gap-1 hover:bg-[#20ba59] active:scale-95 transition-all shadow-sm"
+                    {/* Product 2-Column Grid */}
+                    <div className="grid grid-cols-2 gap-3.5">
+                      {catProducts.map((product) => {
+                        const qty = getProductQuantity(product.id);
+                        return (
+                          <div
+                            key={product.id}
+                            className="bg-white p-3 rounded-3xl border border-slate-200/60 flex flex-col justify-between hover:shadow-xs transition-all duration-200 relative overflow-hidden"
                           >
-                            <Plus className="w-3.5 h-3.5" />
-                            <span>أضف</span>
-                          </button>
-                        ) : (
-                          <div className="flex items-center bg-teal-50 border border-teal-200/50 rounded-full p-0.5 shadow-sm">
-                            <button
-                              onClick={() => removeFromCart(product.id)}
-                              className="bg-white text-teal-700 hover:bg-teal-100 p-1.5 rounded-full transition-colors"
+                            {/* In-Stock Indicator dot */}
+                            <span className="absolute top-3.5 right-3.5 w-2 h-2 rounded-full bg-emerald-500 z-10 border border-white" title="متوفر" />
+                            
+                            {/* Product Image Wrapper */}
+                            <div 
+                              onClick={() => product.image_url && setActivePreviewImage(product.image_url)}
+                              className={`w-full aspect-square bg-slate-50/50 rounded-2xl overflow-hidden flex items-center justify-center border border-slate-100 mb-2.5 relative shrink-0 group ${
+                                product.image_url ? 'cursor-zoom-in' : 'select-none'
+                              }`}
                             >
-                              <Minus className="w-3 h-3" />
-                            </button>
-                            <span className="w-8 text-center text-xs font-extrabold text-teal-900">
-                              {qty}
-                            </span>
-                            <button
-                              onClick={() => addToCart(product)}
-                              className="bg-white text-teal-700 hover:bg-teal-100 p-1.5 rounded-full transition-colors"
-                            >
-                              <Plus className="w-3 h-3" />
-                            </button>
+                              {product.image_url ? (
+                                <>
+                                  <img
+                                    src={product.image_url}
+                                    alt={product.name}
+                                    className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
+                                    loading="lazy"
+                                  />
+                                  <div className="absolute inset-0 bg-black/0 group-hover:bg-black/10 transition-colors flex items-center justify-center opacity-0 group-hover:opacity-100 duration-200">
+                                    <Maximize2 className="w-5 h-5 text-white filter drop-shadow-sm" />
+                                  </div>
+                                </>
+                              ) : (
+                                <div className="flex flex-col items-center justify-center text-slate-350 space-y-1.5 select-none py-4">
+                                  <ShoppingBag className="w-7 h-7 text-slate-300 stroke-[1.5]" />
+                                  <span className="text-[9px] text-slate-400 font-bold">لا توجد صورة</span>
+                                </div>
+                              )}
+                            </div>
+
+                            {/* Info Area */}
+                            <div className="flex-1 flex flex-col justify-between">
+                              <h3 className="text-xs font-bold text-slate-800 line-clamp-2 text-right mb-2.5 min-h-[32px] leading-tight">
+                                {product.name}
+                              </h3>
+                              
+                              {/* Price and Add Control */}
+                              <div className="flex items-center justify-between mt-auto pt-2.5 border-t border-slate-100/60">
+                                {/* Price Block */}
+                                <div className="space-y-0.5">
+                                  {product.price !== null && product.price !== undefined && Number(product.price) > 0 ? (
+                                    <>
+                                      <span className="text-[11px] font-black text-emerald-600 block leading-none">
+                                        {Number(product.price).toFixed(2)} TL
+                                      </span>
+                                      <span className="text-[8px] text-slate-400 font-bold block leading-none mt-0.5">
+                                        للحزمة
+                                      </span>
+                                    </>
+                                  ) : (
+                                    <span className="text-[9px] text-slate-400 font-bold block leading-none py-1">
+                                      يحدد لاحقاً
+                                    </span>
+                                  )}
+                                </div>
+                                
+                                {/* Pill Controller */}
+                                <div className="flex items-center bg-slate-50 border border-slate-200/50 rounded-full p-0.5 shadow-3xs">
+                                  <button
+                                    onClick={() => qty > 0 && removeFromCart(product.id)}
+                                    disabled={qty === 0}
+                                    className={`p-1 rounded-full transition-all shrink-0 select-none ${
+                                      qty > 0 
+                                        ? 'bg-white hover:bg-slate-100 text-slate-700 active:scale-90 shadow-3xs' 
+                                        : 'bg-transparent text-slate-300 cursor-not-allowed'
+                                    }`}
+                                  >
+                                    <Minus className="w-3 h-3 stroke-[2.5]" />
+                                  </button>
+                                  <span className={`w-5 text-center text-[10px] font-black select-none ${
+                                    qty > 0 ? 'text-teal-900 font-extrabold' : 'text-slate-400'
+                                  }`}>
+                                    {qty}
+                                  </span>
+                                  <button
+                                    onClick={() => addToCart(product)}
+                                    className="bg-[#25D366] hover:bg-[#20ba59] text-white p-1 rounded-full transition-all active:scale-90 shrink-0 select-none shadow-3xs"
+                                  >
+                                    <Plus className="w-3 h-3 stroke-[2.5]" />
+                                  </button>
+                                </div>
+                              </div>
+                            </div>
                           </div>
-                        )}
-                      </div>
+                        );
+                      })}
                     </div>
                   </div>
-                );
-              })}
-            </div>
-          ) : (
+                ))}
+              </div>
+            ) : (
+              <div className="text-center py-16 px-4 bg-white rounded-2xl border border-slate-100 space-y-3">
+                <ShoppingBag className="w-12 h-12 text-slate-300 mx-auto" />
+                <h3 className="text-sm font-bold text-slate-600">لم نجد أي منتجات تطابق بحثك</h3>
+                <p className="text-xs text-slate-400">تأكد من كتابة الاسم بشكل صحيح أو تصفح الأقسام الأخرى.</p>
+              </div>
+            );
+          })() : (
             <div className="text-center py-16 px-4 bg-white rounded-2xl border border-slate-100 space-y-3">
               <ShoppingBag className="w-12 h-12 text-slate-300 mx-auto" />
               <h3 className="text-sm font-bold text-slate-600">لم نجد أي منتجات تطابق بحثك</h3>
@@ -306,6 +374,35 @@ export default function CatalogPage() {
                 <span className="text-xs font-bold leading-none">عرض الفاتورة &larr;</span>
               </div>
             </Link>
+          </div>
+        </div>
+      )}
+
+      {/* Full-Screen Image Preview Modal */}
+      {activePreviewImage && (
+        <div 
+          onClick={() => setActivePreviewImage(null)}
+          className="fixed inset-0 bg-black/90 backdrop-blur-md z-50 flex items-center justify-center p-4 cursor-zoom-out transition-opacity duration-300"
+        >
+          {/* Close Button */}
+          <button 
+            onClick={(e) => {
+              e.stopPropagation();
+              setActivePreviewImage(null);
+            }}
+            className="absolute top-6 left-6 bg-white/10 hover:bg-white/20 active:scale-95 text-white p-2.5 rounded-full border border-white/20 transition-all cursor-pointer shadow-lg z-50 flex items-center justify-center"
+            title="إغلاق الصورة"
+          >
+            <X className="w-5 h-5" />
+          </button>
+          
+          {/* Centered Image */}
+          <div className="relative max-w-full max-h-[85vh] flex items-center justify-center" onClick={(e) => e.stopPropagation()}>
+            <img 
+              src={activePreviewImage} 
+              alt="Preview" 
+              className="max-w-full max-h-[85vh] object-contain rounded-xl shadow-2xl border border-white/5 select-none"
+            />
           </div>
         </div>
       )}
