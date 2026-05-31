@@ -229,15 +229,11 @@ export default function CatalogPage() {
                         <h3 className="text-sm font-bold text-slate-800 truncate text-right">
                           {product.name}
                         </h3>
-                        <p className="text-sm font-black text-[#128C7E] text-right">
-                          {product.price !== null && product.price !== undefined && Number(product.price) > 0 ? (
-                            `${Number(product.price).toFixed(2)} TL`
-                          ) : (
-                            <span className="text-[11px] font-bold text-slate-500 bg-slate-100/80 px-2 py-0.5 rounded border border-slate-200">
-                              السعر عند الطلب
-                            </span>
-                          )}
-                        </p>
+                        {product.price !== null && product.price !== undefined && Number(product.price) > 0 && (
+                          <p className="text-sm font-black text-[#128C7E] text-right">
+                            {Number(product.price).toFixed(2)} TL
+                          </p>
+                        )}
                       </div>
 
                       {/* Quantity Selector - Minimalist & Prominent */}
