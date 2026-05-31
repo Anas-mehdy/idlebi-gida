@@ -282,7 +282,7 @@ export default function CatalogPage() {
                               <div className="flex items-center justify-between mt-auto pt-2.5 border-t border-slate-100/60">
                                 {/* Price Block */}
                                 <div className="space-y-0.5">
-                                  {product.price !== null && product.price !== undefined && Number(product.price) > 0 ? (
+                                  {product.price !== null && product.price !== undefined && Number(product.price) > 0 && (
                                     <>
                                       <span className="text-[11px] font-black text-emerald-600 block leading-none">
                                         {Number(product.price).toFixed(2)} TL
@@ -291,10 +291,6 @@ export default function CatalogPage() {
                                         للحزمة
                                       </span>
                                     </>
-                                  ) : (
-                                    <span className="text-[9px] text-slate-400 font-bold block leading-none py-1">
-                                      يحدد لاحقاً
-                                    </span>
                                   )}
                                 </div>
                                 
