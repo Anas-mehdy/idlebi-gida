@@ -5,7 +5,7 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useCart } from '@/context/CartContext';
 import { supabase } from '@/lib/supabase';
-import { ChevronRight, MessageSquare, User, FileText, ShoppingCart, Trash2, ArrowRight } from 'lucide-react';
+import { ChevronRight, MessageSquare, User, FileText, ShoppingCart, Trash2, ArrowRight, X, ShoppingBag } from 'lucide-react';
 
 export default function CheckoutPage() {
   const { cart, totalPrice, totalQuantity, clearCart, removeFromCart, addToCart } = useCart();
@@ -14,6 +14,7 @@ export default function CheckoutPage() {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [whatsappNumber, setWhatsappNumber] = useState('905000000000'); // Seed fallback
   const [errorMsg, setErrorMsg] = useState('');
+  const [activePreviewImage, setActivePreviewImage] = useState<string | null>(null);
 
   // Fetch active WhatsApp number from settings
   useEffect(() => {
@@ -91,21 +92,15 @@ export default function CheckoutPage() {
       // الحساب: [Total] TL
       // الزبون: [Customer Name]
       
-      const hasUnpricedItems = cart.some(item => !item.price || Number(item.price) === 0);
       let messageLines = ['طلب جديد: idelbi gida'];
       cart.forEach((item, index) => {
         messageLines.push(`${index + 1}. ${item.name} (x${item.quantity})`);
         if (item.price !== null && item.price !== undefined && Number(item.price) > 0) {
           messageLines.push(`${(item.price * item.quantity).toFixed(2)} TL`);
-        } else {
-          messageLines.push('السعر يحدد لاحقاً عند الطلب');
         }
       });
       messageLines.push('-----------------------');
       messageLines.push(`الحساب: ${totalPrice.toFixed(2)} TL`);
-      if (hasUnpricedItems) {
-        messageLines.push('*(يوجد مواد يحدد سعرها عند الطلب)*');
-      }
       messageLines.push(`الزبون: ${customerName.trim()}`);
 
       const encodedText = encodeURIComponent(messageLines.join('\n'));
@@ -120,21 +115,15 @@ export default function CheckoutPage() {
       console.error('Checkout process encountered an error, falling back silently and instantly to WhatsApp:', err);
       
       // Fallback redirection to WhatsApp silently and instantly even if DB fails
-      const hasUnpricedItems = cart.some(item => !item.price || Number(item.price) === 0);
       let messageLines = ['طلب جديد: idelbi gida'];
       cart.forEach((item, index) => {
         messageLines.push(`${index + 1}. ${item.name} (x${item.quantity})`);
         if (item.price !== null && item.price !== undefined && Number(item.price) > 0) {
           messageLines.push(`${(item.price * item.quantity).toFixed(2)} TL`);
-        } else {
-          messageLines.push('السعر يحدد لاحقاً عند الطلب');
         }
       });
       messageLines.push('-----------------------');
       messageLines.push(`الحساب: ${totalPrice.toFixed(2)} TL`);
-      if (hasUnpricedItems) {
-        messageLines.push('*(يوجد مواد يحدد سعرها عند الطلب)*');
-      }
       messageLines.push(`الزبون: ${customerName.trim()}`);
 
       const encodedText = encodeURIComponent(messageLines.join('\n'));
@@ -198,27 +187,50 @@ export default function CheckoutPage() {
             {/* List of items */}
             <div className="divide-y divide-slate-100 max-h-60 overflow-y-auto no-scrollbar">
               {cart.map((item) => (
-                <div key={item.id} className="py-3 flex items-center justify-between gap-4">
-                  <div className="min-w-0 flex-1">
-                    <p className="text-sm font-semibold text-slate-800 truncate text-right">
-                      {item.name}
-                    </p>
-                    <p className="text-xs text-slate-400 mt-0.5 text-right">
-                      {item.price !== null && item.price !== undefined && Number(item.price) > 0 ? (
-                        `${item.quantity} × ${Number(item.price).toFixed(2)} TL`
+                <div key={item.id} className="py-3 flex items-center justify-between gap-3">
+                  {/* Right side: Image Thumbnail & Text details */}
+                  <div className="flex items-center gap-3 min-w-0 flex-1">
+                    {/* Image Thumbnail */}
+                    <div
+                      onClick={() => item.image_url && setActivePreviewImage(item.image_url)}
+                      className={`w-12 h-12 rounded-xl bg-slate-50 border border-slate-100 flex items-center justify-center shrink-0 overflow-hidden relative group ${
+                        item.image_url ? 'cursor-zoom-in hover:brightness-95 transition-all' : 'select-none'
+                      }`}
+                    >
+                      {item.image_url ? (
+                        <img
+                          src={item.image_url}
+                          alt={item.name}
+                          className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-200"
+                          loading="lazy"
+                        />
                       ) : (
-                        `${item.quantity} × السعر يحدد لاحقاً عند الطلب`
+                        <ShoppingBag className="w-5 h-5 text-slate-350 stroke-[1.5]" />
                       )}
-                    </p>
+                    </div>
+
+                    {/* Name & Sub-description */}
+                    <div className="min-w-0 flex-1">
+                      <p className="text-sm font-semibold text-slate-800 truncate text-right">
+                        {item.name}
+                      </p>
+                      <p className="text-xs text-slate-400 mt-0.5 text-right font-medium">
+                        {item.price !== null && item.price !== undefined && Number(item.price) > 0 ? (
+                          `${item.quantity} × ${Number(item.price).toFixed(2)} TL`
+                        ) : (
+                          `الكمية: ${item.quantity}`
+                        )}
+                      </p>
+                    </div>
                   </div>
-                  <div className="flex items-center gap-3">
-                    <span className="text-sm font-bold text-slate-800">
-                      {item.price !== null && item.price !== undefined && Number(item.price) > 0 ? (
-                        `${(Number(item.price) * item.quantity).toFixed(2)} TL`
-                      ) : (
-                        'يحدد عند الطلب'
-                      )}
-                    </span>
+
+                  {/* Left side: Price total & Actions */}
+                  <div className="flex items-center gap-3 shrink-0">
+                    {item.price !== null && item.price !== undefined && Number(item.price) > 0 && (
+                      <span className="text-sm font-bold text-slate-800">
+                        {`${(Number(item.price) * item.quantity).toFixed(2)} TL`}
+                      </span>
+                    )}
                     <div className="flex items-center bg-slate-100 rounded-lg p-0.5 border border-slate-200/50">
                       <button
                         onClick={() => removeFromCart(item.id)}
@@ -237,9 +249,6 @@ export default function CheckoutPage() {
               <span className="text-sm font-bold text-slate-500">إجمالي الفاتورة:</span>
               <span className="text-lg font-black text-[#128C7E] flex flex-col items-end">
                 <span>{totalPrice.toFixed(2)} TL</span>
-                {cart.some(item => !item.price || Number(item.price) === 0) && (
-                  <span className="text-[10px] text-slate-400 font-bold block mt-0.5">*(يوجد مواد يحدد سعرها عند الطلب)*</span>
-                )}
               </span>
             </div>
           </div>
@@ -288,6 +297,35 @@ export default function CheckoutPage() {
           </form>
         </div>
       </main>
+
+      {/* Full-Screen Image Preview Modal */}
+      {activePreviewImage && (
+        <div 
+          onClick={() => setActivePreviewImage(null)}
+          className="fixed inset-0 bg-black/90 backdrop-blur-md z-50 flex items-center justify-center p-4 cursor-zoom-out transition-opacity duration-300"
+        >
+          {/* Close Button */}
+          <button 
+            onClick={(e) => {
+              e.stopPropagation();
+              setActivePreviewImage(null);
+            }}
+            className="absolute top-6 left-6 bg-white/10 hover:bg-white/20 active:scale-95 text-white p-2.5 rounded-full border border-white/20 transition-all cursor-pointer shadow-lg z-50 flex items-center justify-center"
+            title="إغلاق الصورة"
+          >
+            <X className="w-5 h-5" />
+          </button>
+          
+          {/* Centered Image */}
+          <div className="relative max-w-full max-h-[85vh] flex items-center justify-center" onClick={(e) => e.stopPropagation()}>
+            <img 
+              src={activePreviewImage} 
+              alt="Preview" 
+              className="max-w-full max-h-[85vh] object-contain rounded-xl shadow-2xl border border-white/5 select-none"
+            />
+          </div>
+        </div>
+      )}
     </div>
   );
 }
