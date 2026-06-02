@@ -7,6 +7,7 @@ import { Plus, Trash2, ShoppingBag, Loader2, Image as ImageIcon, Upload, AlertCi
 interface Category {
   id: string;
   name: string;
+  sort_order?: number;
 }
 
 interface Product {
@@ -23,10 +24,10 @@ interface Product {
 }
 
 const MOCK_CATEGORIES: Category[] = [
-  { id: '1', name: 'بسكويت وحلويات' },
-  { id: '2', name: 'مشروبات وغازيات' },
-  { id: '3', name: 'معلبات وأغذية مجففة' },
-  { id: '4', name: 'البان وأجبان' }
+  { id: '1', name: 'بسكويت وحلويات', sort_order: 0 },
+  { id: '2', name: 'مشروبات وغازيات', sort_order: 1 },
+  { id: '3', name: 'معلبات وأغذية مجففة', sort_order: 2 },
+  { id: '4', name: 'البان وأجبان', sort_order: 3 }
 ];
 
 const MOCK_PRODUCTS: Product[] = [
@@ -78,6 +79,7 @@ export default function AdminProducts() {
       const { data: catData, error: catError } = await supabase
         .from('categories')
         .select('*')
+        .order('sort_order', { ascending: true })
         .order('name', { ascending: true });
 
       if (catError) throw catError;

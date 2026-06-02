@@ -88,3 +88,6 @@ ALTER TABLE products ADD COLUMN IF NOT EXISTS is_hidden BOOLEAN DEFAULT FALSE NO
 ALTER TABLE products ALTER COLUMN price DROP NOT NULL;
 ALTER TABLE order_items ALTER COLUMN price_at_purchase DROP NOT NULL;
 
+-- Migration: Add sort_order to categories table (drag & drop sorting)
+ALTER TABLE categories ADD COLUMN IF NOT EXISTS sort_order INTEGER DEFAULT 0;
+

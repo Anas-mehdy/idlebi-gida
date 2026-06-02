@@ -2,19 +2,20 @@
 
 import React, { useState, useEffect } from 'react';
 import { supabase } from '@/lib/supabase';
-import { Plus, Trash2, Folder, Loader2, AlertCircle } from 'lucide-react';
+import { Plus, Trash2, Folder, Loader2, AlertCircle, GripVertical } from 'lucide-react';
 
 interface Category {
   id: string;
   name: string;
   created_at?: string;
+  sort_order?: number;
 }
 
 const MOCK_CATEGORIES: Category[] = [
-  { id: '1', name: 'بسكويت وحلويات' },
-  { id: '2', name: 'مشروبات وغازيات' },
-  { id: '3', name: 'معلبات وأغذية مجففة' },
-  { id: '4', name: 'البان وأجبان' }
+  { id: '1', name: 'بسكويت وحلويات', sort_order: 0 },
+  { id: '2', name: 'مشروبات وغازيات', sort_order: 1 },
+  { id: '3', name: 'معلبات وأغذية مجففة', sort_order: 2 },
+  { id: '4', name: 'البان وأجبان', sort_order: 3 }
 ];
 
 export default function AdminCategories() {
@@ -25,6 +26,11 @@ export default function AdminCategories() {
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const [usingMockData, setUsingMockData] = useState(false);
   const [errorMsg, setErrorMsg] = useState('');
+
+  // Drag and drop states
+  const [draggingId, setDraggingId] = useState<string | null>(null);
+  const [dragOverId, setDragOverId] = useState<string | null>(null);
+  const [savingOrder, setSavingOrder] = useState(false);
 
   const fetchCategories = async () => {
     try {
@@ -39,6 +45,7 @@ export default function AdminCategories() {
       const { data, error } = await supabase
         .from('categories')
         .select('*')
+        .order('sort_order', { ascending: true })
         .order('name', { ascending: true });
 
       if (error) throw error;
@@ -57,6 +64,77 @@ export default function AdminCategories() {
     fetchCategories();
   }, []);
 
+  // Drag & Drop Handlers for categories sorting
+  const handleDragStart = (e: React.DragEvent, id: string) => {
+    setDraggingId(id);
+    e.dataTransfer.effectAllowed = 'move';
+  };
+
+  const handleDragOver = (e: React.DragEvent, id: string) => {
+    e.preventDefault();
+    if (id !== draggingId) {
+      setDragOverId(id);
+    }
+  };
+
+  const handleDragEnd = () => {
+    setDraggingId(null);
+    setDragOverId(null);
+  };
+
+  const handleDrop = async (e: React.DragEvent, targetId: string) => {
+    e.preventDefault();
+    if (!draggingId || draggingId === targetId) return;
+
+    const displayList = [...categories];
+
+    const draggingIndex = displayList.findIndex(c => c.id === draggingId);
+    const targetIndex = displayList.findIndex(c => c.id === targetId);
+
+    if (draggingIndex === -1 || targetIndex === -1) return;
+
+    // Reorder inside list
+    const [removed] = displayList.splice(draggingIndex, 1);
+    displayList.splice(targetIndex, 0, removed);
+
+    // Assign new sequential sort_orders
+    const updatedCategories = displayList.map((cat, idx) => ({
+      ...cat,
+      sort_order: idx
+    }));
+
+    setCategories(updatedCategories);
+    setDraggingId(null);
+    setDragOverId(null);
+
+    setSavingOrder(true);
+    try {
+      const isUrlConfigured = process.env.NEXT_PUBLIC_SUPABASE_URL && !process.env.NEXT_PUBLIC_SUPABASE_URL.includes('placeholder');
+      
+      if (isUrlConfigured) {
+        // Upsert updated categories in database
+        const updates = updatedCategories.map(c => ({
+          id: c.id,
+          name: c.name,
+          sort_order: c.sort_order
+        }));
+
+        const { error } = await supabase
+          .from('categories')
+          .upsert(updates);
+
+        if (error) throw error;
+      } else {
+        console.log('Database not connected. Saved custom category sort order locally.');
+      }
+    } catch (err) {
+      console.error('Failed to save category sort order:', err);
+      alert('حدث خطأ أثناء حفظ الترتيب الجديد للأقسام في قاعدة البيانات.');
+    } finally {
+      setSavingOrder(false);
+    }
+  };
+
   const handleAddCategory = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!newCategoryName.trim()) return;
@@ -70,21 +148,25 @@ export default function AdminCategories() {
       if (isUrlConfigured) {
         const { data, error } = await supabase
           .from('categories')
-          .insert({ name: newCategoryName.trim() })
+          .insert({ 
+            name: newCategoryName.trim(),
+            sort_order: categories.length
+          })
           .select()
           .single();
 
         if (error) throw error;
         
-        // Add to active state
-        setCategories((prev) => [...prev, data].sort((a, b) => a.name.localeCompare(b.name)));
+        // Add to active state (append to the end since its sort_order is categories.length)
+        setCategories((prev) => [...prev, data]);
       } else {
         // Mock add
         const newCat: Category = {
           id: Math.random().toString(),
-          name: newCategoryName.trim()
+          name: newCategoryName.trim(),
+          sort_order: categories.length
         };
-        setCategories((prev) => [...prev, newCat].sort((a, b) => a.name.localeCompare(b.name)));
+        setCategories((prev) => [...prev, newCat]);
       }
 
       setNewCategoryName('');
@@ -154,7 +236,7 @@ export default function AdminCategories() {
                 value={newCategoryName}
                 onChange={(e) => setNewCategoryName(e.target.value)}
                 placeholder="أدخل اسم القسم (مثال: أجبان وألبان)"
-                className="w-full bg-slate-50 border border-slate-200 outline-none rounded-xl px-4 py-3 text-sm text-slate-800 placeholder-slate-400 focus:bg-white focus:border-[#128C7E] focus:ring-1 focus:ring-[#128C7E] transition-all text-right"
+                className="w-full bg-slate-50 border border-slate-200 outline-none rounded-xl px-4 py-3 text-sm text-slate-850 placeholder-slate-400 focus:bg-white focus:border-[#128C7E] focus:ring-1 focus:ring-[#128C7E] transition-all text-right"
                 disabled={submitting}
               />
             </div>
@@ -196,8 +278,23 @@ export default function AdminCategories() {
           ) : categories.length > 0 ? (
             <div className="divide-y divide-slate-100">
               {categories.map((category) => (
-                <div key={category.id} className="py-3.5 flex items-center justify-between gap-4">
+                <div 
+                  key={category.id} 
+                  draggable={!submitting && !savingOrder}
+                  onDragStart={(e) => handleDragStart(e, category.id)}
+                  onDragOver={(e) => handleDragOver(e, category.id)}
+                  onDragEnd={handleDragEnd}
+                  onDrop={(e) => handleDrop(e, category.id)}
+                  className={`py-3 flex items-center justify-between gap-4 transition-all cursor-grab active:cursor-grabbing hover:bg-slate-50/50 px-2 rounded-xl ${
+                    draggingId === category.id ? 'opacity-40 bg-slate-105' : ''
+                  } ${
+                    dragOverId === category.id ? 'border-b-2 border-emerald-500 bg-emerald-500/5' : ''
+                  }`}
+                >
                   <div className="flex items-center gap-3">
+                    <span className="text-slate-400 hover:text-slate-600 cursor-grab active:cursor-grabbing shrink-0 p-1" title="اسحب لإعادة الترتيب">
+                      <GripVertical className="w-4 h-4" />
+                    </span>
                     <div className="bg-slate-50 p-2 rounded-xl text-slate-600 border border-slate-200">
                       <Folder className="w-4.5 h-4.5 text-emerald-600" />
                     </div>
