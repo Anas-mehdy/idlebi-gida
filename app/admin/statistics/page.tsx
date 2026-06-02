@@ -36,6 +36,7 @@ export default function AdminStatistics() {
   const [orders, setOrders] = useState<Order[]>([]);
   const [loading, setLoading] = useState(true);
   const [usingMockData, setUsingMockData] = useState(false);
+  const [activePreviewImage, setActivePreviewImage] = useState<string | null>(null);
 
   // Filters
   const [dateFilter, setDateFilter] = useState('');
@@ -373,9 +374,14 @@ export default function AdminStatistics() {
                     <div key={item.id} className="flex justify-between items-center text-xs text-slate-655">
                       <div className="flex items-center gap-2">
                         {item.products?.image_url ? (
-                          <img src={item.products.image_url} className="w-10 h-10 rounded-lg object-cover shrink-0 border border-slate-200" alt={item.products.name} />
+                          <img 
+                            src={item.products.image_url} 
+                            onClick={() => setActivePreviewImage(item.products?.image_url || null)}
+                            className="w-14 h-14 rounded-lg object-cover shrink-0 border border-slate-200 cursor-zoom-in hover:brightness-95 transition-all" 
+                            alt={item.products.name || ''} 
+                          />
                         ) : (
-                          <ShoppingBag className="w-10 h-10 p-2 bg-white text-slate-400 border border-slate-200 rounded-lg shrink-0" />
+                          <ShoppingBag className="w-14 h-14 p-2.5 bg-white text-slate-400 border border-slate-200 rounded-lg shrink-0" />
                         )}
                         <span>{item.products?.name || 'منتج غير متوفر'}</span>
                       </div>
@@ -422,9 +428,14 @@ export default function AdminStatistics() {
               >
                 <div className="flex items-center gap-3">
                   {item.imageUrl ? (
-                    <img src={item.imageUrl} className="w-10 h-10 rounded-xl object-cover shrink-0 border border-slate-200 shadow-xs" alt={item.productName} />
+                    <img 
+                      src={item.imageUrl} 
+                      onClick={() => setActivePreviewImage(item.imageUrl || null)}
+                      className="w-14 h-14 rounded-xl object-cover shrink-0 border border-slate-200 shadow-xs cursor-zoom-in hover:brightness-95 transition-all" 
+                      alt={item.productName} 
+                    />
                   ) : (
-                    <ShoppingBag className="w-10 h-10 p-2 bg-white text-slate-400 border border-slate-200 rounded-xl shrink-0" />
+                    <ShoppingBag className="w-14 h-14 p-2.5 bg-white text-slate-400 border border-slate-200 rounded-xl shrink-0" />
                   )}
                   <div className="space-y-1">
                     <span className="text-sm font-semibold text-slate-800 block">{item.productName}</span>
@@ -446,6 +457,34 @@ export default function AdminStatistics() {
         )}
       </div>
 
+      {/* Full-Screen Image Preview Modal */}
+      {activePreviewImage && (
+        <div 
+          onClick={() => setActivePreviewImage(null)}
+          className="fixed inset-0 bg-black/90 backdrop-blur-md z-50 flex items-center justify-center p-4 cursor-zoom-out transition-opacity duration-300"
+        >
+          {/* Close Button */}
+          <button 
+            onClick={(e) => {
+              e.stopPropagation();
+              setActivePreviewImage(null);
+            }}
+            className="absolute top-6 left-6 bg-white/10 hover:bg-white/20 active:scale-95 text-white p-2.5 rounded-full border border-white/20 transition-all cursor-pointer shadow-lg z-50 flex items-center justify-center"
+            title="إغلاق الصورة"
+          >
+            <X className="w-5 h-5" />
+          </button>
+          
+          {/* Centered Image */}
+          <div className="relative max-w-full max-h-[85vh] flex items-center justify-center" onClick={(e) => e.stopPropagation()}>
+            <img 
+              src={activePreviewImage} 
+              alt="Preview" 
+              className="max-w-full max-h-[85vh] object-contain rounded-xl shadow-2xl border border-white/5 select-none"
+            />
+          </div>
+        </div>
+      )}
     </div>
   );
 }

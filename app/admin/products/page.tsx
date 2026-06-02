@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect, useRef } from 'react';
 import { supabase } from '@/lib/supabase';
-import { Plus, Trash2, ShoppingBag, Loader2, Image as ImageIcon, Upload, AlertCircle, RefreshCw, GripVertical, Eye, EyeOff } from 'lucide-react';
+import { Plus, Trash2, ShoppingBag, Loader2, Image as ImageIcon, Upload, AlertCircle, RefreshCw, GripVertical, Eye, EyeOff, X } from 'lucide-react';
 
 interface Category {
   id: string;
@@ -59,6 +59,7 @@ export default function AdminProducts() {
   const [dragOverId, setDragOverId] = useState<string | null>(null);
   const [savingOrder, setSavingOrder] = useState(false);
   const [selectedFilterCategory, setSelectedFilterCategory] = useState('all');
+  const [activePreviewImage, setActivePreviewImage] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const filteredDisplayProducts = selectedFilterCategory === 'all'
@@ -602,7 +603,12 @@ export default function AdminProducts() {
                           <span className="text-slate-400 hover:text-slate-600 cursor-grab active:cursor-grabbing shrink-0 p-1" title="اسحب لإعادة الترتيب">
                             <GripVertical className="w-4 h-4" />
                           </span>
-                          <div className="w-10 h-10 bg-slate-50 border border-slate-200 rounded-lg overflow-hidden shrink-0 flex items-center justify-center text-xs text-emerald-600 font-bold">
+                          <div 
+                            onClick={() => product.image_url && setActivePreviewImage(product.image_url)}
+                            className={`w-14 h-14 bg-slate-50 border border-slate-200 rounded-xl overflow-hidden shrink-0 flex items-center justify-center text-sm text-emerald-600 font-bold ${
+                              product.image_url ? 'cursor-zoom-in hover:brightness-95 transition-all' : 'select-none'
+                            }`}
+                          >
                             {product.image_url ? (
                               <img src={product.image_url} alt={product.name} className="w-full h-full object-cover" />
                             ) : (
@@ -686,6 +692,35 @@ export default function AdminProducts() {
           )}
         </div>
       </div>
+
+      {/* Full-Screen Image Preview Modal */}
+      {activePreviewImage && (
+        <div 
+          onClick={() => setActivePreviewImage(null)}
+          className="fixed inset-0 bg-black/90 backdrop-blur-md z-50 flex items-center justify-center p-4 cursor-zoom-out transition-opacity duration-300"
+        >
+          {/* Close Button */}
+          <button 
+            onClick={(e) => {
+              e.stopPropagation();
+              setActivePreviewImage(null);
+            }}
+            className="absolute top-6 left-6 bg-white/10 hover:bg-white/20 active:scale-95 text-white p-2.5 rounded-full border border-white/20 transition-all cursor-pointer shadow-lg z-50 flex items-center justify-center"
+            title="إغلاق الصورة"
+          >
+            <X className="w-5 h-5" />
+          </button>
+          
+          {/* Centered Image */}
+          <div className="relative max-w-full max-h-[85vh] flex items-center justify-center" onClick={(e) => e.stopPropagation()}>
+            <img 
+              src={activePreviewImage} 
+              alt="Preview" 
+              className="max-w-full max-h-[85vh] object-contain rounded-xl shadow-2xl border border-white/5 select-none"
+            />
+          </div>
+        </div>
+      )}
     </div>
   );
 }
