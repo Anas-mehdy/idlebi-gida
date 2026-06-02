@@ -472,16 +472,23 @@ export default function AdminDashboard() {
                 className="bg-slate-50 border border-slate-200 rounded-2xl p-5 space-y-4 hover:border-slate-300 transition-all"
               >
                 {/* Order Header Info */}
-                <div className="flex items-center justify-between pb-3 border-b border-slate-200">
-                  <div>
-                    <h3 className="text-sm font-bold text-slate-800">{order.customer_name}</h3>
-                    <div className="flex items-center gap-1.5 text-[10px] text-slate-500 mt-1">
-                      <Clock className="w-3.5 h-3.5 text-slate-400" />
-                      <span>ساعة الاستلام: {formatTime(order.created_at)}</span>
+                <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 pb-3 border-b border-slate-200">
+                  <div className="flex justify-between items-start w-full sm:w-auto">
+                    <div>
+                      <h3 className="text-sm font-bold text-slate-800">{order.customer_name}</h3>
+                      <div className="flex items-center gap-1.5 text-[10px] text-slate-500 mt-1">
+                        <Clock className="w-3.5 h-3.5 text-slate-400" />
+                        <span>ساعة الاستلام: {formatTime(order.created_at)}</span>
+                      </div>
                     </div>
+                    {/* On mobile, show the price badge here to save space on the button group */}
+                    <span className="sm:hidden bg-white border border-slate-200 text-emerald-600 font-extrabold px-2.5 py-1.5 rounded-xl text-xs self-center">
+                      {Number(order.total_price).toFixed(2)} TL
+                    </span>
                   </div>
-                  <div className="flex items-center gap-2">
-                    <span className="bg-white border border-slate-200 text-emerald-600 font-extrabold px-3 py-1.5 rounded-xl text-xs">
+                  <div className="flex items-center gap-1.5 flex-wrap w-full sm:w-auto justify-end">
+                    {/* On desktop, show the price badge in the group */}
+                    <span className="hidden sm:inline-block bg-white border border-slate-200 text-emerald-600 font-extrabold px-3 py-1.5 rounded-xl text-xs">
                       {Number(order.total_price).toFixed(2)} TL
                     </span>
                     <button
@@ -674,16 +681,23 @@ export default function AdminDashboard() {
                 className="bg-amber-50/10 border border-amber-200/50 rounded-2xl p-5 space-y-4 hover:border-amber-300/60 transition-all"
               >
                 {/* Order Header Info */}
-                <div className="flex items-center justify-between pb-3 border-b border-amber-100/50">
-                  <div>
-                    <h3 className="text-sm font-bold text-slate-800">{order.customer_name}</h3>
-                    <div className="flex items-center gap-1.5 text-[10px] text-slate-500 mt-1">
-                      <Clock className="w-3.5 h-3.5 text-slate-400" />
-                      <span>ساعة الاستلام: {formatTime(order.created_at)}</span>
+                <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 pb-3 border-b border-amber-100/50">
+                  <div className="flex justify-between items-start w-full sm:w-auto">
+                    <div>
+                      <h3 className="text-sm font-bold text-slate-800">{order.customer_name}</h3>
+                      <div className="flex items-center gap-1.5 text-[10px] text-slate-500 mt-1">
+                        <Clock className="w-3.5 h-3.5 text-slate-400" />
+                        <span>ساعة الاستلام: {formatTime(order.created_at)}</span>
+                      </div>
                     </div>
+                    {/* On mobile, show the price badge here to save space on the button group */}
+                    <span className="sm:hidden bg-white border border-slate-200 text-emerald-600 font-extrabold px-2.5 py-1.5 rounded-xl text-xs self-center">
+                      {Number(order.total_price).toFixed(2)} TL
+                    </span>
                   </div>
-                  <div className="flex items-center gap-2">
-                    <span className="bg-white border border-slate-200 text-emerald-600 font-extrabold px-3 py-1.5 rounded-xl text-xs">
+                  <div className="flex items-center gap-1.5 flex-wrap w-full sm:w-auto justify-end">
+                    {/* On desktop, show the price badge in the group */}
+                    <span className="hidden sm:inline-block bg-white border border-slate-200 text-emerald-600 font-extrabold px-3 py-1.5 rounded-xl text-xs">
                       {Number(order.total_price).toFixed(2)} TL
                     </span>
                     <button
