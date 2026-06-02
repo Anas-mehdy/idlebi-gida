@@ -91,3 +91,10 @@ ALTER TABLE order_items ALTER COLUMN price_at_purchase DROP NOT NULL;
 -- Migration: Add sort_order to categories table (drag & drop sorting)
 ALTER TABLE categories ADD COLUMN IF NOT EXISTS sort_order INTEGER DEFAULT 0;
 
+-- Migration: Allow public select on orders and order_items (to view priced invoices)
+DROP POLICY IF EXISTS "Allow public select orders" ON orders;
+CREATE POLICY "Allow public select orders" ON orders FOR SELECT USING (true);
+
+DROP POLICY IF EXISTS "Allow public select order_items" ON order_items;
+CREATE POLICY "Allow public select order_items" ON order_items FOR SELECT USING (true);
+

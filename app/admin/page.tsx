@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { supabase } from '@/lib/supabase';
-import { ShoppingBag, Users, CheckSquare, ClipboardList, TrendingUp, DollarSign, Clock, AlertCircle, Trash2 } from 'lucide-react';
+import { ShoppingBag, Users, CheckSquare, ClipboardList, TrendingUp, DollarSign, Clock, AlertCircle, Trash2, Save, Share2, Copy } from 'lucide-react';
 
 interface OrderItem {
   id: string;
@@ -49,6 +49,7 @@ export default function AdminDashboard() {
   // Stats
   const [totalRevenueToday, setTotalRevenueToday] = useState(0);
   const [aggregatedItems, setAggregatedItems] = useState<AggregatedItem[]>([]);
+  const [editedPrices, setEditedPrices] = useState<{[itemId: string]: string}>({});
 
   // Seed data for admin preview
   const getMockOrders = (): Order[] => [
@@ -260,6 +261,97 @@ export default function AdminDashboard() {
     }
   };
 
+  const handleSavePrices = async (orderId: string) => {
+    const order = orders.find(o => o.id === orderId);
+    if (!order) return;
+
+    setIsUpdating(true);
+    try {
+      const isUrlConfigured = process.env.NEXT_PUBLIC_SUPABASE_URL && !process.env.NEXT_PUBLIC_SUPABASE_URL.includes('placeholder');
+      
+      const itemsToUpdate = order.order_items.map(item => {
+        const newPriceStr = editedPrices[item.id];
+        const newPrice = newPriceStr !== undefined && newPriceStr !== '' ? parseFloat(newPriceStr) : (item.price_at_purchase || 0);
+        return {
+          id: item.id,
+          order_id: orderId,
+          product_id: item.product_id,
+          quantity: item.quantity,
+          price_at_purchase: newPrice
+        };
+      });
+
+      const newTotalPrice = itemsToUpdate.reduce((sum, item) => sum + (item.quantity * item.price_at_purchase), 0);
+
+      if (isUrlConfigured) {
+        // 1. Update items
+        const { error: itemsError } = await supabase
+          .from('order_items')
+          .upsert(itemsToUpdate);
+
+        if (itemsError) throw itemsError;
+
+        // 2. Update order total
+        const { error: orderError } = await supabase
+          .from('orders')
+          .update({ total_price: newTotalPrice })
+          .eq('id', orderId);
+
+        if (orderError) throw orderError;
+      }
+
+      // Update local state
+      const updatedOrders = orders.map(o => {
+        if (o.id === orderId) {
+          return {
+            ...o,
+            total_price: newTotalPrice,
+            order_items: o.order_items.map(item => {
+              const newPriceStr = editedPrices[item.id];
+              const newPrice = newPriceStr !== undefined && newPriceStr !== '' ? parseFloat(newPriceStr) : item.price_at_purchase;
+              return {
+                ...item,
+                price_at_purchase: newPrice
+              };
+            })
+          };
+        }
+        return o;
+      });
+
+      setOrders(updatedOrders);
+      calculateStats(updatedOrders);
+      alert('تم حفظ الأسعار وتحديث إجمالي الفاتورة بنجاح!');
+    } catch (err: any) {
+      console.error(err);
+      alert('حدث خطأ أثناء حفظ أسعار الفاتورة.');
+    } finally {
+      setIsUpdating(false);
+    }
+  };
+
+  const handleShareInvoice = (order: Order) => {
+    if (order.total_price <= 0) {
+      alert('يرجى حفظ وتسعير الفاتورة أولاً قبل مشاركتها مع الزبون.');
+      return;
+    }
+    const invoiceUrl = `${window.location.origin}/invoice/${order.id}`;
+    const message = `مرحباً ${order.customer_name}، تم تسعير طلبيتك وتجهيز الفاتورة بالكامل. يمكنك الاطلاع على تفاصيل الأسعار والإجمالي النهائي من هنا:\n${invoiceUrl}`;
+    const encodedText = encodeURIComponent(message);
+    const whatsappUrl = `https://wa.me/?text=${encodedText}`;
+    window.open(whatsappUrl, '_blank');
+  };
+
+  const handleCopyInvoiceLink = (orderId: string, totalPrice: number) => {
+    if (totalPrice <= 0) {
+      alert('يرجى حفظ وتسعير الفاتورة أولاً قبل نسخ الرابط.');
+      return;
+    }
+    const invoiceUrl = `${window.location.origin}/invoice/${orderId}`;
+    navigator.clipboard.writeText(invoiceUrl);
+    alert('تم نسخ رابط الفاتورة المباشر إلى الحافظة بنجاح!');
+  };
+
   return (
     <div className="space-y-6">
       {/* Top Warning for offline test mode */}
@@ -377,15 +469,64 @@ export default function AdminDashboard() {
                         )}
                         <span>{item.products?.name || 'منتج غير متوفر'}</span>
                       </div>
-                      <span className="font-semibold text-slate-800">
-                        {item.price_at_purchase !== null && item.price_at_purchase !== undefined && Number(item.price_at_purchase) > 0 ? (
-                          `${item.quantity} صندوق × ${Number(item.price_at_purchase).toFixed(2)} TL`
-                        ) : (
-                          `${item.quantity} صندوق × يحدد لاحقاً`
-                        )}
-                      </span>
+                      <div className="flex items-center gap-1.5 shrink-0">
+                        <span className="text-xs font-bold text-slate-500">{item.quantity} صندوق ×</span>
+                        <input
+                          type="number"
+                          step="0.01"
+                          min="0"
+                          placeholder="السعر (TL)"
+                          value={editedPrices[item.id] !== undefined ? editedPrices[item.id] : (item.price_at_purchase !== null && item.price_at_purchase !== undefined && Number(item.price_at_purchase) > 0 ? item.price_at_purchase.toString() : '')}
+                          onChange={(e) => {
+                            setEditedPrices(prev => ({
+                              ...prev,
+                              [item.id]: e.target.value
+                            }));
+                          }}
+                          className="w-20 bg-white border border-slate-250 outline-none rounded-lg px-2 py-1 text-xs text-slate-800 focus:border-[#128C7E] focus:ring-1 focus:ring-[#128C7E] transition-all text-center font-bold"
+                          disabled={isUpdating}
+                        />
+                        <span className="text-[10px] text-slate-450 font-bold">TL</span>
+                      </div>
                     </div>
                   ))}
+                </div>
+
+                {/* Actions Footer */}
+                <div className="flex flex-wrap items-center justify-between gap-3 pt-3 border-t border-slate-200 mt-1">
+                  <div className="flex items-center gap-2">
+                    <button
+                      onClick={() => handleSavePrices(order.id)}
+                      disabled={isUpdating}
+                      className="bg-emerald-50 hover:bg-emerald-100 border border-emerald-250 text-emerald-700 font-bold px-3 py-1.5 rounded-xl text-xs flex items-center gap-1 cursor-pointer transition-all active:scale-95 shadow-sm"
+                      title="حفظ الأسعار المدخلة وتحديث الإجمالي"
+                    >
+                      <Save className="w-3.5 h-3.5" />
+                      <span>حفظ الأسعار</span>
+                    </button>
+                    
+                    <button
+                      onClick={() => handleShareInvoice(order)}
+                      className="bg-[#25D366] hover:bg-[#20ba59] disabled:bg-slate-100 disabled:text-slate-400 text-white font-bold px-3 py-1.5 rounded-xl text-xs flex items-center gap-1 cursor-pointer transition-all active:scale-95 shadow-sm"
+                      title="مشاركة الفاتورة المسعرة مع الزبون عبر واتساب"
+                    >
+                      <Share2 className="w-3.5 h-3.5" />
+                      <span>مشاركة الفاتورة</span>
+                    </button>
+
+                    <button
+                      onClick={() => handleCopyInvoiceLink(order.id, order.total_price)}
+                      className="bg-slate-50 hover:bg-slate-100 border border-slate-250 text-slate-600 hover:text-slate-800 font-bold px-3 py-1.5 rounded-xl text-xs flex items-center gap-1 cursor-pointer transition-all active:scale-95 shadow-sm"
+                      title="نسخ رابط الفاتورة لمشاركته بأي طريقة أخرى"
+                    >
+                      <Copy className="w-3.5 h-3.5" />
+                      <span>نسخ الرابط</span>
+                    </button>
+                  </div>
+
+                  <span className="text-[10px] text-slate-400 font-medium">
+                    * قم بحفظ الأسعار أولاً لتفعيل المشاركة.
+                  </span>
                 </div>
               </div>
             ))}
