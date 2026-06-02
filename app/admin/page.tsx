@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { supabase } from '@/lib/supabase';
-import { ShoppingBag, Users, CheckSquare, ClipboardList, TrendingUp, DollarSign, Clock, AlertCircle, Trash2, Save, Share2, Copy } from 'lucide-react';
+import { ShoppingBag, Users, CheckSquare, ClipboardList, TrendingUp, DollarSign, Clock, AlertCircle, Trash2, Save, Copy } from 'lucide-react';
 
 interface OrderItem {
   id: string;
@@ -330,17 +330,7 @@ export default function AdminDashboard() {
     }
   };
 
-  const handleShareInvoice = (order: Order) => {
-    if (order.total_price <= 0) {
-      alert('يرجى حفظ وتسعير الفاتورة أولاً قبل مشاركتها مع الزبون.');
-      return;
-    }
-    const invoiceUrl = `${window.location.origin}/invoice/${order.id}`;
-    const message = `مرحباً ${order.customer_name}، تم تسعير طلبيتك وتجهيز الفاتورة بالكامل. يمكنك الاطلاع على تفاصيل الأسعار والإجمالي النهائي من هنا:\n${invoiceUrl}`;
-    const encodedText = encodeURIComponent(message);
-    const whatsappUrl = `https://wa.me/?text=${encodedText}`;
-    window.open(whatsappUrl, '_blank');
-  };
+
 
   const handleCopyInvoiceLink = (orderId: string, totalPrice: number) => {
     if (totalPrice <= 0) {
@@ -505,15 +495,6 @@ export default function AdminDashboard() {
                       <span>حفظ الأسعار</span>
                     </button>
                     
-                    <button
-                      onClick={() => handleShareInvoice(order)}
-                      className="bg-[#25D366] hover:bg-[#20ba59] disabled:bg-slate-100 disabled:text-slate-400 text-white font-bold px-3 py-1.5 rounded-xl text-xs flex items-center gap-1 cursor-pointer transition-all active:scale-95 shadow-sm"
-                      title="مشاركة الفاتورة المسعرة مع الزبون عبر واتساب"
-                    >
-                      <Share2 className="w-3.5 h-3.5" />
-                      <span>مشاركة الفاتورة</span>
-                    </button>
-
                     <button
                       onClick={() => handleCopyInvoiceLink(order.id, order.total_price)}
                       className="bg-slate-50 hover:bg-slate-100 border border-slate-250 text-slate-600 hover:text-slate-800 font-bold px-3 py-1.5 rounded-xl text-xs flex items-center gap-1 cursor-pointer transition-all active:scale-95 shadow-sm"
