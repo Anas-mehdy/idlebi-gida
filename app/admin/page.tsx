@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { supabase } from '@/lib/supabase';
-import { ShoppingBag, Users, CheckSquare, ClipboardList, TrendingUp, DollarSign, Clock, AlertCircle, Trash2, Save, Copy, X } from 'lucide-react';
+import { ShoppingBag, Users, CheckSquare, ClipboardList, TrendingUp, DollarSign, Clock, AlertCircle, Trash2, Save, Copy, X, CalendarClock } from 'lucide-react';
 
 interface OrderItem {
   id: string;
@@ -20,7 +20,7 @@ interface Order {
   id: string;
   customer_name: string;
   total_price: number;
-  status: 'pending' | 'delivered';
+  status: 'pending' | 'delivered' | 'postponed';
   created_at: string;
   order_items: OrderItem[];
 }
@@ -75,6 +75,16 @@ export default function AdminDashboard() {
         { id: 'mi-3', order_id: 'm-ord2', product_id: 'p1', quantity: 10, price_at_purchase: 45.00, products: { name: 'بسكويت شوكولاتة أولكر 12 قطعة', image_url: 'https://images.unsplash.com/photo-1590080875515-8a3a8dc5735e?w=120&auto=format&fit=crop&q=60' } },
         { id: 'mi-4', order_id: 'm-ord2', product_id: 'p3', quantity: 2, price_at_purchase: 85.00, products: { name: 'شاي تركي غوكسو 100 ظرف', image_url: 'https://images.unsplash.com/photo-1576092768241-dec231879fc3?w=120&auto=format&fit=crop&q=60' } }
       ]
+    },
+    {
+      id: 'm-ord3',
+      customer_name: 'محلات الأمل (مؤجلة)',
+      total_price: 340.00,
+      status: 'postponed',
+      created_at: new Date(Date.now() - 7200000).toISOString(),
+      order_items: [
+        { id: 'mi-5', order_id: 'm-ord3', product_id: 'p3', quantity: 4, price_at_purchase: 85.00, products: { name: 'شاي تركي غوكسو 100 ظرف', image_url: 'https://images.unsplash.com/photo-1576092768241-dec231879fc3?w=120&auto=format&fit=crop&q=60' } }
+      ]
     }
   ];
 
@@ -87,7 +97,7 @@ export default function AdminDashboard() {
         throw new Error('Supabase environment variables not configured');
       }
 
-      // Fetch pending orders today
+      // Fetch pending and postponed orders
       const { data, error } = await supabase
         .from('orders')
         .select(`
@@ -100,7 +110,7 @@ export default function AdminDashboard() {
             )
           )
         `)
-        .eq('status', 'pending')
+        .in('status', ['pending', 'postponed'])
         .order('created_at', { ascending: false });
 
       if (error) throw error;
@@ -133,14 +143,17 @@ export default function AdminDashboard() {
   }, []);
 
   const calculateStats = (activeOrders: Order[]) => {
+    // Only calculate stats for active/pending orders (excluding postponed ones)
+    const pendingOrders = activeOrders.filter(o => o.status === 'pending');
+
     // 1. Revenue
-    const revenue = activeOrders.reduce((sum, order) => sum + Number(order.total_price), 0);
+    const revenue = pendingOrders.reduce((sum, order) => sum + Number(order.total_price), 0);
     setTotalRevenueToday(revenue);
 
     // 2. Aggregate quantities needed for fulfillment (Layer 1)
     const productAggregation: { [name: string]: { qty: number, imageUrl?: string | null } } = {};
     
-    activeOrders.forEach((order) => {
+    pendingOrders.forEach((order) => {
       order.order_items.forEach((item) => {
         const productName = item.products?.name || 'منتج غير معروف';
         const imgUrl = item.products?.image_url || null;
@@ -162,7 +175,8 @@ export default function AdminDashboard() {
 
   // Fulfillment Action: Mark all pending as delivered (Purchase renaming)
   const handleFulfillAll = async () => {
-    if (orders.length === 0) return;
+    const pendingOrders = orders.filter(o => o.status === 'pending');
+    if (pendingOrders.length === 0) return;
     const confirmAction = window.confirm('هل أنت متأكد من شراء كافة الطلبيات المعلقة وأرشفتها؟');
     if (!confirmAction) return;
 
@@ -172,7 +186,7 @@ export default function AdminDashboard() {
       
       if (isUrlConfigured) {
         // Fetch all pending ids
-        const pendingIds = orders.map(o => o.id);
+        const pendingIds = pendingOrders.map(o => o.id);
         const { error } = await supabase
           .from('orders')
           .update({ status: 'delivered' })
@@ -183,10 +197,10 @@ export default function AdminDashboard() {
         console.log('Database not connected. Bypassing state update in demo mode.');
       }
 
-      // Success, clear active view
-      setOrders([]);
-      setTotalRevenueToday(0);
-      setAggregatedItems([]);
+      // Success, clear active pending view, keeping postponed orders untouched
+      const updatedOrders = orders.filter(o => o.status !== 'pending');
+      setOrders(updatedOrders);
+      calculateStats(updatedOrders);
       alert('تم تحديث حالة الطلبات إلى تم الشراء بنجاح!');
     } catch (err: any) {
       console.error(err);
@@ -333,6 +347,46 @@ export default function AdminDashboard() {
 
 
 
+  const handlePostponeOrder = async (orderId: string, currentStatus: 'pending' | 'postponed') => {
+    const newStatus: 'pending' | 'postponed' = currentStatus === 'pending' ? 'postponed' : 'pending';
+    const actionText = newStatus === 'postponed' ? 'تأجيل' : 'تنشيط';
+    const confirmAction = window.confirm(`هل أنت متأكد من ${actionText} هذه الطلبية؟`);
+    if (!confirmAction) return;
+
+    setIsUpdating(true);
+    try {
+      const isUrlConfigured = process.env.NEXT_PUBLIC_SUPABASE_URL && !process.env.NEXT_PUBLIC_SUPABASE_URL.includes('placeholder');
+      
+      if (isUrlConfigured) {
+        const { error } = await supabase
+          .from('orders')
+          .update({ status: newStatus })
+          .eq('id', orderId);
+
+        if (error) throw error;
+      } else {
+        console.log('Database not connected. Bypassing state update in demo mode.');
+      }
+
+      // Update local state
+      const updatedOrders = orders.map(o => {
+        if (o.id === orderId) {
+          return { ...o, status: newStatus };
+        }
+        return o;
+      });
+
+      setOrders(updatedOrders);
+      calculateStats(updatedOrders);
+      alert(`تم ${actionText} الطلبية بنجاح!`);
+    } catch (err: any) {
+      console.error(err);
+      alert(`حدث خطأ أثناء ${actionText} الطلبية.`);
+    } finally {
+      setIsUpdating(false);
+    }
+  };
+
   const handleCopyInvoiceLink = (orderId: string, totalPrice: number) => {
     if (totalPrice <= 0) {
       alert('يرجى حفظ وتسعير الفاتورة أولاً قبل نسخ الرابط.');
@@ -342,6 +396,9 @@ export default function AdminDashboard() {
     navigator.clipboard.writeText(invoiceUrl);
     alert('تم نسخ رابط الفاتورة المباشر إلى الحافظة بنجاح!');
   };
+
+  const activeOrdersList = orders.filter(o => o.status === 'pending');
+  const postponedOrdersList = orders.filter(o => o.status === 'postponed');
 
   return (
     <div className="space-y-6">
@@ -364,7 +421,7 @@ export default function AdminDashboard() {
           </div>
           <div>
             <p className="text-xs text-slate-500 font-bold">زبائن اليوم المعلقين</p>
-            <h3 className="text-2xl font-black text-slate-850 mt-1">{orders.length} زبائن</h3>
+            <h3 className="text-2xl font-black text-slate-850 mt-1">{orders.filter(o => o.status === 'pending').length} زبائن</h3>
           </div>
         </div>
 
@@ -407,9 +464,9 @@ export default function AdminDashboard() {
           </div>
         </div>
 
-        {orders.length > 0 ? (
+        {activeOrdersList.length > 0 ? (
           <div className="space-y-4">
-            {orders.map((order) => (
+            {activeOrdersList.map((order) => (
               <div 
                 key={order.id}
                 className="bg-slate-50 border border-slate-200 rounded-2xl p-5 space-y-4 hover:border-slate-300 transition-all"
@@ -427,6 +484,15 @@ export default function AdminDashboard() {
                     <span className="bg-white border border-slate-200 text-emerald-600 font-extrabold px-3 py-1.5 rounded-xl text-xs">
                       {Number(order.total_price).toFixed(2)} TL
                     </span>
+                    <button
+                      onClick={() => handlePostponeOrder(order.id, 'pending')}
+                      disabled={isUpdating}
+                      className="bg-amber-50 hover:bg-amber-100 border border-amber-250 text-amber-700 font-bold px-3 py-1.5 rounded-xl text-xs flex items-center gap-1 cursor-pointer transition-colors"
+                      title="تأجيل الطلبية لوقت لاحق"
+                    >
+                      <CalendarClock className="w-3.5 h-3.5" />
+                      <span>تأجيل</span>
+                    </button>
                     <button
                       onClick={() => handleFulfillOrder(order.id, order.customer_name)}
                       disabled={isUpdating}
@@ -536,11 +602,11 @@ export default function AdminDashboard() {
             </div>
             <div>
               <h2 className="text-md font-bold text-slate-800">تجميع الطلبيات الإجمالي لليوم</h2>
-              <p className="text-[11px] text-slate-500">إجمالي الكميات والسلع اللازم تجهيزها من المستودع لتلبية كافة الزبائن</p>
+              <p className="text-[11px] text-slate-505">إجمالي الكميات والسلع اللازم تجهيزها من المستودع لتلبية كافة الزبائن</p>
             </div>
           </div>
 
-          {orders.length > 0 && (
+          {activeOrdersList.length > 0 && (
             <button
               onClick={handleFulfillAll}
               disabled={isUpdating}
@@ -584,6 +650,147 @@ export default function AdminDashboard() {
             <CheckSquare className="w-10 h-10 text-slate-400 mx-auto" />
             <h3 className="text-sm font-bold text-slate-700">كل السلع مجهزة وسُلمت للزبائن</h3>
             <p className="text-xs text-slate-500">لا يوجد منتجات معلقة تحتاج للتجهيز من المستودع حالياً.</p>
+          </div>
+        )}
+      </div>
+
+      {/* Postponed Orders Section */}
+      <div className="bg-white border border-slate-200 rounded-3xl p-6 space-y-5 shadow-sm">
+        <div className="flex items-center gap-3 pb-4 border-b border-slate-100">
+          <div className="bg-amber-500/10 p-2.5 rounded-xl text-amber-600 border border-amber-500/20">
+            <CalendarClock className="w-5 h-5" />
+          </div>
+          <div>
+            <h2 className="text-md font-bold text-slate-800">الطلبيات المؤجلة</h2>
+            <p className="text-[11px] text-slate-500">قائمة بالفواتير التي تم تأجيلها لوقت لاحق لتسليمها يدوياً</p>
+          </div>
+        </div>
+
+        {postponedOrdersList.length > 0 ? (
+          <div className="space-y-4">
+            {postponedOrdersList.map((order) => (
+              <div 
+                key={order.id}
+                className="bg-amber-50/10 border border-amber-200/50 rounded-2xl p-5 space-y-4 hover:border-amber-300/60 transition-all"
+              >
+                {/* Order Header Info */}
+                <div className="flex items-center justify-between pb-3 border-b border-amber-100/50">
+                  <div>
+                    <h3 className="text-sm font-bold text-slate-800">{order.customer_name}</h3>
+                    <div className="flex items-center gap-1.5 text-[10px] text-slate-500 mt-1">
+                      <Clock className="w-3.5 h-3.5 text-slate-400" />
+                      <span>ساعة الاستلام: {formatTime(order.created_at)}</span>
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <span className="bg-white border border-slate-200 text-emerald-600 font-extrabold px-3 py-1.5 rounded-xl text-xs">
+                      {Number(order.total_price).toFixed(2)} TL
+                    </span>
+                    <button
+                      onClick={() => handlePostponeOrder(order.id, 'postponed')}
+                      disabled={isUpdating}
+                      className="bg-emerald-600 hover:bg-emerald-700 disabled:bg-slate-200 disabled:text-slate-450 text-white font-bold px-3 py-1.5 rounded-xl text-xs flex items-center gap-1 cursor-pointer transition-colors"
+                      title="إعادة تنشيط الطلبية ونقلها للنشطة"
+                    >
+                      <CalendarClock className="w-3.5 h-3.5" />
+                      <span>تنشيط</span>
+                    </button>
+                    <button
+                      onClick={() => handleFulfillOrder(order.id, order.customer_name)}
+                      disabled={isUpdating}
+                      className="bg-emerald-600 hover:bg-emerald-700 disabled:bg-slate-200 disabled:text-slate-450 text-white font-bold px-3 py-1.5 rounded-xl text-xs flex items-center gap-1 cursor-pointer transition-colors"
+                      title="تحديد كـ تم التسليم ونقل للأرشيف"
+                    >
+                      <CheckSquare className="w-3.5 h-3.5" />
+                      <span>تم التسليم</span>
+                    </button>
+                    <button
+                      onClick={() => handleCancelOrder(order.id, order.customer_name)}
+                      disabled={isUpdating}
+                      className="bg-rose-50 hover:bg-rose-100 border border-rose-200 text-rose-600 hover:text-rose-700 font-bold px-3 py-1.5 rounded-xl text-xs flex items-center gap-1 cursor-pointer transition-colors"
+                      title="إلغاء وحذف الطلبية"
+                    >
+                      <Trash2 className="w-3.5 h-3.5" />
+                      <span>إلغاء</span>
+                    </button>
+                  </div>
+                </div>
+
+                {/* Item Details */}
+                <div className="space-y-2">
+                  {order.order_items.map((item) => (
+                    <div key={item.id} className="flex justify-between items-center text-xs text-slate-600">
+                      <div className="flex items-center gap-2">
+                        {item.products?.image_url ? (
+                          <img 
+                            src={item.products.image_url} 
+                            onClick={() => setActivePreviewImage(item.products?.image_url || null)}
+                            className="w-14 h-14 rounded-lg object-cover shrink-0 border border-slate-200 cursor-zoom-in hover:brightness-95 transition-all" 
+                            alt={item.products.name || ''} 
+                          />
+                        ) : (
+                          <ShoppingBag className="w-14 h-14 p-2.5 bg-white text-slate-400 border border-slate-200 rounded-lg shrink-0" />
+                        )}
+                        <span>{item.products?.name || 'منتج غير متوفر'}</span>
+                      </div>
+                      <div className="flex items-center gap-1.5 shrink-0">
+                        <span className="text-xs font-bold text-slate-500">{item.quantity} صندوق ×</span>
+                        <input
+                          type="number"
+                          step="0.01"
+                          min="0"
+                          placeholder="السعر (TL)"
+                          value={editedPrices[item.id] !== undefined ? editedPrices[item.id] : (item.price_at_purchase !== null && item.price_at_purchase !== undefined && Number(item.price_at_purchase) > 0 ? item.price_at_purchase.toString() : '')}
+                          onChange={(e) => {
+                            setEditedPrices(prev => ({
+                              ...prev,
+                              [item.id]: e.target.value
+                            }));
+                          }}
+                          className="w-20 bg-white border border-slate-250 outline-none rounded-lg px-2 py-1 text-xs text-slate-800 focus:border-[#128C7E] focus:ring-1 focus:ring-[#128C7E] transition-all text-center font-bold"
+                          disabled={isUpdating}
+                        />
+                        <span className="text-[10px] text-slate-450 font-bold">TL</span>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+
+                {/* Actions Footer */}
+                <div className="flex flex-wrap items-center justify-between gap-3 pt-3 border-t border-slate-200 mt-1">
+                  <div className="flex items-center gap-2">
+                    <button
+                      onClick={() => handleSavePrices(order.id)}
+                      disabled={isUpdating}
+                      className="bg-emerald-50 hover:bg-emerald-100 border border-emerald-250 text-emerald-700 font-bold px-3 py-1.5 rounded-xl text-xs flex items-center gap-1 cursor-pointer transition-all active:scale-95 shadow-sm"
+                      title="حفظ الأسعار المدخلة وتحديث الإجمالي"
+                    >
+                      <Save className="w-3.5 h-3.5" />
+                      <span>حفظ الأسعار</span>
+                    </button>
+                    
+                    <button
+                      onClick={() => handleCopyInvoiceLink(order.id, order.total_price)}
+                      className="bg-slate-50 hover:bg-slate-100 border border-slate-250 text-slate-600 hover:text-slate-800 font-bold px-3 py-1.5 rounded-xl text-xs flex items-center gap-1 cursor-pointer transition-all active:scale-95 shadow-sm"
+                      title="نسخ رابط الفاتورة لمشاركته بأي طريقة أخرى"
+                    >
+                      <Copy className="w-3.5 h-3.5" />
+                      <span>نسخ الرابط</span>
+                    </button>
+                  </div>
+
+                  <span className="text-[10px] text-slate-400 font-medium">
+                    * يمكنك تنشيط الطلبية لتعود لقائمة التوزيع الفعالة.
+                  </span>
+                </div>
+              </div>
+            ))}
+          </div>
+        ) : (
+          <div className="text-center py-10 space-y-2">
+            <CalendarClock className="w-10 h-10 text-slate-400 mx-auto" />
+            <h3 className="text-sm font-bold text-slate-700">لا يوجد طلبات مؤجلة حالياً</h3>
+            <p className="text-xs text-slate-500">الطلبيات المؤجلة تظهر هنا لتنظيم العمل اليومي.</p>
           </div>
         )}
       </div>

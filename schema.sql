@@ -98,3 +98,7 @@ CREATE POLICY "Allow public select orders" ON orders FOR SELECT USING (true);
 DROP POLICY IF EXISTS "Allow public select order_items" ON order_items;
 CREATE POLICY "Allow public select order_items" ON order_items FOR SELECT USING (true);
 
+-- Migration: Update status check constraint to allow 'postponed' orders
+ALTER TABLE orders DROP CONSTRAINT IF EXISTS orders_status_check;
+ALTER TABLE orders ADD CONSTRAINT orders_status_check CHECK (status IN ('pending', 'delivered', 'postponed'));
+
