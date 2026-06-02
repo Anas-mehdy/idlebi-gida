@@ -312,62 +312,6 @@ export default function AdminDashboard() {
         </div>
       </div>
 
-      {/* Layer 1: Global Daily Fulfillment Stats */}
-      <div className="bg-white border border-slate-200 rounded-3xl p-6 space-y-5 shadow-sm">
-        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 pb-4 border-b border-slate-100">
-          <div className="flex items-center gap-3">
-            <div className="bg-blue-500/10 p-2.5 rounded-xl text-blue-600 border border-blue-500/20">
-              <ClipboardList className="w-5 h-5" />
-            </div>
-            <div>
-              <h2 className="text-md font-bold text-slate-800">المستوى 1: تجميع الطلبيات الإجمالي لليوم</h2>
-              <p className="text-[11px] text-slate-500">إجمالي الكميات والسلع اللازم تجهيزها من المستودع لتلبية كافة الزبائن</p>
-            </div>
-          </div>
-
-          {orders.length > 0 && (
-            <button
-              onClick={handleFulfillAll}
-              disabled={isUpdating}
-              className="bg-emerald-650 hover:bg-emerald-700 disabled:bg-slate-100 disabled:text-slate-400 text-white px-5 py-2.5 rounded-xl text-xs font-bold transition-all shadow-md flex items-center gap-2 cursor-pointer animate-pulse"
-              style={{ backgroundColor: '#128C7E' }}
-            >
-              <CheckSquare className="w-4 h-4" />
-              <span>{isUpdating ? 'جاري التحديث...' : 'تم الشراء'}</span>
-            </button>
-          )}
-        </div>
-
-        {aggregatedItems.length > 0 ? (
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            {aggregatedItems.map((item, idx) => (
-              <div 
-                key={idx}
-                className="bg-slate-50 p-4 rounded-2xl border border-slate-200/60 flex items-center justify-between hover:border-slate-300 transition-colors"
-              >
-                <div className="flex items-center gap-3">
-                  {item.imageUrl ? (
-                    <img src={item.imageUrl} className="w-12 h-12 rounded-xl object-cover shrink-0 border border-slate-205" alt={item.productName} />
-                  ) : (
-                    <ShoppingBag className="w-12 h-12 p-2.5 bg-white text-slate-400 border border-slate-200 rounded-xl shrink-0" />
-                  )}
-                  <span className="text-sm font-semibold text-slate-700">{item.productName}</span>
-                </div>
-                <span className="bg-white text-emerald-600 font-extrabold px-3 py-1.5 rounded-xl text-sm border border-slate-200 shrink-0">
-                  {item.totalQty} علبة / صندوق
-                </span>
-              </div>
-            ))}
-          </div>
-        ) : (
-          <div className="text-center py-10 space-y-2">
-            <CheckSquare className="w-10 h-10 text-slate-400 mx-auto" />
-            <h3 className="text-sm font-bold text-slate-700">كل السلع مجهزة وسُلمت للزبائن</h3>
-            <p className="text-xs text-slate-500">لا يوجد منتجات معلقة تحتاج للتجهيز من المستودع حالياً.</p>
-          </div>
-        )}
-      </div>
-
       {/* Layer 2: Customer Order Breakdown */}
       <div className="bg-white border border-slate-200 rounded-3xl p-6 space-y-5 shadow-sm">
         <div className="flex items-center gap-3 pb-4 border-b border-slate-100">
@@ -375,7 +319,7 @@ export default function AdminDashboard() {
             <ClipboardList className="w-5 h-5" />
           </div>
           <div>
-            <h2 className="text-md font-bold text-slate-800">المستوى 2: كشف الفواتير والزبائن بالتفصيل</h2>
+            <h2 className="text-md font-bold text-slate-800">كشف الفواتير والزبائن بالتفصيل</h2>
             <p className="text-[11px] text-slate-500">قائمة بالفواتير الفردية المستلمة وتفاصيل طلب كل زبون</p>
           </div>
         </div>
@@ -451,6 +395,62 @@ export default function AdminDashboard() {
             <ClipboardList className="w-10 h-10 text-slate-400 mx-auto" />
             <h3 className="text-sm font-bold text-slate-700">لا يوجد فواتير فردية نشطة</h3>
             <p className="text-xs text-slate-500">سيتم سرد الفواتير فور إرسالها من الزبائن في المتجر العام.</p>
+          </div>
+        )}
+      </div>
+
+      {/* Layer 1: Global Daily Fulfillment Stats */}
+      <div className="bg-white border border-slate-200 rounded-3xl p-6 space-y-5 shadow-sm">
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 pb-4 border-b border-slate-100">
+          <div className="flex items-center gap-3">
+            <div className="bg-blue-500/10 p-2.5 rounded-xl text-blue-600 border border-blue-500/20">
+              <ClipboardList className="w-5 h-5" />
+            </div>
+            <div>
+              <h2 className="text-md font-bold text-slate-800">تجميع الطلبيات الإجمالي لليوم</h2>
+              <p className="text-[11px] text-slate-500">إجمالي الكميات والسلع اللازم تجهيزها من المستودع لتلبية كافة الزبائن</p>
+            </div>
+          </div>
+
+          {orders.length > 0 && (
+            <button
+              onClick={handleFulfillAll}
+              disabled={isUpdating}
+              className="bg-emerald-650 hover:bg-emerald-700 disabled:bg-slate-100 disabled:text-slate-400 text-white px-5 py-2.5 rounded-xl text-xs font-bold transition-all shadow-md flex items-center gap-2 cursor-pointer animate-pulse"
+              style={{ backgroundColor: '#128C7E' }}
+            >
+              <CheckSquare className="w-4 h-4" />
+              <span>{isUpdating ? 'جاري التحديث...' : 'تم الشراء'}</span>
+            </button>
+          )}
+        </div>
+
+        {aggregatedItems.length > 0 ? (
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            {aggregatedItems.map((item, idx) => (
+              <div 
+                key={idx}
+                className="bg-slate-50 p-4 rounded-2xl border border-slate-200/60 flex items-center justify-between hover:border-slate-300 transition-colors"
+              >
+                <div className="flex items-center gap-3">
+                  {item.imageUrl ? (
+                    <img src={item.imageUrl} className="w-12 h-12 rounded-xl object-cover shrink-0 border border-slate-205" alt={item.productName} />
+                  ) : (
+                    <ShoppingBag className="w-12 h-12 p-2.5 bg-white text-slate-400 border border-slate-200 rounded-xl shrink-0" />
+                  )}
+                  <span className="text-sm font-semibold text-slate-700">{item.productName}</span>
+                </div>
+                <span className="bg-white text-emerald-600 font-extrabold px-3 py-1.5 rounded-xl text-sm border border-slate-200 shrink-0">
+                  {item.totalQty} علبة / صندوق
+                </span>
+              </div>
+            ))}
+          </div>
+        ) : (
+          <div className="text-center py-10 space-y-2">
+            <CheckSquare className="w-10 h-10 text-slate-400 mx-auto" />
+            <h3 className="text-sm font-bold text-slate-700">كل السلع مجهزة وسُلمت للزبائن</h3>
+            <p className="text-xs text-slate-500">لا يوجد منتجات معلقة تحتاج للتجهيز من المستودع حالياً.</p>
           </div>
         )}
       </div>
