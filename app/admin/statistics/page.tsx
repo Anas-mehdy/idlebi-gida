@@ -328,51 +328,6 @@ export default function AdminStatistics() {
         </div>
       </div>
 
-      {/* Filtered Sales Item Aggregator */}
-      <div className="bg-white border border-slate-200 rounded-3xl p-6 space-y-5 shadow-sm">
-        <div className="flex items-center gap-3 pb-4 border-b border-slate-100">
-          <div className="bg-blue-50 p-2.5 rounded-xl text-blue-650 border border-blue-200/50">
-            <ShoppingBag className="w-5 h-5 text-blue-600" />
-          </div>
-          <div>
-            <h2 className="text-md font-bold text-slate-800">إجمالي المنتجات والسلع المباعة (في الفلاتر الحالية)</h2>
-            <p className="text-[11px] text-slate-500">الكميات التراكمية المباعة من كل منتج وقيمتها المالية الإجمالية</p>
-          </div>
-        </div>
-
-        {aggregatedSoldItems.length > 0 ? (
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            {aggregatedSoldItems.map((item, idx) => (
-              <div 
-                key={idx}
-                className="bg-slate-50 p-4 rounded-2xl border border-slate-200 flex items-center justify-between hover:border-slate-300 transition-colors shadow-xs"
-              >
-                <div className="flex items-center gap-3">
-                  {item.imageUrl ? (
-                    <img src={item.imageUrl} className="w-10 h-10 rounded-xl object-cover shrink-0 border border-slate-200 shadow-xs" alt={item.productName} />
-                  ) : (
-                    <ShoppingBag className="w-10 h-10 p-2 bg-white text-slate-400 border border-slate-200 rounded-xl shrink-0" />
-                  )}
-                  <div className="space-y-1">
-                    <span className="text-sm font-semibold text-slate-800 block">{item.productName}</span>
-                    <span className="text-[10px] text-emerald-650 font-bold font-mono block">الإيراد: {item.totalSales.toFixed(2)} TL</span>
-                  </div>
-                </div>
-                <span className="bg-white text-emerald-600 font-extrabold px-3 py-1.5 rounded-xl text-sm border border-slate-200 shadow-sm shrink-0">
-                  {item.totalQty} علبة / صندوق
-                </span>
-              </div>
-            ))}
-          </div>
-        ) : (
-          <div className="text-center py-10 space-y-2">
-            <ShoppingBag className="w-10 h-10 text-slate-400 mx-auto" />
-            <h3 className="text-sm font-bold text-slate-700">لا يوجد كميات مباعة</h3>
-            <p className="text-xs text-slate-550">لا تطابق الفلاتر الحالية أي طلبيات مسجلة.</p>
-          </div>
-        )}
-      </div>
-
       {/* Historical Detailed Breakdown */}
       <div className="bg-white border border-slate-200 rounded-3xl p-6 space-y-5 shadow-sm">
         <div className="flex items-center gap-3 pb-4 border-b border-slate-100">
@@ -442,6 +397,51 @@ export default function AdminStatistics() {
             <FileText className="w-10 h-10 text-slate-400 mx-auto" />
             <h3 className="text-sm font-bold text-slate-700">لم نجد أي طلبيات مطابقة للبحث</h3>
             <p className="text-xs text-slate-550">جرب تعديل التاريخ أو تصفية مدخلات اسم الزبون.</p>
+          </div>
+        )}
+      </div>
+
+      {/* Filtered Sales Item Aggregator */}
+      <div className="bg-white border border-slate-200 rounded-3xl p-6 space-y-5 shadow-sm">
+        <div className="flex items-center gap-3 pb-4 border-b border-slate-100">
+          <div className="bg-blue-50 p-2.5 rounded-xl text-blue-650 border border-blue-200/50">
+            <ShoppingBag className="w-5 h-5 text-blue-600" />
+          </div>
+          <div>
+            <h2 className="text-md font-bold text-slate-800">إجمالي المنتجات والسلع المباعة (في الفلاتر الحالية)</h2>
+            <p className="text-[11px] text-slate-500">الكميات التراكمية المباعة من كل منتج وقيمتها المالية الإجمالية</p>
+          </div>
+        </div>
+
+        {aggregatedSoldItems.length > 0 ? (
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            {aggregatedSoldItems.map((item, idx) => (
+              <div 
+                key={idx}
+                className="bg-slate-50 p-4 rounded-2xl border border-slate-200 flex items-center justify-between hover:border-slate-300 transition-colors shadow-xs"
+              >
+                <div className="flex items-center gap-3">
+                  {item.imageUrl ? (
+                    <img src={item.imageUrl} className="w-10 h-10 rounded-xl object-cover shrink-0 border border-slate-200 shadow-xs" alt={item.productName} />
+                  ) : (
+                    <ShoppingBag className="w-10 h-10 p-2 bg-white text-slate-400 border border-slate-200 rounded-xl shrink-0" />
+                  )}
+                  <div className="space-y-1">
+                    <span className="text-sm font-semibold text-slate-800 block">{item.productName}</span>
+                    <span className="text-[10px] text-emerald-650 font-bold font-mono block">الإيراد: {item.totalSales.toFixed(2)} TL</span>
+                  </div>
+                </div>
+                <span className="bg-white text-emerald-600 font-extrabold px-3 py-1.5 rounded-xl text-sm border border-slate-200 shadow-sm shrink-0">
+                  {item.totalQty} علبة / صندوق
+                </span>
+              </div>
+            ))}
+          </div>
+        ) : (
+          <div className="text-center py-10 space-y-2">
+            <ShoppingBag className="w-10 h-10 text-slate-400 mx-auto" />
+            <h3 className="text-sm font-bold text-slate-700">لا يوجد كميات مباعة</h3>
+            <p className="text-xs text-slate-550">لا تطابق الفلاتر الحالية أي طلبيات مسجلة.</p>
           </div>
         )}
       </div>
