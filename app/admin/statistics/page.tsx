@@ -163,27 +163,30 @@ export default function AdminStatistics() {
 
   // Aggregate quantities sold in the filtered range
   const calculateAggregatedSoldItems = (): AggregatedItem[] => {
-    const productAggregation: { [name: string]: { qty: number, sales: number, imageUrl?: string | null } } = {};
+    const productAggregation: { 
+      [productIdOrName: string]: { productName: string, qty: number, sales: number, imageUrl?: string | null } 
+    } = {};
     
     filteredOrders.forEach((order) => {
       order.order_items.forEach((item) => {
         const productName = item.products?.name || 'منتج غير معروف';
         const imgUrl = item.products?.image_url || null;
         const itemSales = item.quantity * Number(item.price_at_purchase);
+        const groupKey = item.product_id || productName;
         
-        if (!productAggregation[productName]) {
-          productAggregation[productName] = { qty: 0, sales: 0, imageUrl: imgUrl };
+        if (!productAggregation[groupKey]) {
+          productAggregation[groupKey] = { productName, qty: 0, sales: 0, imageUrl: imgUrl };
         }
-        productAggregation[productName].qty += item.quantity;
-        productAggregation[productName].sales += itemSales;
+        productAggregation[groupKey].qty += item.quantity;
+        productAggregation[groupKey].sales += itemSales;
       });
     });
 
-    return Object.keys(productAggregation).map((name) => ({
-      productName: name,
-      totalQty: productAggregation[name].qty,
-      totalSales: productAggregation[name].sales,
-      imageUrl: productAggregation[name].imageUrl,
+    return Object.keys(productAggregation).map((key) => ({
+      productName: productAggregation[key].productName,
+      totalQty: productAggregation[key].qty,
+      totalSales: productAggregation[key].sales,
+      imageUrl: productAggregation[key].imageUrl,
     })).sort((a, b) => b.totalQty - a.totalQty); // Sort by quantity sold descending
   };
 

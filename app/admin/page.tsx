@@ -151,23 +151,27 @@ export default function AdminDashboard() {
     setTotalRevenueToday(revenue);
 
     // 2. Aggregate quantities needed for fulfillment (Layer 1)
-    const productAggregation: { [name: string]: { qty: number, imageUrl?: string | null } } = {};
+    const productAggregation: { 
+      [productIdOrName: string]: { productName: string, qty: number, imageUrl?: string | null } 
+    } = {};
     
     pendingOrders.forEach((order) => {
       order.order_items.forEach((item) => {
         const productName = item.products?.name || 'منتج غير معروف';
         const imgUrl = item.products?.image_url || null;
-        if (!productAggregation[productName]) {
-          productAggregation[productName] = { qty: 0, imageUrl: imgUrl };
+        const groupKey = item.product_id || productName;
+
+        if (!productAggregation[groupKey]) {
+          productAggregation[groupKey] = { productName, qty: 0, imageUrl: imgUrl };
         }
-        productAggregation[productName].qty += item.quantity;
+        productAggregation[groupKey].qty += item.quantity;
       });
     });
 
-    const aggregatedList: AggregatedItem[] = Object.keys(productAggregation).map((name) => ({
-      productName: name,
-      totalQty: productAggregation[name].qty,
-      imageUrl: productAggregation[name].imageUrl,
+    const aggregatedList: AggregatedItem[] = Object.keys(productAggregation).map((key) => ({
+      productName: productAggregation[key].productName,
+      totalQty: productAggregation[key].qty,
+      imageUrl: productAggregation[key].imageUrl,
     }));
 
     setAggregatedItems(aggregatedList);
