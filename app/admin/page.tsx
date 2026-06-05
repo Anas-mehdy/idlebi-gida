@@ -10,6 +10,8 @@ interface OrderItem {
   product_id: string | null;
   quantity: number;
   price_at_purchase: number;
+  product_name?: string | null;
+  product_image?: string | null;
   products?: {
     name: string;
     image_url?: string | null;
@@ -104,6 +106,8 @@ export default function AdminDashboard() {
           *,
           order_items (
             *,
+            product_name,
+            product_image,
             products (
               name,
               image_url
@@ -120,6 +124,8 @@ export default function AdminDashboard() {
         ...order,
         order_items: (order.order_items || []).map((item: any) => ({
           ...item,
+          product_name: item.product_name,
+          product_image: item.product_image,
           products: item.products ? { name: item.products.name, image_url: item.products.image_url } : null
         }))
       }));
@@ -157,8 +163,8 @@ export default function AdminDashboard() {
     
     pendingOrders.forEach((order) => {
       order.order_items.forEach((item) => {
-        const productName = item.products?.name || 'منتج غير معروف';
-        const imgUrl = item.products?.image_url || null;
+        const productName = item.product_name || item.products?.name || 'منتج غير معروف';
+        const imgUrl = item.product_image || item.products?.image_url || null;
         const groupKey = item.product_id || productName;
 
         if (!productAggregation[groupKey]) {
@@ -530,17 +536,17 @@ export default function AdminDashboard() {
                   {order.order_items.map((item) => (
                     <div key={item.id} className="flex justify-between items-center text-xs text-slate-600">
                       <div className="flex items-center gap-2">
-                        {item.products?.image_url ? (
+                        {item.product_image || item.products?.image_url ? (
                           <img 
-                            src={item.products.image_url} 
-                            onClick={() => setActivePreviewImage(item.products?.image_url || null)}
+                            src={item.product_image || item.products?.image_url || undefined} 
+                            onClick={() => setActivePreviewImage(item.product_image || item.products?.image_url || null)}
                             className="w-14 h-14 rounded-lg object-cover shrink-0 border border-slate-200 cursor-zoom-in hover:brightness-95 transition-all" 
-                            alt={item.products.name || ''} 
+                            alt={item.product_name || item.products?.name || ''} 
                           />
                         ) : (
                           <ShoppingBag className="w-14 h-14 p-2.5 bg-white text-slate-400 border border-slate-200 rounded-lg shrink-0" />
                         )}
-                        <span>{item.products?.name || 'منتج غير متوفر'}</span>
+                        <span>{item.product_name || item.products?.name || 'منتج غير متوفر'}</span>
                       </div>
                       <div className="flex items-center gap-1.5 shrink-0">
                         <span className="text-xs font-bold text-slate-500">{item.quantity} صندوق ×</span>
@@ -739,17 +745,17 @@ export default function AdminDashboard() {
                   {order.order_items.map((item) => (
                     <div key={item.id} className="flex justify-between items-center text-xs text-slate-600">
                       <div className="flex items-center gap-2">
-                        {item.products?.image_url ? (
+                        {item.product_image || item.products?.image_url ? (
                           <img 
-                            src={item.products.image_url} 
-                            onClick={() => setActivePreviewImage(item.products?.image_url || null)}
+                            src={item.product_image || item.products?.image_url || undefined} 
+                            onClick={() => setActivePreviewImage(item.product_image || item.products?.image_url || null)}
                             className="w-14 h-14 rounded-lg object-cover shrink-0 border border-slate-200 cursor-zoom-in hover:brightness-95 transition-all" 
-                            alt={item.products.name || ''} 
+                            alt={item.product_name || item.products?.name || ''} 
                           />
                         ) : (
                           <ShoppingBag className="w-14 h-14 p-2.5 bg-white text-slate-400 border border-slate-200 rounded-lg shrink-0" />
                         )}
-                        <span>{item.products?.name || 'منتج غير متوفر'}</span>
+                        <span>{item.product_name || item.products?.name || 'منتج غير متوفر'}</span>
                       </div>
                       <div className="flex items-center gap-1.5 shrink-0">
                         <span className="text-xs font-bold text-slate-500">{item.quantity} صندوق ×</span>

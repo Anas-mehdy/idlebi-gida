@@ -72,7 +72,9 @@ export default function CheckoutPage() {
           order_id: orderId,
           product_id: item.id.startsWith('p') ? null : item.id, // Set null if using mock ids (p1, p2)
           quantity: item.quantity,
-          price_at_purchase: item.price
+          price_at_purchase: item.price,
+          product_name: item.name,
+          product_image: item.image_url
         }));
 
         const { error: itemsError } = await supabase

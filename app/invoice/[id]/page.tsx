@@ -11,6 +11,8 @@ interface OrderItem {
   product_id: string | null;
   quantity: number;
   price_at_purchase: number;
+  product_name?: string | null;
+  product_image?: string | null;
   products?: {
     name: string;
     image_url?: string | null;
@@ -48,6 +50,8 @@ export default function PublicInvoicePage({ params }: { params: Promise<{ id: st
           *,
           order_items (
             *,
+            product_name,
+            product_image,
             products (
               name,
               image_url
@@ -67,6 +71,8 @@ export default function PublicInvoicePage({ params }: { params: Promise<{ id: st
         ...data,
         order_items: (data.order_items || []).map((item: any) => ({
           ...item,
+          product_name: item.product_name,
+          product_image: item.product_image,
           products: item.products ? { name: item.products.name, image_url: item.products.image_url } : null
         }))
       };
@@ -197,10 +203,10 @@ export default function PublicInvoicePage({ params }: { params: Promise<{ id: st
                   <div className="flex items-center gap-3 min-w-0 flex-1">
                     {/* Image Thumbnail */}
                     <div className="w-10 h-10 rounded-lg bg-slate-50 border border-slate-200 flex items-center justify-center shrink-0 overflow-hidden">
-                      {item.products?.image_url ? (
+                      {item.product_image || item.products?.image_url ? (
                         <img
-                          src={item.products.image_url}
-                          alt={item.products.name}
+                          src={item.product_image || item.products?.image_url || undefined}
+                          alt={item.product_name || item.products?.name || ''}
                           className="w-full h-full object-cover"
                         />
                       ) : (
@@ -209,7 +215,7 @@ export default function PublicInvoicePage({ params }: { params: Promise<{ id: st
                     </div>
                     {/* Item details */}
                     <div className="min-w-0 flex-1 text-right">
-                      <p className="text-sm font-bold text-slate-800 truncate">{item.products?.name || 'منتج غير متوفر'}</p>
+                      <p className="text-sm font-bold text-slate-800 truncate">{item.product_name || item.products?.name || 'منتج غير متوفر'}</p>
                       <p className="text-[10px] text-slate-450 font-semibold mt-0.5">
                         {item.price_at_purchase > 0 ? (
                           `${item.quantity} صندوق × ${Number(item.price_at_purchase).toFixed(2)} TL`
