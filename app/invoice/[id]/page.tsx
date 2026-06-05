@@ -239,6 +239,14 @@ export default function PublicInvoicePage({ params }: { params: Promise<{ id: st
           </div>
         </div>
 
+        {/* إحصائية الصناديق للفاتورة */}
+        <div className="bg-slate-50 rounded-2xl p-4 border border-slate-200/60 flex items-center justify-between text-xs font-bold text-slate-700">
+          <span>إجمالي عدد الصناديق المطلوبة:</span>
+          <span className="font-mono text-sm bg-slate-200/60 px-2.5 py-0.5 rounded-lg text-slate-800">
+            {order.order_items.reduce((sum, item) => sum + item.quantity, 0)} صندوق
+          </span>
+        </div>
+
         {/* Grand Total Card */}
         <div className="bg-emerald-50/50 rounded-2xl p-4 border border-emerald-100 flex items-center justify-between">
           <div>

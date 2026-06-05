@@ -569,6 +569,12 @@ export default function AdminDashboard() {
                       </div>
                     </div>
                   ))}
+                  
+                  {/* إحصائية عدد الصناديق الإجمالي للفاتورة */}
+                  <div className="flex justify-between items-center text-xs font-extrabold text-[#128C7E] bg-emerald-50/30 border border-emerald-100/80 rounded-xl px-3.5 py-2 mt-2 shadow-2xs">
+                    <span>إجمالي عدد الصناديق المطلوبة:</span>
+                    <span className="font-mono text-sm bg-[#128C7E]/10 px-2 py-0.5 rounded-lg">{order.order_items.reduce((sum, item) => sum + item.quantity, 0)} صندوق</span>
+                  </div>
                 </div>
 
                 {/* Actions Footer */}
@@ -778,6 +784,12 @@ export default function AdminDashboard() {
                       </div>
                     </div>
                   ))}
+                  
+                  {/* إحصائية عدد الصناديق الإجمالي للفاتورة */}
+                  <div className="flex justify-between items-center text-xs font-extrabold text-[#128C7E] bg-emerald-50/30 border border-emerald-100/80 rounded-xl px-3.5 py-2 mt-2 shadow-2xs">
+                    <span>إجمالي عدد الصناديق المطلوبة:</span>
+                    <span className="font-mono text-sm bg-[#128C7E]/10 px-2 py-0.5 rounded-lg">{order.order_items.reduce((sum, item) => sum + item.quantity, 0)} صندوق</span>
+                  </div>
                 </div>
 
                 {/* Actions Footer */}
