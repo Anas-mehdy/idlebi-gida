@@ -36,6 +36,63 @@ const MOCK_PRODUCTS: Product[] = [
   { id: 'p3', name: 'شاي تركي غوكسو 100 ظرف', price: 85.00, category_id: '2', image_url: null, categories: { name: 'مشروبات وغازيات' } }
 ];
 
+const compressImage = (file: File, maxWidth = 800): Promise<Blob | File> => {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.readAsDataURL(file);
+    reader.onload = (event) => {
+      const img = new Image();
+      img.src = event.target?.result as string;
+      img.onload = () => {
+        const canvas = document.createElement('canvas');
+        let width = img.width;
+        let height = img.height;
+
+        // Resize if larger than maxWidth
+        if (width > maxWidth || height > maxWidth) {
+          if (width > height) {
+            height = Math.round((height * maxWidth) / width);
+            width = maxWidth;
+          } else {
+            width = Math.round((width * maxWidth) / height);
+            height = maxWidth;
+          }
+        }
+
+        canvas.width = width;
+        canvas.height = height;
+
+        const ctx = canvas.getContext('2d');
+        if (!ctx) {
+          resolve(file);
+          return;
+        }
+
+        ctx.drawImage(img, 0, 0, width, height);
+
+        canvas.toBlob(
+          (blob) => {
+            if (blob) {
+              const baseName = file.name.substring(0, file.name.lastIndexOf('.')) || file.name;
+              const compressedFile = new File([blob], `${baseName.replace(/\s+/g, '_')}_opt_${Date.now()}.jpg`, {
+                type: 'image/jpeg',
+                lastModified: Date.now(),
+              });
+              resolve(compressedFile);
+            } else {
+              resolve(file);
+            }
+          },
+          'image/jpeg',
+          0.75 // 75% quality is perfect for web speed
+        );
+      };
+      img.onerror = (err) => reject(err);
+    };
+    reader.onerror = (err) => reject(err);
+  });
+};
+
 export default function AdminProducts() {
   const [products, setProducts] = useState<Product[]>([]);
   const [categories, setCategories] = useState<Category[]>([]);
@@ -252,14 +309,30 @@ export default function AdminProducts() {
       if (isUrlConfigured) {
         // 1. Upload image to Storage if exists
         if (imageFile) {
-          const fileExt = imageFile.name.split('.').pop();
-          const fileName = `product-${Date.now()}.${fileExt}`;
+          // Compress image client-side first
+          let fileToUpload: File | Blob = imageFile;
+          let fileName = `product-${Date.now()}.jpg`; // Default filename
+
+          try {
+            const compressed = await compressImage(imageFile);
+            fileToUpload = compressed;
+            if (compressed instanceof File) {
+              fileName = compressed.name;
+            } else {
+              fileName = `product-${Date.now()}.jpg`;
+            }
+          } catch (compressErr) {
+            console.warn('Image compression failed, uploading original image:', compressErr);
+            const fileExt = imageFile.name.split('.').pop();
+            fileName = `product-${Date.now()}.${fileExt}`;
+          }
+
           const filePath = `${fileName}`;
 
           const { error: uploadError } = await supabase.storage
             .from('product-images')
-            .upload(filePath, imageFile, {
-              cacheControl: '3600',
+            .upload(filePath, fileToUpload, {
+              cacheControl: '31536000', // Cache for 1 year
               upsert: true
             });
 
