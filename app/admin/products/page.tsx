@@ -93,53 +93,6 @@ const compressImage = (file: File, maxWidth = 800): Promise<Blob | File> => {
   });
 };
 
-const compressImageUrl = async (url: string, maxWidth = 800): Promise<Blob> => {
-  return new Promise((resolve, reject) => {
-    const img = new Image();
-    img.crossOrigin = "anonymous";
-    img.src = url;
-    img.onload = () => {
-      const canvas = document.createElement('canvas');
-      let width = img.width;
-      let height = img.height;
-
-      if (width > maxWidth || height > maxWidth) {
-        if (width > height) {
-          height = Math.round((height * maxWidth) / width);
-          width = maxWidth;
-        } else {
-          width = Math.round((width * maxWidth) / height);
-          height = maxWidth;
-        }
-      }
-
-      canvas.width = width;
-      canvas.height = height;
-
-      const ctx = canvas.getContext('2d');
-      if (!ctx) {
-        reject(new Error('Canvas context not available'));
-        return;
-      }
-
-      ctx.drawImage(img, 0, 0, width, height);
-
-      canvas.toBlob(
-        (blob) => {
-          if (blob) {
-            resolve(blob);
-          } else {
-            reject(new Error('Canvas blob generation failed'));
-          }
-        },
-        'image/jpeg',
-        0.75
-      );
-    };
-    img.onerror = (err) => reject(new Error('Failed to load image from URL for compression'));
-  });
-};
-
 export default function AdminProducts() {
   const [products, setProducts] = useState<Product[]>([]);
   const [categories, setCategories] = useState<Category[]>([]);
@@ -162,7 +115,6 @@ export default function AdminProducts() {
   const [draggingId, setDraggingId] = useState<string | null>(null);
   const [dragOverId, setDragOverId] = useState<string | null>(null);
   const [savingOrder, setSavingOrder] = useState(false);
-  const [isOptimizing, setIsOptimizing] = useState(false);
   const [selectedFilterCategory, setSelectedFilterCategory] = useState('all');
   const [activePreviewImage, setActivePreviewImage] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -519,64 +471,6 @@ export default function AdminProducts() {
     }
   };
 
-  const handleOptimizeImages = async (limit: number) => {
-    // Filter products that have non-null image urls and aren't placeholders
-    const productsWithImages = products.filter(
-      p => p.image_url && p.image_url.startsWith('http') && !p.image_url.includes('unsplash.com')
-    );
-
-    if (productsWithImages.length === 0) {
-      alert('لا توجد منتجات تحتوي على صور مرفوعة على السحابة حالياً.');
-      return;
-    }
-
-    const targetProducts = productsWithImages.slice(0, limit);
-    const namesList = targetProducts.map(p => p.name).join('، ');
-    
-    const confirmAction = window.confirm(
-      `سيتم تحميل وضغط صور المنتجات التالية وإعادة رفعها إلى السحابة مع كاش لمدة سنة:\n\n${namesList}\n\nهل تريد الاستمرار؟`
-    );
-    if (!confirmAction) return;
-
-    setIsOptimizing(true);
-    let successCount = 0;
-    let failedCount = 0;
-    const successNames: string[] = [];
-
-    for (const prod of targetProducts) {
-      if (!prod.image_url) continue;
-      try {
-        // Parse filename from URL
-        const fileName = prod.image_url.split('/').pop();
-        if (!fileName) continue;
-
-        // Load and compress
-        const blob = await compressImageUrl(prod.image_url);
-
-        // Upload back to Storage (overwrite)
-        const { error: uploadErr } = await supabase.storage
-          .from('product-images')
-          .upload(fileName, blob, {
-            cacheControl: '31536000', // Update cache to 1 year
-            upsert: true
-          });
-
-        if (uploadErr) throw uploadErr;
-
-        successCount++;
-        successNames.push(prod.name);
-      } catch (err) {
-        console.error(`Failed to optimize image for ${prod.name}:`, err);
-        failedCount++;
-      }
-    }
-
-    setIsOptimizing(false);
-    alert(
-      `اكتملت العملية!\nتم تحسين صور: ${successCount} منتج بنجاح.\nفشل: ${failedCount} منتج.\n\nالمنتجات المعدلة:\n${successNames.join(' - ')}`
-    );
-  };
-
   return (
     <div className="space-y-6">
       {/* Warning */}
@@ -602,34 +496,6 @@ export default function AdminProducts() {
         </button>
       </div>
 
-      {/* Developer Storage Optimizer Tool */}
-      {products.some(p => p.image_url && p.image_url.startsWith('http') && !p.image_url.includes('unsplash.com')) && (
-        <div className="bg-amber-50/45 border border-amber-200 rounded-2xl p-5 space-y-3 shadow-sm">
-          <div className="flex items-center gap-2 text-amber-800">
-            <Upload className="w-5 h-5 text-amber-600 animate-bounce" />
-            <h3 className="text-sm font-bold">أداة تحسين كفاءة الصور القديمة المرفوعة</h3>
-          </div>
-          <p className="text-xs text-slate-600 leading-relaxed">
-            هذه الأداة تقوم بتحميل الصور القديمة كبيرة الحجم التي قمت برفعها وتصغير حجمها تلقائياً (إلى أقل من 100 كيلوبايت) وإعادة كتابتها بنفس أسمائها لتحديث الكاش وتخفيض استهلاك البيانات، دون التأثير على أي منتج أو حذف أي بيانات.
-          </p>
-          <div className="flex flex-wrap gap-2.5 pt-1">
-            <button
-              onClick={() => handleOptimizeImages(2)}
-              disabled={isOptimizing}
-              className="bg-amber-600 hover:bg-amber-700 disabled:bg-slate-200 disabled:text-slate-400 text-white font-bold px-4 py-2 rounded-xl text-xs flex items-center gap-1.5 cursor-pointer transition-colors shadow-sm"
-            >
-              {isOptimizing ? 'جاري التحسين...' : 'تجربة ضغط (منتجين 2 فقط)'}
-            </button>
-            <button
-              onClick={() => handleOptimizeImages(1000)}
-              disabled={isOptimizing}
-              className="bg-[#128C7E] hover:bg-[#0e7065] disabled:bg-slate-200 disabled:text-slate-400 text-white font-bold px-4 py-2 rounded-xl text-xs flex items-center gap-1.5 cursor-pointer transition-colors shadow-sm"
-            >
-              {isOptimizing ? 'جاري التحسين للكل...' : 'تحسين كافة صور المنتجات القديمة دفعة واحدة'}
-            </button>
-          </div>
-        </div>
-      )}
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 items-start">
         {/* Create Form */}
