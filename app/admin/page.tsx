@@ -643,30 +643,40 @@ export default function AdminDashboard() {
         </div>
 
         {aggregatedItems.length > 0 ? (
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            {aggregatedItems.map((item, idx) => (
-              <div 
-                key={idx}
-                className="bg-slate-50 p-4 rounded-2xl border border-slate-200/60 flex items-center justify-between hover:border-slate-300 transition-colors"
-              >
-                <div className="flex items-center gap-3">
-                  {item.imageUrl ? (
-                    <img 
-                      src={item.imageUrl} 
-                      onClick={() => setActivePreviewImage(item.imageUrl || null)}
-                      className="w-14 h-14 rounded-xl object-cover shrink-0 border border-slate-205 cursor-zoom-in hover:brightness-95 transition-all" 
-                      alt={item.productName} 
-                    />
-                  ) : (
-                    <ShoppingBag className="w-14 h-14 p-2.5 bg-white text-slate-400 border border-slate-200 rounded-xl shrink-0" />
-                  )}
-                  <span className="text-sm font-semibold text-slate-700">{item.productName}</span>
+          <div className="space-y-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              {aggregatedItems.map((item, idx) => (
+                <div 
+                  key={idx}
+                  className="bg-slate-50 p-4 rounded-2xl border border-slate-200/60 flex items-center justify-between hover:border-slate-300 transition-colors"
+                >
+                  <div className="flex items-center gap-3">
+                    {item.imageUrl ? (
+                      <img 
+                        src={item.imageUrl} 
+                        onClick={() => setActivePreviewImage(item.imageUrl || null)}
+                        className="w-14 h-14 rounded-xl object-cover shrink-0 border border-slate-205 cursor-zoom-in hover:brightness-95 transition-all" 
+                        alt={item.productName} 
+                      />
+                    ) : (
+                      <ShoppingBag className="w-14 h-14 p-2.5 bg-white text-slate-400 border border-slate-200 rounded-xl shrink-0" />
+                    )}
+                    <span className="text-sm font-semibold text-slate-700">{item.productName}</span>
+                  </div>
+                  <span className="bg-white text-emerald-600 font-extrabold px-3 py-1.5 rounded-xl text-sm border border-slate-200 shrink-0">
+                    {item.totalQty} علبة / صندوق
+                  </span>
                 </div>
-                <span className="bg-white text-emerald-600 font-extrabold px-3 py-1.5 rounded-xl text-sm border border-slate-200 shrink-0">
-                  {item.totalQty} علبة / صندوق
-                </span>
-              </div>
-            ))}
+              ))}
+            </div>
+            
+            {/* إجمالي عدد الصناديق لتجميع الطلبيات الإجمالي */}
+            <div className="flex justify-between items-center text-xs font-extrabold text-[#128C7E] bg-emerald-50/30 border border-emerald-100/80 rounded-xl px-4 py-3 shadow-2xs">
+              <span>إجمالي عدد الصناديق المطلوب تجهيزها اليوم:</span>
+              <span className="font-mono text-sm bg-[#128C7E]/10 px-2.5 py-0.5 rounded-lg text-emerald-700">
+                {aggregatedItems.reduce((sum, item) => sum + item.totalQty, 0)} صندوق
+              </span>
+            </div>
           </div>
         ) : (
           <div className="text-center py-10 space-y-2">
