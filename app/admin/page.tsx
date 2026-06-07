@@ -63,7 +63,7 @@ export default function AdminDashboard() {
   const [addQtyForOrder, setAddQtyForOrder] = useState<{[orderId: string]: number}>({});
   const [addPriceForOrder, setAddPriceForOrder] = useState<{[orderId: string]: string}>({});
   const [prodSearchQuery, setProdSearchQuery] = useState<{[orderId: string]: string}>({});
-  const [printType, setPrintType] = useState<'aggregation' | 'invoice'>('aggregation');
+  const [printType, setPrintType] = useState<'aggregation' | 'invoice' | 'receipt'>('aggregation');
   const [activePrintOrder, setActivePrintOrder] = useState<Order | null>(null);
 
 
@@ -643,6 +643,14 @@ export default function AdminDashboard() {
     }, 150);
   };
 
+  const handlePrintReceipt = (order: Order) => {
+    setPrintType('receipt');
+    setActivePrintOrder(order);
+    setTimeout(() => {
+      window.print();
+    }, 150);
+  };
+
   const handlePrintAggregation = () => {
     setPrintType('aggregation');
     setActivePrintOrder(null);
@@ -1042,10 +1050,19 @@ export default function AdminDashboard() {
                     <button
                       onClick={() => handlePrintInvoice(order)}
                       className="bg-blue-50 hover:bg-blue-100 border border-blue-250 text-blue-700 font-bold px-3 py-1.5 rounded-xl text-xs flex items-center gap-1 cursor-pointer transition-all active:scale-95 shadow-sm"
-                      title="طباعة الفاتورة وتصديرها"
+                      title="طباعة الفاتورة A4"
                     >
                       <Printer className="w-3.5 h-3.5" />
-                      <span>طباعة الفاتورة</span>
+                      <span>طباعة A4</span>
+                    </button>
+
+                    <button
+                      onClick={() => handlePrintReceipt(order)}
+                      className="bg-amber-50 hover:bg-amber-100 border border-amber-250 text-amber-700 font-bold px-3 py-1.5 rounded-xl text-xs flex items-center gap-1 cursor-pointer transition-all active:scale-95 shadow-sm"
+                      title="طباعة إيصال حراري 58 مم"
+                    >
+                      <Printer className="w-3.5 h-3.5" />
+                      <span>إيصال 58 مم</span>
                     </button>
 
                     <button
@@ -1437,10 +1454,19 @@ export default function AdminDashboard() {
                     <button
                       onClick={() => handlePrintInvoice(order)}
                       className="bg-blue-50 hover:bg-blue-100 border border-blue-250 text-blue-700 font-bold px-3 py-1.5 rounded-xl text-xs flex items-center gap-1 cursor-pointer transition-all active:scale-95 shadow-sm"
-                      title="طباعة الفاتورة وتصديرها"
+                      title="طباعة الفاتورة A4"
                     >
                       <Printer className="w-3.5 h-3.5" />
-                      <span>طباعة الفاتورة</span>
+                      <span>طباعة A4</span>
+                    </button>
+
+                    <button
+                      onClick={() => handlePrintReceipt(order)}
+                      className="bg-amber-50 hover:bg-amber-100 border border-amber-250 text-amber-700 font-bold px-3 py-1.5 rounded-xl text-xs flex items-center gap-1 cursor-pointer transition-all active:scale-95 shadow-sm"
+                      title="طباعة إيصال حراري 58 مم"
+                    >
+                      <Printer className="w-3.5 h-3.5" />
+                      <span>إيصال 58 مم</span>
                     </button>
 
                     <button
@@ -1638,6 +1664,72 @@ export default function AdminDashboard() {
 
           <div className="mt-16 text-center text-[10px] text-slate-400 border-t border-slate-200 pt-4 font-bold">
             * شكراً لتعاملكم معنا • تمنياتنا لكم بالرزق والتوفيق • İDELBİ GIDA
+          </div>
+        </div>
+      )}
+
+      {/* 4. Print-only Layout: 58mm Thermal Receipt Print Sheet */}
+      {printType === 'receipt' && activePrintOrder && (
+        <div className="hidden print:block font-mono text-right text-xs bg-white text-black p-1 w-[58mm] mx-auto leading-relaxed" dir="rtl">
+          {/* Header */}
+          <div className="text-center border-b border-dashed border-black pb-2 mb-2">
+            <h1 className="text-sm font-bold uppercase">İDELBİ GIDA</h1>
+            <p className="text-[9px] mt-0.5 font-bold">İDELBİ GIDA TİCARET L.Ş.</p>
+            <p className="text-[8px] text-slate-600">Esenler, İstanbul</p>
+            <p className="text-[9px] font-bold mt-1 border border-black py-0.5 px-2 inline-block rounded">إيصال مبيعات</p>
+          </div>
+
+          {/* Metadata */}
+          <div className="text-[9px] space-y-0.5 mb-2 pb-1.5 border-b border-dashed border-black">
+            <p><strong>العميل:</strong> {activePrintOrder.customer_name}</p>
+            <p><strong>التاريخ:</strong> {new Date(activePrintOrder.created_at).toLocaleDateString('ar-EG', { dateStyle: 'short' })}</p>
+            <p><strong>رقم الفاتورة:</strong> #{activePrintOrder.id.substring(0, 8).toUpperCase()}</p>
+          </div>
+
+          {/* Items Table */}
+          <table className="w-full text-[9px] mb-2 border-collapse">
+            <thead>
+              <tr className="border-b border-black text-right">
+                <th className="pb-1 font-bold">الصنف</th>
+                <th className="pb-1 text-center w-10 font-bold">الكمية</th>
+                <th className="pb-1 text-left w-14 font-bold">الإجمالي</th>
+              </tr>
+            </thead>
+            <tbody>
+              {activePrintOrder.order_items.map((item) => {
+                const price = Number(item.price_at_purchase || 0);
+                const qty = item.quantity;
+                const total = price * qty;
+                return (
+                  <tr key={item.id} className="border-b border-dashed border-slate-200">
+                    <td className="py-1">
+                      <div className="font-bold">{item.product_name || item.products?.name || 'مادة'}</div>
+                      <div className="text-[8px] text-slate-500 font-sans">{price.toFixed(2)} TL</div>
+                    </td>
+                    <td className="py-1 text-center font-bold font-mono">{qty}</td>
+                    <td className="py-1 text-left font-bold font-mono">{total.toFixed(2)} TL</td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+
+          {/* Summary */}
+          <div className="border-t border-black pt-1.5 space-y-1 text-[10px] font-bold">
+            <div className="flex justify-between">
+              <span>إجمالي الصناديق:</span>
+              <span>{activePrintOrder.order_items.reduce((sum, item) => sum + item.quantity, 0)} صندوق</span>
+            </div>
+            <div className="flex justify-between text-[11px] border-t border-dashed border-black pt-1">
+              <span>المجموع الكلي:</span>
+              <span>{Number(activePrintOrder.total_price).toFixed(2)} TL</span>
+            </div>
+          </div>
+
+          {/* Footer */}
+          <div className="text-center mt-4 pt-2 border-t border-dashed border-black text-[8px] text-slate-500">
+            <p>شكراً لتعاملكم معنا</p>
+            <p className="mt-0.5">İDELBİ GIDA • 58mm Thermal</p>
           </div>
         </div>
       )}
