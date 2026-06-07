@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { supabase } from '@/lib/supabase';
-import { ShoppingBag, Users, CheckSquare, ClipboardList, TrendingUp, DollarSign, Clock, AlertCircle, Trash2, Save, Copy, X, CalendarClock, Printer, Plus, Search } from 'lucide-react';
+import { ShoppingBag, Users, CheckSquare, ClipboardList, TrendingUp, DollarSign, Clock, AlertCircle, Trash2, Save, Copy, X, CalendarClock, Printer, Plus, Search, Download } from 'lucide-react';
 
 interface OrderItem {
   id: string;
@@ -579,6 +579,91 @@ export default function AdminDashboard() {
     }
   };
 
+  // Helper to generate and download client-side PDF for WhatsApp sharing
+  const handleDownloadPDF = async (order: Order) => {
+    setIsUpdating(true);
+    try {
+      const html2canvas = (await import('html2canvas')).default;
+      const { jsPDF } = await import('jspdf');
+
+      // Set the active print order so the print sheet is rendered in the DOM
+      setPrintType('invoice');
+      setActivePrintOrder(order);
+
+      // Wait for DOM to render the invoice print container
+      await new Promise((resolve) => setTimeout(resolve, 350));
+
+      const input = document.getElementById('customer-invoice-print-sheet');
+      if (!input) {
+        alert('لم يتم العثور على هيكل الفاتورة للتحويل.');
+        return;
+      }
+
+      // Temporarily display the print sheet offscreen to capture it
+      input.classList.remove('hidden');
+      input.classList.add('block');
+      const originalPosition = input.style.position;
+      const originalLeft = input.style.left;
+      const originalTop = input.style.top;
+      const originalWidth = input.style.width;
+      const originalPadding = input.style.padding;
+      const originalBg = input.style.backgroundColor;
+      const originalZ = input.style.zIndex;
+
+      input.style.position = 'fixed';
+      input.style.left = '-9999px';
+      input.style.top = '0';
+      input.style.width = '790px'; 
+      input.style.padding = '40px';
+      input.style.backgroundColor = '#ffffff';
+      input.style.zIndex = '-100';
+
+      const canvas = await html2canvas(input, {
+        scale: 2, // higher resolution
+        useCORS: true,
+        logging: false
+      });
+
+      // Restore original classes and styles
+      input.classList.remove('block');
+      input.classList.add('hidden');
+      input.style.position = originalPosition;
+      input.style.left = originalLeft;
+      input.style.top = originalTop;
+      input.style.width = originalWidth;
+      input.style.padding = originalPadding;
+      input.style.backgroundColor = originalBg;
+      input.style.zIndex = originalZ;
+
+      const imgData = canvas.toDataURL('image/png');
+      
+      // Calculate A4 dimensions (210mm x 297mm)
+      const pdf = new jsPDF('p', 'mm', 'a4');
+      const imgWidth = 210;
+      const pageHeight = 297;
+      const imgHeight = (canvas.height * imgWidth) / canvas.width;
+      let heightLeft = imgHeight;
+      let position = 0;
+
+      pdf.addImage(imgData, 'PNG', 0, position, imgWidth, imgHeight);
+      heightLeft -= pageHeight;
+
+      while (heightLeft >= 0) {
+        position = heightLeft - imgHeight;
+        pdf.addPage();
+        pdf.addImage(imgData, 'PNG', 0, position, imgWidth, imgHeight);
+        heightLeft -= pageHeight;
+      }
+
+      pdf.save(`فاتورة_${order.customer_name.replace(/\s+/g, '_')}_${order.id.substring(0, 8)}.pdf`);
+    } catch (error) {
+      console.error('Error generating PDF:', error);
+      alert('حدث خطأ أثناء تصدير ملف PDF.');
+    } finally {
+      setIsUpdating(false);
+    }
+  };
+
   // Helper functions for print triggers
   const handlePrintInvoice = (order: Order) => {
     setPrintType('invoice');
@@ -992,6 +1077,16 @@ export default function AdminDashboard() {
                       <Printer className="w-3.5 h-3.5" />
                       <span>طباعة الفاتورة</span>
                     </button>
+
+                    <button
+                      onClick={() => handleDownloadPDF(order)}
+                      disabled={isUpdating}
+                      className="bg-teal-50 hover:bg-teal-100 border border-teal-250 text-teal-700 font-bold px-3 py-1.5 rounded-xl text-xs flex items-center gap-1 cursor-pointer transition-all active:scale-95 shadow-sm disabled:opacity-50"
+                      title="تحميل الفاتورة كـ PDF لمشاركتها على واتساب"
+                    >
+                      <Download className="w-3.5 h-3.5" />
+                      <span>تصدير PDF للواتساب</span>
+                    </button>
                   </div>
 
                   <span className="text-[10px] text-slate-400 font-medium">
@@ -1377,6 +1472,16 @@ export default function AdminDashboard() {
                       <Printer className="w-3.5 h-3.5" />
                       <span>طباعة الفاتورة</span>
                     </button>
+
+                    <button
+                      onClick={() => handleDownloadPDF(order)}
+                      disabled={isUpdating}
+                      className="bg-teal-50 hover:bg-teal-100 border border-teal-250 text-teal-700 font-bold px-3 py-1.5 rounded-xl text-xs flex items-center gap-1 cursor-pointer transition-all active:scale-95 shadow-sm disabled:opacity-50"
+                      title="تحميل الفاتورة كـ PDF لمشاركتها على واتساب"
+                    >
+                      <Download className="w-3.5 h-3.5" />
+                      <span>تصدير PDF للواتساب</span>
+                    </button>
                   </div>
 
                   <span className="text-[10px] text-slate-400 font-medium">
@@ -1469,7 +1574,7 @@ export default function AdminDashboard() {
 
       {/* 3. Print-only Layout: Customer Invoice Print Sheet */}
       {printType === 'invoice' && activePrintOrder && (
-        <div className="hidden print:block font-sans text-right" dir="rtl">
+        <div id="customer-invoice-print-sheet" className="hidden print:block font-sans text-right" dir="rtl">
           {/* Header */}
           <div className="border-b-2 border-slate-900 pb-4 mb-6">
             <div className="flex justify-between items-start">
