@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { supabase } from '@/lib/supabase';
-import { ShoppingBag, Users, CheckSquare, ClipboardList, TrendingUp, DollarSign, Clock, AlertCircle, Trash2, Save, Copy, X, CalendarClock, Printer } from 'lucide-react';
+import { ShoppingBag, Users, CheckSquare, ClipboardList, TrendingUp, DollarSign, Clock, AlertCircle, Trash2, Save, Copy, X, CalendarClock, Printer, Plus, Search } from 'lucide-react';
 
 interface OrderItem {
   id: string;
@@ -53,6 +53,17 @@ export default function AdminDashboard() {
   const [aggregatedItems, setAggregatedItems] = useState<AggregatedItem[]>([]);
   const [editedPrices, setEditedPrices] = useState<{[itemId: string]: string}>({});
   const [activePreviewImage, setActivePreviewImage] = useState<string | null>(null);
+
+  // States for adding products, searching and printing invoices
+  const [allProducts, setAllProducts] = useState<any[]>([]);
+  const [showAddForm, setShowAddForm] = useState<{[orderId: string]: boolean}>({});
+  const [selectedProdForOrder, setSelectedProdForOrder] = useState<{[orderId: string]: string}>({});
+  const [addQtyForOrder, setAddQtyForOrder] = useState<{[orderId: string]: number}>({});
+  const [addPriceForOrder, setAddPriceForOrder] = useState<{[orderId: string]: string}>({});
+  const [prodSearchQuery, setProdSearchQuery] = useState<{[orderId: string]: string}>({});
+  const [printType, setPrintType] = useState<'aggregation' | 'invoice'>('aggregation');
+  const [activePrintOrder, setActivePrintOrder] = useState<Order | null>(null);
+
 
   // Seed data for admin preview
   const getMockOrders = (): Order[] => [
@@ -130,6 +141,15 @@ export default function AdminDashboard() {
         }))
       }));
 
+      // Fetch all products for adding products dropdown
+      const { data: prodData, error: prodError } = await supabase
+        .from('products')
+        .select('*')
+        .order('name', { ascending: true });
+      if (!prodError) {
+        setAllProducts(prodData || []);
+      }
+
       setOrders(typedOrders);
       calculateStats(typedOrders);
       setUsingMockData(false);
@@ -138,6 +158,16 @@ export default function AdminDashboard() {
       const mockOrders = getMockOrders();
       setOrders(mockOrders);
       calculateStats(mockOrders);
+      setAllProducts([
+        { id: 'p1', name: 'بسكويت شوكولاتة أولكر 12 قطعة', price: 45.00, image_url: 'https://images.unsplash.com/photo-1590080875515-8a3a8dc5735e?w=120&auto=format&fit=crop&q=60' },
+        { id: 'p2', name: 'شوكولاتة داماك بالفستق', price: 65.00, image_url: null },
+        { id: 'p3', name: 'شاي تركي غوكسو 100 ظرف', price: 85.00, image_url: 'https://images.unsplash.com/photo-1576092768241-dec231879fc3?w=120&auto=format&fit=crop&q=60' },
+        { id: 'p4', name: 'كوكا كولا علب 330 مل', price: 25.00, image_url: 'https://images.unsplash.com/photo-1622483767028-3f66f32aef97?w=120&auto=format&fit=crop&q=60' },
+        { id: 'p5', name: 'صلصة طماطم تات 800 غ', price: 55.00, image_url: null },
+        { id: 'p6', name: 'أرز تركي بالدو 1 كغ', price: 70.00, image_url: null },
+        { id: 'p7', name: 'جبنة بيضاء بينار 500 غ', price: 110.00, image_url: null },
+        { id: 'p8', name: 'لبن زبادي سوتاس 1.5 كغ', price: 75.00, image_url: null }
+      ]);
       setUsingMockData(true);
     } finally {
       setLoading(false);
@@ -357,6 +387,221 @@ export default function AdminDashboard() {
 
 
 
+  // DB Mutation: Add item to order
+  const handleAddOrderItem = async (orderId: string) => {
+    const prodId = selectedProdForOrder[orderId];
+    if (!prodId) {
+      alert('يرجى اختيار منتج أولاً.');
+      return;
+    }
+    const qty = addQtyForOrder[orderId] || 1;
+    const priceStr = addPriceForOrder[orderId];
+    const price = priceStr ? parseFloat(priceStr) : 0;
+    if (qty <= 0) {
+      alert('الكمية يجب أن تكون أكبر من الصفر.');
+      return;
+    }
+
+    const selectedProduct = allProducts.find(p => p.id === prodId);
+    if (!selectedProduct) return;
+
+    setIsUpdating(true);
+    try {
+      const isUrlConfigured = process.env.NEXT_PUBLIC_SUPABASE_URL && !process.env.NEXT_PUBLIC_SUPABASE_URL.includes('placeholder');
+      
+      const order = orders.find(o => o.id === orderId);
+      if (!order) return;
+
+      // Check if product is already in the order
+      const existingItem = order.order_items.find(item => item.product_id === prodId);
+      
+      let newTotalPrice = 0;
+      if (existingItem) {
+        newTotalPrice = order.order_items.reduce((sum, item) => {
+          const itemPrice = item.id === existingItem.id ? price : (item.price_at_purchase || 0);
+          const itemQty = item.id === existingItem.id ? (item.quantity + qty) : item.quantity;
+          return sum + (itemQty * itemPrice);
+        }, 0);
+      } else {
+        newTotalPrice = order.order_items.reduce((sum, item) => sum + (item.quantity * (item.price_at_purchase || 0)), 0) + (qty * price);
+      }
+
+      let insertedId = 'temp-' + Date.now();
+
+      if (isUrlConfigured) {
+        if (existingItem) {
+          const { error: updateError } = await supabase
+            .from('order_items')
+            .update({ 
+              quantity: existingItem.quantity + qty,
+              price_at_purchase: price
+            })
+            .eq('id', existingItem.id);
+
+          if (updateError) throw updateError;
+        } else {
+          const { data: insertData, error: insertError } = await supabase
+            .from('order_items')
+            .insert({
+              order_id: orderId,
+              product_id: prodId,
+              quantity: qty,
+              price_at_purchase: price,
+              product_name: selectedProduct.name,
+              product_image: selectedProduct.image_url
+            })
+            .select();
+
+          if (insertError) throw insertError;
+          if (insertData && insertData[0]) {
+            insertedId = insertData[0].id;
+          }
+        }
+
+        // Update orders.total_price
+        const { error: orderError } = await supabase
+          .from('orders')
+          .update({ total_price: newTotalPrice })
+          .eq('id', orderId);
+        if (orderError) throw orderError;
+      }
+
+      // Local state update
+      const updatedOrders = orders.map(o => {
+        if (o.id === orderId) {
+          let newItems = [...o.order_items];
+          if (existingItem) {
+            newItems = newItems.map(item => {
+              if (item.id === existingItem.id) {
+                return {
+                  ...item,
+                  quantity: item.quantity + qty,
+                  price_at_purchase: price
+                };
+              }
+              return item;
+            });
+          } else {
+            newItems.push({
+              id: insertedId,
+              order_id: orderId,
+              product_id: prodId,
+              quantity: qty,
+              price_at_purchase: price,
+              product_name: selectedProduct.name,
+              product_image: selectedProduct.image_url,
+              products: {
+                name: selectedProduct.name,
+                image_url: selectedProduct.image_url
+              }
+            });
+          }
+          return {
+            ...o,
+            total_price: newTotalPrice,
+            order_items: newItems
+          };
+        }
+        return o;
+      });
+
+      setOrders(updatedOrders);
+      calculateStats(updatedOrders);
+
+      // Clear add form states for this order
+      setShowAddForm(prev => ({ ...prev, [orderId]: false }));
+      setSelectedProdForOrder(prev => ({ ...prev, [orderId]: '' }));
+      setAddQtyForOrder(prev => ({ ...prev, [orderId]: 1 }));
+      setAddPriceForOrder(prev => ({ ...prev, [orderId]: '' }));
+      setProdSearchQuery(prev => ({ ...prev, [orderId]: '' }));
+
+      alert('تم إضافة المنتج بنجاح وتحديث إجمالي الفاتورة!');
+    } catch (err: any) {
+      console.error(err);
+      alert('حدث خطأ أثناء إضافة المنتج.');
+    } finally {
+      setIsUpdating(false);
+    }
+  };
+
+  // DB Mutation: Delete item from order
+  const handleDeleteOrderItem = async (orderId: string, itemId: string) => {
+    const confirmAction = window.confirm('هل أنت متأكد من حذف هذا البند من الفاتورة؟');
+    if (!confirmAction) return;
+
+    setIsUpdating(true);
+    try {
+      const isUrlConfigured = process.env.NEXT_PUBLIC_SUPABASE_URL && !process.env.NEXT_PUBLIC_SUPABASE_URL.includes('placeholder');
+      
+      const order = orders.find(o => o.id === orderId);
+      if (!order) return;
+
+      const remainingItems = order.order_items.filter(item => item.id !== itemId);
+      const newTotalPrice = remainingItems.reduce((sum, item) => sum + (item.quantity * (item.price_at_purchase || 0)), 0);
+
+      if (isUrlConfigured) {
+        // Delete the item
+        const { error: deleteError } = await supabase
+          .from('order_items')
+          .delete()
+          .eq('id', itemId);
+
+        if (deleteError) throw deleteError;
+
+        // Update orders.total_price
+        const { error: orderError } = await supabase
+          .from('orders')
+          .update({ total_price: newTotalPrice })
+          .eq('id', orderId);
+        if (orderError) throw orderError;
+      }
+
+      // Local state update
+      const updatedOrders = orders.map(o => {
+        if (o.id === orderId) {
+          return {
+            ...o,
+            total_price: newTotalPrice,
+            order_items: remainingItems
+          };
+        }
+        return o;
+      });
+
+      setOrders(updatedOrders);
+      calculateStats(updatedOrders);
+      alert('تم حذف البند وتحديث إجمالي الفاتورة بنجاح!');
+    } catch (err: any) {
+      console.error(err);
+      alert('حدث خطأ أثناء حذف البند.');
+    } finally {
+      setIsUpdating(false);
+    }
+  };
+
+  // Helper functions for print triggers
+  const handlePrintInvoice = (order: Order) => {
+    setPrintType('invoice');
+    setActivePrintOrder(order);
+    setTimeout(() => {
+      window.print();
+    }, 150);
+  };
+
+  const handlePrintAggregation = () => {
+    setPrintType('aggregation');
+    setActivePrintOrder(null);
+    setTimeout(() => {
+      window.print();
+    }, 150);
+  };
+
+  const getFilteredProducts = (orderId: string) => {
+    const query = (prodSearchQuery[orderId] || '').trim().toLowerCase();
+    if (!query) return allProducts;
+    return allProducts.filter(p => p.name.toLowerCase().includes(query));
+  };
+
   const handlePostponeOrder = async (orderId: string, currentStatus: 'pending' | 'postponed') => {
     const newStatus: 'pending' | 'postponed' = currentStatus === 'pending' ? 'postponed' : 'pending';
     const actionText = newStatus === 'postponed' ? 'تأجيل' : 'تنشيط';
@@ -567,6 +812,16 @@ export default function AdminDashboard() {
                           disabled={isUpdating}
                         />
                         <span className="text-[10px] text-slate-450 font-bold">TL</span>
+                        
+                        <button
+                          type="button"
+                          onClick={() => handleDeleteOrderItem(order.id, item.id)}
+                          disabled={isUpdating}
+                          className="p-1 text-rose-500 hover:text-rose-700 hover:bg-rose-50 rounded-lg transition-colors cursor-pointer shrink-0 ml-1"
+                          title="حذف هذا البند"
+                        >
+                          <Trash2 className="w-4 h-4" />
+                        </button>
                       </div>
                     </div>
                   ))}
@@ -575,6 +830,135 @@ export default function AdminDashboard() {
                   <div className="flex justify-between items-center text-xs font-extrabold text-[#128C7E] bg-emerald-50/30 border border-emerald-100/80 rounded-xl px-3.5 py-2 mt-2 shadow-2xs">
                     <span>إجمالي عدد الصناديق المطلوبة:</span>
                     <span className="font-mono text-sm bg-[#128C7E]/10 px-2 py-0.5 rounded-lg">{order.order_items.reduce((sum, item) => sum + item.quantity, 0)} صندوق</span>
+                  </div>
+
+                  {/* زر ونموذج إضافة منتج للفاتورة */}
+                  <div className="mt-3 pt-2 border-t border-dashed border-slate-200">
+                    {!showAddForm[order.id] ? (
+                      <button
+                        type="button"
+                        onClick={() => setShowAddForm(prev => ({ ...prev, [order.id]: true }))}
+                        className="w-full py-2 border border-dashed border-slate-350 hover:border-[#128C7E] rounded-xl text-xs text-slate-600 hover:text-[#128C7E] bg-white transition-all flex items-center justify-center gap-1 cursor-pointer font-bold"
+                      >
+                        <Plus className="w-4 h-4" />
+                        <span>إضافة منتج للفاتورة</span>
+                      </button>
+                    ) : (
+                      <div className="bg-slate-100 border border-slate-200 rounded-xl p-3.5 space-y-3.5 shadow-2xs relative">
+                        <div className="flex items-center justify-between">
+                          <span className="text-xs font-extrabold text-slate-700">إضافة بند جديد للفاتورة</span>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setShowAddForm(prev => ({ ...prev, [order.id]: false }));
+                              setSelectedProdForOrder(prev => ({ ...prev, [order.id]: '' }));
+                              setAddQtyForOrder(prev => ({ ...prev, [order.id]: 1 }));
+                              setAddPriceForOrder(prev => ({ ...prev, [order.id]: '' }));
+                              setProdSearchQuery(prev => ({ ...prev, [order.id]: '' }));
+                            }}
+                            className="p-1 hover:bg-slate-250 rounded-lg transition-colors cursor-pointer text-slate-400 hover:text-slate-600"
+                          >
+                            <X className="w-4 h-4" />
+                          </button>
+                        </div>
+
+                        {/* البحث عن المنتج */}
+                        <div className="space-y-1">
+                          <label className="text-[10px] text-slate-500 font-bold block">بحث عن المنتج في المتجر</label>
+                          <div className="relative">
+                            <Search className="w-3.5 h-3.5 text-slate-400 absolute right-2.5 top-1/2 -translate-y-1/2" />
+                            <input
+                              type="text"
+                              placeholder="اكتب اسم المنتج للتصفية..."
+                              value={prodSearchQuery[order.id] || ''}
+                              onChange={(e) => {
+                                setProdSearchQuery(prev => ({ ...prev, [order.id]: e.target.value }));
+                              }}
+                              className="w-full bg-white border border-slate-250 outline-none rounded-xl pr-8 pl-3 py-1.5 text-xs text-slate-850 focus:border-[#128C7E] focus:ring-1 focus:ring-[#128C7E] transition-all font-bold"
+                            />
+                          </div>
+                        </div>
+
+                        {/* اختيار المنتج من المنسدلة */}
+                        <div className="space-y-1">
+                          <label className="text-[10px] text-slate-500 font-bold block">اختر المنتج من القائمة</label>
+                          <select
+                            value={selectedProdForOrder[order.id] || ''}
+                            onChange={(e) => {
+                              const pId = e.target.value;
+                              setSelectedProdForOrder(prev => ({ ...prev, [order.id]: pId }));
+                              const prod = allProducts.find(p => p.id === pId);
+                              if (prod) {
+                                setAddPriceForOrder(prev => ({ ...prev, [order.id]: (prod.price || 0).toString() }));
+                              }
+                            }}
+                            className="w-full bg-white border border-slate-250 outline-none rounded-xl px-2.5 py-1.5 text-xs text-slate-850 focus:border-[#128C7E] focus:ring-1 focus:ring-[#128C7E] transition-all font-bold"
+                          >
+                            <option value="">-- اختر المنتج --</option>
+                            {getFilteredProducts(order.id).map(p => (
+                              <option key={p.id} value={p.id}>
+                                {p.name} {p.price ? `(${p.price} TL)` : ''}
+                              </option>
+                            ))}
+                          </select>
+                        </div>
+
+                        {/* الكمية والسعر */}
+                        <div className="grid grid-cols-2 gap-2.5">
+                          <div className="space-y-1">
+                            <label className="text-[10px] text-slate-500 font-bold block">الكمية (صناديق)</label>
+                            <input
+                              type="number"
+                              min="1"
+                              value={addQtyForOrder[order.id] || 1}
+                              onChange={(e) => {
+                                setAddQtyForOrder(prev => ({ ...prev, [order.id]: parseInt(e.target.value) || 1 }));
+                              }}
+                              className="w-full bg-white border border-slate-250 outline-none rounded-xl px-2.5 py-1.5 text-xs text-slate-850 focus:border-[#128C7E] focus:ring-1 focus:ring-[#128C7E] transition-all text-center font-bold font-mono"
+                            />
+                          </div>
+                          <div className="space-y-1">
+                            <label className="text-[10px] text-slate-500 font-bold block">السعر للصندوق (TL)</label>
+                            <input
+                              type="number"
+                              step="0.01"
+                              min="0"
+                              value={addPriceForOrder[order.id] || ''}
+                              placeholder="مثال: 45.00"
+                              onChange={(e) => {
+                                setAddPriceForOrder(prev => ({ ...prev, [order.id]: e.target.value }));
+                              }}
+                              className="w-full bg-white border border-slate-250 outline-none rounded-xl px-2.5 py-1.5 text-xs text-slate-850 focus:border-[#128C7E] focus:ring-1 focus:ring-[#128C7E] transition-all text-center font-bold font-mono"
+                            />
+                          </div>
+                        </div>
+
+                        {/* زري الإضافة والإلغاء */}
+                        <div className="flex gap-2 pt-1">
+                          <button
+                            type="button"
+                            onClick={() => handleAddOrderItem(order.id)}
+                            disabled={isUpdating || !selectedProdForOrder[order.id]}
+                            className="flex-1 bg-[#128C7E] hover:bg-[#128C7E]/95 disabled:bg-slate-300 disabled:text-slate-500 text-white font-bold px-3 py-1.5 rounded-xl text-xs transition-all cursor-pointer"
+                          >
+                            إضافة البند
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setShowAddForm(prev => ({ ...prev, [order.id]: false }));
+                              setSelectedProdForOrder(prev => ({ ...prev, [order.id]: '' }));
+                              setAddQtyForOrder(prev => ({ ...prev, [order.id]: 1 }));
+                              setAddPriceForOrder(prev => ({ ...prev, [order.id]: '' }));
+                              setProdSearchQuery(prev => ({ ...prev, [order.id]: '' }));
+                            }}
+                            className="flex-1 bg-white hover:bg-slate-200 border border-slate-350 text-slate-650 font-bold px-3 py-1.5 rounded-xl text-xs transition-all cursor-pointer"
+                          >
+                            إلغاء
+                          </button>
+                        </div>
+                      </div>
+                    )}
                   </div>
                 </div>
 
@@ -599,10 +983,19 @@ export default function AdminDashboard() {
                       <Copy className="w-3.5 h-3.5" />
                       <span>نسخ الرابط</span>
                     </button>
+
+                    <button
+                      onClick={() => handlePrintInvoice(order)}
+                      className="bg-blue-50 hover:bg-blue-100 border border-blue-250 text-blue-700 font-bold px-3 py-1.5 rounded-xl text-xs flex items-center gap-1 cursor-pointer transition-all active:scale-95 shadow-sm"
+                      title="طباعة الفاتورة وتصديرها"
+                    >
+                      <Printer className="w-3.5 h-3.5" />
+                      <span>طباعة الفاتورة</span>
+                    </button>
                   </div>
 
                   <span className="text-[10px] text-slate-400 font-medium">
-                    * قم بحفظ الأسعار أولاً لتفعيل المشاركة.
+                    * قم بحفظ الأسعار أولاً لتفعيل المشاركة والطباعة.
                   </span>
                 </div>
               </div>
@@ -633,7 +1026,7 @@ export default function AdminDashboard() {
           <div className="flex items-center gap-2 flex-wrap shrink-0">
             {aggregatedItems.length > 0 && (
               <button
-                onClick={() => window.print()}
+                onClick={handlePrintAggregation}
                 className="bg-slate-100 hover:bg-slate-200 border border-slate-200 text-slate-700 font-bold px-4 py-2.5 rounded-xl text-xs flex items-center gap-1.5 cursor-pointer transition-all active:scale-95 shadow-2xs"
                 title="طباعة ورقة تجميع السلع للمستودع"
               >
@@ -804,6 +1197,16 @@ export default function AdminDashboard() {
                           disabled={isUpdating}
                         />
                         <span className="text-[10px] text-slate-450 font-bold">TL</span>
+                        
+                        <button
+                          type="button"
+                          onClick={() => handleDeleteOrderItem(order.id, item.id)}
+                          disabled={isUpdating}
+                          className="p-1 text-rose-500 hover:text-rose-700 hover:bg-rose-50 rounded-lg transition-colors cursor-pointer shrink-0 ml-1"
+                          title="حذف هذا البند"
+                        >
+                          <Trash2 className="w-4 h-4" />
+                        </button>
                       </div>
                     </div>
                   ))}
@@ -812,6 +1215,135 @@ export default function AdminDashboard() {
                   <div className="flex justify-between items-center text-xs font-extrabold text-[#128C7E] bg-emerald-50/30 border border-emerald-100/80 rounded-xl px-3.5 py-2 mt-2 shadow-2xs">
                     <span>إجمالي عدد الصناديق المطلوبة:</span>
                     <span className="font-mono text-sm bg-[#128C7E]/10 px-2 py-0.5 rounded-lg">{order.order_items.reduce((sum, item) => sum + item.quantity, 0)} صندوق</span>
+                  </div>
+
+                  {/* زر ونموذج إضافة منتج للفاتورة */}
+                  <div className="mt-3 pt-2 border-t border-dashed border-slate-200">
+                    {!showAddForm[order.id] ? (
+                      <button
+                        type="button"
+                        onClick={() => setShowAddForm(prev => ({ ...prev, [order.id]: true }))}
+                        className="w-full py-2 border border-dashed border-slate-350 hover:border-[#128C7E] rounded-xl text-xs text-slate-600 hover:text-[#128C7E] bg-white transition-all flex items-center justify-center gap-1 cursor-pointer font-bold"
+                      >
+                        <Plus className="w-4 h-4" />
+                        <span>إضافة منتج للفاتورة</span>
+                      </button>
+                    ) : (
+                      <div className="bg-slate-100 border border-slate-200 rounded-xl p-3.5 space-y-3.5 shadow-2xs relative">
+                        <div className="flex items-center justify-between">
+                          <span className="text-xs font-extrabold text-slate-700">إضافة بند جديد للفاتورة</span>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setShowAddForm(prev => ({ ...prev, [order.id]: false }));
+                              setSelectedProdForOrder(prev => ({ ...prev, [order.id]: '' }));
+                              setAddQtyForOrder(prev => ({ ...prev, [order.id]: 1 }));
+                              setAddPriceForOrder(prev => ({ ...prev, [order.id]: '' }));
+                              setProdSearchQuery(prev => ({ ...prev, [order.id]: '' }));
+                            }}
+                            className="p-1 hover:bg-slate-250 rounded-lg transition-colors cursor-pointer text-slate-400 hover:text-slate-650"
+                          >
+                            <X className="w-4 h-4" />
+                          </button>
+                        </div>
+
+                        {/* البحث عن المنتج */}
+                        <div className="space-y-1">
+                          <label className="text-[10px] text-slate-500 font-bold block">بحث عن المنتج في المتجر</label>
+                          <div className="relative">
+                            <Search className="w-3.5 h-3.5 text-slate-400 absolute right-2.5 top-1/2 -translate-y-1/2" />
+                            <input
+                              type="text"
+                              placeholder="اكتب اسم المنتج للتصفية..."
+                              value={prodSearchQuery[order.id] || ''}
+                              onChange={(e) => {
+                                setProdSearchQuery(prev => ({ ...prev, [order.id]: e.target.value }));
+                              }}
+                              className="w-full bg-white border border-slate-250 outline-none rounded-xl pr-8 pl-3 py-1.5 text-xs text-slate-850 focus:border-[#128C7E] focus:ring-1 focus:ring-[#128C7E] transition-all font-bold"
+                            />
+                          </div>
+                        </div>
+
+                        {/* اختيار المنتج من المنسدلة */}
+                        <div className="space-y-1">
+                          <label className="text-[10px] text-slate-500 font-bold block">اختر المنتج من القائمة</label>
+                          <select
+                            value={selectedProdForOrder[order.id] || ''}
+                            onChange={(e) => {
+                              const pId = e.target.value;
+                              setSelectedProdForOrder(prev => ({ ...prev, [order.id]: pId }));
+                              const prod = allProducts.find(p => p.id === pId);
+                              if (prod) {
+                                setAddPriceForOrder(prev => ({ ...prev, [order.id]: (prod.price || 0).toString() }));
+                              }
+                            }}
+                            className="w-full bg-white border border-slate-250 outline-none rounded-xl px-2.5 py-1.5 text-xs text-slate-850 focus:border-[#128C7E] focus:ring-1 focus:ring-[#128C7E] transition-all font-bold"
+                          >
+                            <option value="">-- اختر المنتج --</option>
+                            {getFilteredProducts(order.id).map(p => (
+                              <option key={p.id} value={p.id}>
+                                {p.name} {p.price ? `(${p.price} TL)` : ''}
+                              </option>
+                            ))}
+                          </select>
+                        </div>
+
+                        {/* الكمية والسعر */}
+                        <div className="grid grid-cols-2 gap-2.5">
+                          <div className="space-y-1">
+                            <label className="text-[10px] text-slate-500 font-bold block">الكمية (صناديق)</label>
+                            <input
+                              type="number"
+                              min="1"
+                              value={addQtyForOrder[order.id] || 1}
+                              onChange={(e) => {
+                                setAddQtyForOrder(prev => ({ ...prev, [order.id]: parseInt(e.target.value) || 1 }));
+                              }}
+                              className="w-full bg-white border border-slate-250 outline-none rounded-xl px-2.5 py-1.5 text-xs text-slate-850 focus:border-[#128C7E] focus:ring-1 focus:ring-[#128C7E] transition-all text-center font-bold font-mono"
+                            />
+                          </div>
+                          <div className="space-y-1">
+                            <label className="text-[10px] text-slate-500 font-bold block">السعر للصندوق (TL)</label>
+                            <input
+                              type="number"
+                              step="0.01"
+                              min="0"
+                              value={addPriceForOrder[order.id] || ''}
+                              placeholder="مثال: 45.00"
+                              onChange={(e) => {
+                                setAddPriceForOrder(prev => ({ ...prev, [order.id]: e.target.value }));
+                              }}
+                              className="w-full bg-white border border-slate-250 outline-none rounded-xl px-2.5 py-1.5 text-xs text-slate-850 focus:border-[#128C7E] focus:ring-1 focus:ring-[#128C7E] transition-all text-center font-bold font-mono"
+                            />
+                          </div>
+                        </div>
+
+                        {/* زري الإضافة والإلغاء */}
+                        <div className="flex gap-2 pt-1">
+                          <button
+                            type="button"
+                            onClick={() => handleAddOrderItem(order.id)}
+                            disabled={isUpdating || !selectedProdForOrder[order.id]}
+                            className="flex-1 bg-[#128C7E] hover:bg-[#128C7E]/95 disabled:bg-slate-300 disabled:text-slate-500 text-white font-bold px-3 py-1.5 rounded-xl text-xs transition-all cursor-pointer"
+                          >
+                            إضافة البند
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setShowAddForm(prev => ({ ...prev, [order.id]: false }));
+                              setSelectedProdForOrder(prev => ({ ...prev, [order.id]: '' }));
+                              setAddQtyForOrder(prev => ({ ...prev, [order.id]: 1 }));
+                              setAddPriceForOrder(prev => ({ ...prev, [order.id]: '' }));
+                              setProdSearchQuery(prev => ({ ...prev, [order.id]: '' }));
+                            }}
+                            className="flex-1 bg-white hover:bg-slate-200 border border-slate-350 text-slate-650 font-bold px-3 py-1.5 rounded-xl text-xs transition-all cursor-pointer"
+                          >
+                            إلغاء
+                          </button>
+                        </div>
+                      </div>
+                    )}
                   </div>
                 </div>
 
@@ -835,6 +1367,15 @@ export default function AdminDashboard() {
                     >
                       <Copy className="w-3.5 h-3.5" />
                       <span>نسخ الرابط</span>
+                    </button>
+
+                    <button
+                      onClick={() => handlePrintInvoice(order)}
+                      className="bg-blue-50 hover:bg-blue-100 border border-blue-250 text-blue-700 font-bold px-3 py-1.5 rounded-xl text-xs flex items-center gap-1 cursor-pointer transition-all active:scale-95 shadow-sm"
+                      title="طباعة الفاتورة وتصديرها"
+                    >
+                      <Printer className="w-3.5 h-3.5" />
+                      <span>طباعة الفاتورة</span>
                     </button>
                   </div>
 
@@ -885,44 +1426,142 @@ export default function AdminDashboard() {
       </div>
 
       {/* 2. Print-only Layout: Daily Aggregation Print Sheet */}
-      <div className="hidden print:block font-sans text-right" dir="rtl">
-        {/* Brand & Sheet Header */}
-        <div className="border-b-2 border-slate-900 pb-4 mb-6 text-center sm:text-right">
-          <h1 className="text-2xl font-black text-slate-800">idelbi gida | إدلب غذائيات</h1>
-          <p className="text-xs text-slate-500 font-bold mt-1">جدول تجميع الطلبيات الإجمالي اليومي للمستودع</p>
-          <p className="text-[10px] text-slate-400 font-bold mt-1">تاريخ الطباعة: {new Date().toLocaleString('ar-EG', { dateStyle: 'long', timeStyle: 'short' })}</p>
-        </div>
+      {printType === 'aggregation' && (
+        <div className="hidden print:block font-sans text-right" dir="rtl">
+          {/* Brand & Sheet Header */}
+          <div className="border-b-2 border-slate-900 pb-4 mb-6 text-center sm:text-right">
+            <h1 className="text-2xl font-black text-slate-800">idelbi gida | إدلب غذائيات</h1>
+            <p className="text-xs text-slate-500 font-bold mt-1">جدول تجميع الطلبيات الإجمالي اليومي للمستودع</p>
+            <p className="text-[10px] text-slate-400 font-bold mt-1">تاريخ الطباعة: {new Date().toLocaleString('ar-EG', { dateStyle: 'long', timeStyle: 'short' })}</p>
+          </div>
 
-        {/* Aggregated Table */}
-        <table className="w-full border-collapse border border-slate-300 text-sm">
-          <thead>
-            <tr className="bg-slate-150">
-              <th className="border border-slate-300 px-4 py-2 text-right font-black">#</th>
-              <th className="border border-slate-300 px-4 py-2 text-right font-black">اسم المنتج</th>
-              <th className="border border-slate-300 px-4 py-2 text-center font-black">الكمية المطلوبة</th>
-            </tr>
-          </thead>
-          <tbody>
-            {aggregatedItems.map((item, idx) => (
-              <tr key={idx} className="hover:bg-slate-50/50">
-                <td className="border border-slate-300 px-4 py-2.5 font-bold font-mono">{idx + 1}</td>
-                <td className="border border-slate-300 px-4 py-2.5 font-bold">{item.productName}</td>
-                <td className="border border-slate-300 px-4 py-2.5 text-center font-black text-slate-800 text-base">{item.totalQty} علبة / صندوق</td>
+          {/* Aggregated Table */}
+          <table className="w-full border-collapse border border-slate-300 text-sm">
+            <thead>
+              <tr className="bg-slate-150">
+                <th className="border border-slate-300 px-4 py-2 text-right font-black">#</th>
+                <th className="border border-slate-300 px-4 py-2 text-right font-black">اسم المنتج</th>
+                <th className="border border-slate-300 px-4 py-2 text-center font-black">الكمية المطلوبة</th>
               </tr>
-            ))}
-          </tbody>
-        </table>
+            </thead>
+            <tbody>
+              {aggregatedItems.map((item, idx) => (
+                <tr key={idx} className="hover:bg-slate-50/50">
+                  <td className="border border-slate-300 px-4 py-2.5 font-bold font-mono">{idx + 1}</td>
+                  <td className="border border-slate-300 px-4 py-2.5 font-bold">{item.productName}</td>
+                  <td className="border border-slate-300 px-4 py-2.5 text-center font-black text-slate-800 text-base">{item.totalQty} علبة / صندوق</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
 
-        {/* Aggregate Boxes Total */}
-        <div className="mt-6 border-t-2 border-slate-900 pt-4 flex justify-between items-center font-black text-lg">
-          <span>إجمالي عدد الصناديق المطلوب تجهيزها:</span>
-          <span>{aggregatedItems.reduce((sum, item) => sum + item.totalQty, 0)} صندوق</span>
-        </div>
+          {/* Aggregate Boxes Total */}
+          <div className="mt-6 border-t-2 border-slate-900 pt-4 flex justify-between items-center font-black text-lg">
+            <span>إجمالي عدد الصناديق المطلوب تجهيزها:</span>
+            <span>{aggregatedItems.reduce((sum, item) => sum + item.totalQty, 0)} صندوق</span>
+          </div>
 
-        <div className="mt-12 text-center text-[10px] text-slate-400 border-t border-slate-200 pt-4 font-bold">
-          * تم توليد هذه الصفحة تلقائياً لتسهيل تجميع البضائع من الرفوف • idelbi gıda
+          <div className="mt-12 text-center text-[10px] text-slate-400 border-t border-slate-200 pt-4 font-bold">
+            * تم توليد هذه الصفحة تلقائياً لتسهيل تجميع البضائع من الرفوف • idelbi gıda
+          </div>
         </div>
-      </div>
+      )}
+
+      {/* 3. Print-only Layout: Customer Invoice Print Sheet */}
+      {printType === 'invoice' && activePrintOrder && (
+        <div className="hidden print:block font-sans text-right" dir="rtl">
+          {/* Header */}
+          <div className="border-b-2 border-slate-900 pb-4 mb-6">
+            <div className="flex justify-between items-start">
+              <div>
+                <h1 className="text-xl font-black text-slate-850">İDELBİ GIDA TİCARET LİMİTED ŞİRKETİ</h1>
+                <p className="text-xs text-slate-500 font-bold mt-1">Gıda Ürünleri İthalat İhracat ve Toptan Ticareti</p>
+                <p className="text-[11px] text-slate-400 mt-0.5">Esenler, İstanbul</p>
+              </div>
+              <div className="text-left font-mono text-xs text-slate-500">
+                <p>تاريخ الفاتورة: {new Date(activePrintOrder.created_at).toLocaleDateString('ar-EG', { dateStyle: 'long' })}</p>
+                <p>رقم الفاتورة: #{activePrintOrder.id.substring(0, 8).toUpperCase()}</p>
+              </div>
+            </div>
+            <div className="text-center mt-4">
+              <span className="text-2xl font-black border-2 border-slate-900 px-6 py-1.5 inline-block bg-slate-50 rounded-lg">فـاتـورة مـبـيـعـات</span>
+            </div>
+          </div>
+
+          {/* Customer Metadata */}
+          <div className="grid grid-cols-2 gap-4 bg-slate-50 border border-slate-200 rounded-xl p-4 mb-6 text-sm">
+            <div>
+              <span className="text-slate-500 font-bold">السيد / السادة: </span>
+              <span className="font-extrabold text-slate-800">{activePrintOrder.customer_name}</span>
+            </div>
+            <div className="text-left">
+              <span className="text-slate-550 font-bold">حالة الدفع: </span>
+              <span className="font-extrabold text-[#128C7E]">معلق / عند التسليم</span>
+            </div>
+          </div>
+
+          {/* Pricing Grid */}
+          <table className="w-full border-collapse border border-slate-350 text-sm">
+            <thead>
+              <tr className="bg-slate-100 border-b border-slate-350">
+                <th className="border border-slate-350 px-3 py-2 text-center font-black w-12">م</th>
+                <th className="border border-slate-350 px-3 py-2 text-right font-black">الصنف (اسم المادة)</th>
+                <th className="border border-slate-350 px-3 py-2 text-center font-black w-24">الكمية</th>
+                <th className="border border-slate-350 px-3 py-2 text-center font-black w-32">السعر الإفرادي</th>
+                <th className="border border-slate-350 px-3 py-2 text-center font-black w-32">الإجمالي</th>
+              </tr>
+            </thead>
+            <tbody>
+              {activePrintOrder.order_items.map((item, idx) => {
+                const price = Number(item.price_at_purchase || 0);
+                const qty = item.quantity;
+                const total = price * qty;
+                return (
+                  <tr key={item.id} className="border-b border-slate-300">
+                    <td className="border border-slate-355 px-3 py-2.5 text-center font-bold font-mono">{idx + 1}</td>
+                    <td className="border border-slate-355 px-3 py-2.5 font-bold text-slate-800">{item.product_name || item.products?.name || 'منتج غير معروف'}</td>
+                    <td className="border border-slate-355 px-3 py-2.5 text-center font-black font-mono">{qty} صندوق</td>
+                    <td className="border border-slate-355 px-3 py-2.5 text-center font-extrabold font-mono">{price.toFixed(2)} TL</td>
+                    <td className="border border-slate-355 px-3 py-2.5 text-center font-black font-mono">{total.toFixed(2)} TL</td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+
+          {/* Summary / Total section */}
+          <div className="mt-6 border border-slate-350 rounded-xl p-4 bg-slate-50 flex justify-between items-center">
+            <div className="text-xs text-slate-550 font-bold">
+              <span>إجمالي الصناديق: </span>
+              <span className="font-extrabold text-slate-800 text-sm font-mono mr-1">
+                {activePrintOrder.order_items.reduce((sum, item) => sum + item.quantity, 0)} صندوق
+              </span>
+            </div>
+            <div className="text-right">
+              <span className="text-slate-700 font-black text-md">المجموع الكلي النهائي:</span>
+              <span className="text-xl font-black text-[#128C7E] font-mono mr-2 bg-emerald-50 border border-emerald-200 px-3 py-1 rounded-lg">
+                {Number(activePrintOrder.total_price).toFixed(2)} TL
+              </span>
+            </div>
+          </div>
+
+          {/* Signature / Notes */}
+          <div className="grid grid-cols-2 gap-4 mt-16 text-center text-xs">
+            <div>
+              <p className="text-slate-400 font-bold mb-8">توقيع المستلم</p>
+              <div className="border-b border-slate-300 w-40 mx-auto"></div>
+            </div>
+            <div>
+              <p className="text-slate-400 font-bold mb-8">خاتم وتوقيع الشركة</p>
+              <div className="border-b border-slate-300 w-40 mx-auto"></div>
+            </div>
+          </div>
+
+          <div className="mt-16 text-center text-[10px] text-slate-400 border-t border-slate-200 pt-4 font-bold">
+            * شكراً لتعاملكم معنا • تمنياتنا لكم بالرزق والتوفيق • İDELBİ GIDA
+          </div>
+        </div>
+      )}
     </>
   );
 }
