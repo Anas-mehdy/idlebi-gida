@@ -98,7 +98,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
 
       {/* Sidebar navigation */}
       <aside 
-        className={`fixed top-0 bottom-0 right-0 w-64 bg-white border-l border-slate-200 z-50 transition-transform duration-300 lg:translate-x-0 lg:static flex flex-col ${
+        className={`fixed top-0 bottom-0 right-0 w-64 bg-white border-l border-slate-200 z-50 transition-transform duration-300 lg:translate-x-0 lg:static flex flex-col print:hidden ${
           sidebarOpen ? 'translate-x-0' : 'translate-x-full'
         }`}
       >
@@ -166,7 +166,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
       {/* Main content layout wrapper */}
       <div className="flex-1 flex flex-col min-w-0">
         {/* Top Header */}
-        <header className="bg-white border-b border-slate-200 h-16 flex items-center justify-between px-6 shrink-0 lg:justify-end">
+        <header className="bg-white border-b border-slate-200 h-16 flex items-center justify-between px-6 shrink-0 lg:justify-end print:hidden">
           <button
             onClick={() => setSidebarOpen(true)}
             className="lg:hidden p-2 rounded-xl text-slate-500 hover:text-slate-850 hover:bg-slate-50 transition-colors"

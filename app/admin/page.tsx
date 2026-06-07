@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { supabase } from '@/lib/supabase';
-import { ShoppingBag, Users, CheckSquare, ClipboardList, TrendingUp, DollarSign, Clock, AlertCircle, Trash2, Save, Copy, X, CalendarClock } from 'lucide-react';
+import { ShoppingBag, Users, CheckSquare, ClipboardList, TrendingUp, DollarSign, Clock, AlertCircle, Trash2, Save, Copy, X, CalendarClock, Printer } from 'lucide-react';
 
 interface OrderItem {
   id: string;
@@ -411,7 +411,8 @@ export default function AdminDashboard() {
   const postponedOrdersList = orders.filter(o => o.status === 'postponed');
 
   return (
-    <div className="space-y-6">
+    <>
+      <div className="space-y-6 print:hidden">
       {/* Top Warning for offline test mode */}
       {usingMockData && (
         <div className="bg-amber-500/10 border border-amber-500/20 text-amber-800 px-4 py-3 rounded-2xl text-xs flex items-center gap-2.5 shadow-sm">
@@ -629,17 +630,29 @@ export default function AdminDashboard() {
             </div>
           </div>
 
-          {activeOrdersList.length > 0 && (
-            <button
-              onClick={handleFulfillAll}
-              disabled={isUpdating}
-              className="bg-emerald-650 hover:bg-emerald-700 disabled:bg-slate-100 disabled:text-slate-400 text-white px-5 py-2.5 rounded-xl text-xs font-bold transition-all shadow-md flex items-center gap-2 cursor-pointer animate-pulse"
-              style={{ backgroundColor: '#128C7E' }}
-            >
-              <CheckSquare className="w-4 h-4" />
-              <span>{isUpdating ? 'جاري التحديث...' : 'تم الشراء'}</span>
-            </button>
-          )}
+          <div className="flex items-center gap-2 flex-wrap shrink-0">
+            {aggregatedItems.length > 0 && (
+              <button
+                onClick={() => window.print()}
+                className="bg-slate-100 hover:bg-slate-200 border border-slate-200 text-slate-700 font-bold px-4 py-2.5 rounded-xl text-xs flex items-center gap-1.5 cursor-pointer transition-all active:scale-95 shadow-2xs"
+                title="طباعة ورقة تجميع السلع للمستودع"
+              >
+                <Printer className="w-4 h-4 text-slate-500" />
+                <span>طباعة التجميع</span>
+              </button>
+            )}
+
+            {activeOrdersList.length > 0 && (
+              <button
+                onClick={handleFulfillAll}
+                disabled={isUpdating}
+                className="bg-[#128C7E] hover:bg-[#128C7E]/90 disabled:bg-slate-100 disabled:text-slate-400 text-white px-5 py-2.5 rounded-xl text-xs font-bold transition-all shadow-md flex items-center gap-2 cursor-pointer"
+              >
+                <CheckSquare className="w-4 h-4" />
+                <span>{isUpdating ? 'جاري التحديث...' : 'تم الشراء'}</span>
+              </button>
+            )}
+          </div>
         </div>
 
         {aggregatedItems.length > 0 ? (
@@ -869,6 +882,47 @@ export default function AdminDashboard() {
           </div>
         </div>
       )}
-    </div>
+      </div>
+
+      {/* 2. Print-only Layout: Daily Aggregation Print Sheet */}
+      <div className="hidden print:block font-sans text-right" dir="rtl">
+        {/* Brand & Sheet Header */}
+        <div className="border-b-2 border-slate-900 pb-4 mb-6 text-center sm:text-right">
+          <h1 className="text-2xl font-black text-slate-800">idelbi gida | إدلب غذائيات</h1>
+          <p className="text-xs text-slate-500 font-bold mt-1">جدول تجميع الطلبيات الإجمالي اليومي للمستودع</p>
+          <p className="text-[10px] text-slate-400 font-bold mt-1">تاريخ الطباعة: {new Date().toLocaleString('ar-EG', { dateStyle: 'long', timeStyle: 'short' })}</p>
+        </div>
+
+        {/* Aggregated Table */}
+        <table className="w-full border-collapse border border-slate-300 text-sm">
+          <thead>
+            <tr className="bg-slate-150">
+              <th className="border border-slate-300 px-4 py-2 text-right font-black">#</th>
+              <th className="border border-slate-300 px-4 py-2 text-right font-black">اسم المنتج</th>
+              <th className="border border-slate-300 px-4 py-2 text-center font-black">الكمية المطلوبة</th>
+            </tr>
+          </thead>
+          <tbody>
+            {aggregatedItems.map((item, idx) => (
+              <tr key={idx} className="hover:bg-slate-50/50">
+                <td className="border border-slate-300 px-4 py-2.5 font-bold font-mono">{idx + 1}</td>
+                <td className="border border-slate-300 px-4 py-2.5 font-bold">{item.productName}</td>
+                <td className="border border-slate-300 px-4 py-2.5 text-center font-black text-slate-800 text-base">{item.totalQty} علبة / صندوق</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+
+        {/* Aggregate Boxes Total */}
+        <div className="mt-6 border-t-2 border-slate-900 pt-4 flex justify-between items-center font-black text-lg">
+          <span>إجمالي عدد الصناديق المطلوب تجهيزها:</span>
+          <span>{aggregatedItems.reduce((sum, item) => sum + item.totalQty, 0)} صندوق</span>
+        </div>
+
+        <div className="mt-12 text-center text-[10px] text-slate-400 border-t border-slate-200 pt-4 font-bold">
+          * تم توليد هذه الصفحة تلقائياً لتسهيل تجميع البضائع من الرفوف • idelbi gıda
+        </div>
+      </div>
+    </>
   );
 }
