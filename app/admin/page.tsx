@@ -1035,11 +1035,11 @@ export default function AdminDashboard() {
 
                 {/* Actions Footer */}
                 <div className="flex flex-wrap items-center justify-between gap-3 pt-3 border-t border-slate-200 mt-1">
-                  <div className="flex items-center gap-2">
+                  <div className="grid grid-cols-2 gap-2 w-full sm:flex sm:flex-wrap sm:items-center sm:gap-2 sm:w-auto">
                     <button
                       onClick={() => handleSavePrices(order.id)}
                       disabled={isUpdating}
-                      className="bg-emerald-50 hover:bg-emerald-100 border border-emerald-250 text-emerald-700 font-bold px-3 py-1.5 rounded-xl text-xs flex items-center gap-1 cursor-pointer transition-all active:scale-95 shadow-sm"
+                      className="col-span-2 sm:col-auto bg-emerald-50 hover:bg-emerald-100 border border-emerald-250 text-emerald-700 font-bold px-3 py-2 sm:py-1.5 rounded-xl text-xs flex items-center justify-center gap-1 cursor-pointer transition-all active:scale-95 shadow-sm w-full sm:w-auto"
                       title="حفظ الأسعار المدخلة وتحديث الإجمالي"
                     >
                       <Save className="w-3.5 h-3.5" />
@@ -1048,7 +1048,7 @@ export default function AdminDashboard() {
                     
                     <button
                       onClick={() => handleCopyInvoiceLink(order.id, order.total_price)}
-                      className="bg-slate-50 hover:bg-slate-100 border border-slate-250 text-slate-600 hover:text-slate-800 font-bold px-3 py-1.5 rounded-xl text-xs flex items-center gap-1 cursor-pointer transition-all active:scale-95 shadow-sm"
+                      className="col-span-1 sm:col-auto bg-slate-50 hover:bg-slate-100 border border-slate-250 text-slate-600 hover:text-slate-800 font-bold px-3 py-2 sm:py-1.5 rounded-xl text-xs flex items-center justify-center gap-1 cursor-pointer transition-all active:scale-95 shadow-sm w-full sm:w-auto"
                       title="نسخ رابط الفاتورة لمشاركته بأي طريقة أخرى"
                     >
                       <Copy className="w-3.5 h-3.5" />
@@ -1056,8 +1056,18 @@ export default function AdminDashboard() {
                     </button>
 
                     <button
+                      onClick={() => handleDownloadPDF(order)}
+                      disabled={isUpdating}
+                      className="col-span-1 sm:col-auto bg-teal-50 hover:bg-teal-100 border border-teal-250 text-teal-700 font-bold px-3 py-2 sm:py-1.5 rounded-xl text-xs flex items-center justify-center gap-1 cursor-pointer transition-all active:scale-95 shadow-sm disabled:opacity-50 w-full sm:w-auto"
+                      title="تحميل الفاتورة كـ PDF لمشاركتها على واتساب"
+                    >
+                      <Download className="w-3.5 h-3.5" />
+                      <span>تصدير PDF<span className="hidden sm:inline"> للواتساب</span></span>
+                    </button>
+
+                    <button
                       onClick={() => handlePrintInvoice(order)}
-                      className="bg-blue-50 hover:bg-blue-100 border border-blue-250 text-blue-700 font-bold px-3 py-1.5 rounded-xl text-xs flex items-center gap-1 cursor-pointer transition-all active:scale-95 shadow-sm"
+                      className="col-span-1 sm:col-auto bg-blue-50 hover:bg-blue-100 border border-blue-250 text-blue-700 font-bold px-3 py-2 sm:py-1.5 rounded-xl text-xs flex items-center justify-center gap-1 cursor-pointer transition-all active:scale-95 shadow-sm w-full sm:w-auto"
                       title="طباعة الفاتورة A4"
                     >
                       <Printer className="w-3.5 h-3.5" />
@@ -1066,21 +1076,11 @@ export default function AdminDashboard() {
 
                     <button
                       onClick={() => handlePrintReceipt(order)}
-                      className="bg-amber-50 hover:bg-amber-100 border border-amber-250 text-amber-700 font-bold px-3 py-1.5 rounded-xl text-xs flex items-center gap-1 cursor-pointer transition-all active:scale-95 shadow-sm"
+                      className="col-span-1 sm:col-auto bg-amber-50 hover:bg-amber-100 border border-amber-250 text-amber-700 font-bold px-3 py-2 sm:py-1.5 rounded-xl text-xs flex items-center justify-center gap-1 cursor-pointer transition-all active:scale-95 shadow-sm w-full sm:w-auto"
                       title="طباعة إيصال حراري 58 مم"
                     >
                       <Printer className="w-3.5 h-3.5" />
                       <span>إيصال 58 مم</span>
-                    </button>
-
-                    <button
-                      onClick={() => handleDownloadPDF(order)}
-                      disabled={isUpdating}
-                      className="bg-teal-50 hover:bg-teal-100 border border-teal-250 text-teal-700 font-bold px-3 py-1.5 rounded-xl text-xs flex items-center gap-1 cursor-pointer transition-all active:scale-95 shadow-sm disabled:opacity-50"
-                      title="تحميل الفاتورة كـ PDF لمشاركتها على واتساب"
-                    >
-                      <Download className="w-3.5 h-3.5" />
-                      <span>تصدير PDF للواتساب</span>
                     </button>
                   </div>
 
@@ -1450,11 +1450,11 @@ export default function AdminDashboard() {
 
                 {/* Actions Footer */}
                 <div className="flex flex-wrap items-center justify-between gap-3 pt-3 border-t border-slate-200 mt-1">
-                  <div className="flex items-center gap-2">
+                  <div className="grid grid-cols-2 gap-2 w-full sm:flex sm:flex-wrap sm:items-center sm:gap-2 sm:w-auto">
                     <button
                       onClick={() => handleSavePrices(order.id)}
                       disabled={isUpdating}
-                      className="bg-emerald-50 hover:bg-emerald-100 border border-emerald-250 text-emerald-700 font-bold px-3 py-1.5 rounded-xl text-xs flex items-center gap-1 cursor-pointer transition-all active:scale-95 shadow-sm"
+                      className="col-span-2 sm:col-auto bg-emerald-50 hover:bg-emerald-100 border border-emerald-250 text-emerald-700 font-bold px-3 py-2 sm:py-1.5 rounded-xl text-xs flex items-center justify-center gap-1 cursor-pointer transition-all active:scale-95 shadow-sm w-full sm:w-auto"
                       title="حفظ الأسعار المدخلة وتحديث الإجمالي"
                     >
                       <Save className="w-3.5 h-3.5" />
@@ -1463,7 +1463,7 @@ export default function AdminDashboard() {
                     
                     <button
                       onClick={() => handleCopyInvoiceLink(order.id, order.total_price)}
-                      className="bg-slate-50 hover:bg-slate-100 border border-slate-250 text-slate-600 hover:text-slate-800 font-bold px-3 py-1.5 rounded-xl text-xs flex items-center gap-1 cursor-pointer transition-all active:scale-95 shadow-sm"
+                      className="col-span-1 sm:col-auto bg-slate-50 hover:bg-slate-100 border border-slate-250 text-slate-600 hover:text-slate-800 font-bold px-3 py-2 sm:py-1.5 rounded-xl text-xs flex items-center justify-center gap-1 cursor-pointer transition-all active:scale-95 shadow-sm w-full sm:w-auto"
                       title="نسخ رابط الفاتورة لمشاركته بأي طريقة أخرى"
                     >
                       <Copy className="w-3.5 h-3.5" />
@@ -1471,8 +1471,18 @@ export default function AdminDashboard() {
                     </button>
 
                     <button
+                      onClick={() => handleDownloadPDF(order)}
+                      disabled={isUpdating}
+                      className="col-span-1 sm:col-auto bg-teal-50 hover:bg-teal-100 border border-teal-250 text-teal-700 font-bold px-3 py-2 sm:py-1.5 rounded-xl text-xs flex items-center justify-center gap-1 cursor-pointer transition-all active:scale-95 shadow-sm disabled:opacity-50 w-full sm:w-auto"
+                      title="تحميل الفاتورة كـ PDF لمشاركتها على واتساب"
+                    >
+                      <Download className="w-3.5 h-3.5" />
+                      <span>تصدير PDF<span className="hidden sm:inline"> للواتساب</span></span>
+                    </button>
+
+                    <button
                       onClick={() => handlePrintInvoice(order)}
-                      className="bg-blue-50 hover:bg-blue-100 border border-blue-250 text-blue-700 font-bold px-3 py-1.5 rounded-xl text-xs flex items-center gap-1 cursor-pointer transition-all active:scale-95 shadow-sm"
+                      className="col-span-1 sm:col-auto bg-blue-50 hover:bg-blue-100 border border-blue-250 text-blue-700 font-bold px-3 py-2 sm:py-1.5 rounded-xl text-xs flex items-center justify-center gap-1 cursor-pointer transition-all active:scale-95 shadow-sm w-full sm:w-auto"
                       title="طباعة الفاتورة A4"
                     >
                       <Printer className="w-3.5 h-3.5" />
@@ -1481,21 +1491,11 @@ export default function AdminDashboard() {
 
                     <button
                       onClick={() => handlePrintReceipt(order)}
-                      className="bg-amber-50 hover:bg-amber-100 border border-amber-250 text-amber-700 font-bold px-3 py-1.5 rounded-xl text-xs flex items-center gap-1 cursor-pointer transition-all active:scale-95 shadow-sm"
+                      className="col-span-1 sm:col-auto bg-amber-50 hover:bg-amber-100 border border-amber-250 text-amber-700 font-bold px-3 py-2 sm:py-1.5 rounded-xl text-xs flex items-center justify-center gap-1 cursor-pointer transition-all active:scale-95 shadow-sm w-full sm:w-auto"
                       title="طباعة إيصال حراري 58 مم"
                     >
                       <Printer className="w-3.5 h-3.5" />
                       <span>إيصال 58 مم</span>
-                    </button>
-
-                    <button
-                      onClick={() => handleDownloadPDF(order)}
-                      disabled={isUpdating}
-                      className="bg-teal-50 hover:bg-teal-100 border border-teal-250 text-teal-700 font-bold px-3 py-1.5 rounded-xl text-xs flex items-center gap-1 cursor-pointer transition-all active:scale-95 shadow-sm disabled:opacity-50"
-                      title="تحميل الفاتورة كـ PDF لمشاركتها على واتساب"
-                    >
-                      <Download className="w-3.5 h-3.5" />
-                      <span>تصدير PDF للواتساب</span>
                     </button>
                   </div>
 
