@@ -63,7 +63,7 @@ export default function AdminDashboard() {
   const [addQtyForOrder, setAddQtyForOrder] = useState<{[orderId: string]: number}>({});
   const [addPriceForOrder, setAddPriceForOrder] = useState<{[orderId: string]: string}>({});
   const [prodSearchQuery, setProdSearchQuery] = useState<{[orderId: string]: string}>({});
-  const [printType, setPrintType] = useState<'aggregation' | 'invoice' | 'receipt'>('aggregation');
+  const [printType, setPrintType] = useState<'aggregation' | 'invoice' | 'receipt' | 'aggregation_receipt'>('aggregation');
   const [activePrintOrder, setActivePrintOrder] = useState<Order | null>(null);
 
 
@@ -659,6 +659,14 @@ export default function AdminDashboard() {
     }, 150);
   };
 
+  const handlePrintAggregationReceipt = () => {
+    setPrintType('aggregation_receipt');
+    setActivePrintOrder(null);
+    setTimeout(() => {
+      window.print();
+    }, 150);
+  };
+
   const getFilteredProducts = (orderId: string) => {
     const query = (prodSearchQuery[orderId] || '').trim().toLowerCase();
     if (!query) return allProducts;
@@ -1107,14 +1115,25 @@ export default function AdminDashboard() {
 
           <div className="flex items-center gap-2 flex-wrap shrink-0">
             {aggregatedItems.length > 0 && (
-              <button
-                onClick={handlePrintAggregation}
-                className="bg-slate-100 hover:bg-slate-200 border border-slate-200 text-slate-700 font-bold px-4 py-2.5 rounded-xl text-xs flex items-center gap-1.5 cursor-pointer transition-all active:scale-95 shadow-2xs"
-                title="طباعة ورقة تجميع السلع للمستودع"
-              >
-                <Printer className="w-4 h-4 text-slate-500" />
-                <span>طباعة التجميع</span>
-              </button>
+              <>
+                <button
+                  onClick={handlePrintAggregation}
+                  className="bg-slate-100 hover:bg-slate-200 border border-slate-200 text-slate-700 font-bold px-3.5 py-2.5 rounded-xl text-xs flex items-center gap-1.5 cursor-pointer transition-all active:scale-95 shadow-2xs"
+                  title="طباعة ورقة تجميع السلع للمستودع A4"
+                >
+                  <Printer className="w-4 h-4 text-slate-500" />
+                  <span>طباعة A4</span>
+                </button>
+
+                <button
+                  onClick={handlePrintAggregationReceipt}
+                  className="bg-amber-50 hover:bg-amber-100 border border-amber-250 text-amber-700 font-bold px-3.5 py-2.5 rounded-xl text-xs flex items-center gap-1.5 cursor-pointer transition-all active:scale-95 shadow-2xs"
+                  title="طباعة ورقة التجميع للمستودع على ورق حراري 58 مم"
+                >
+                  <Printer className="w-4 h-4 text-amber-600" />
+                  <span>تجميع 58 مم</span>
+                </button>
+              </>
             )}
 
             {activeOrdersList.length > 0 && (
@@ -1729,6 +1748,53 @@ export default function AdminDashboard() {
           {/* Footer */}
           <div className="text-center mt-4 pt-2 border-t border-dashed border-black text-[8px] text-slate-500">
             <p>شكراً لتعاملكم معنا</p>
+            <p className="mt-0.5">İDELBİ GIDA • 58mm Thermal</p>
+          </div>
+        </div>
+      )}
+
+      {/* 5. Print-only Layout: 58mm Thermal Daily Aggregation Print Sheet */}
+      {printType === 'aggregation_receipt' && (
+        <div className="hidden print:block font-mono text-right text-xs bg-white text-black p-1 w-[58mm] mx-auto leading-relaxed" dir="rtl">
+          {/* Header */}
+          <div className="text-center border-b border-black pb-2 mb-2">
+            <h1 className="text-sm font-bold uppercase">idelbi gida | إدلب غذائيات</h1>
+            <p className="text-[9px] mt-0.5 font-bold">تجميع المستودع اليومي</p>
+            <p className="text-[8px] text-slate-600">تاريخ الطباعة: {new Date().toLocaleDateString('ar-EG', { dateStyle: 'short' })}</p>
+            <p className="text-[9px] font-bold mt-1 border border-black py-0.5 px-2 inline-block rounded">ورقة التجميع 58 مم</p>
+          </div>
+
+          {/* Table */}
+          <table className="w-full text-[9px] mb-2 border-collapse">
+            <thead>
+              <tr className="border-b border-black text-right">
+                <th className="pb-1 font-bold">#</th>
+                <th className="pb-1 font-bold">اسم المنتج</th>
+                <th className="pb-1 text-center w-16 font-bold">الكمية</th>
+              </tr>
+            </thead>
+            <tbody>
+              {aggregatedItems.map((item, idx) => (
+                <tr key={idx} className="border-b border-dashed border-slate-200">
+                  <td className="py-1 font-bold font-mono">{idx + 1}</td>
+                  <td className="py-1 font-bold">{item.productName}</td>
+                  <td className="py-1 text-center font-black text-xs font-mono">{item.totalQty} علبة</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+
+          {/* Summary */}
+          <div className="border-t border-black pt-1.5 text-[10px] font-bold">
+            <div className="flex justify-between">
+              <span>إجمالي الصناديق المطلوبة:</span>
+              <span>{aggregatedItems.reduce((sum, item) => sum + item.totalQty, 0)} صندوق</span>
+            </div>
+          </div>
+
+          {/* Footer */}
+          <div className="text-center mt-4 pt-2 border-t border-dashed border-black text-[8px] text-slate-500">
+            <p>تم توليد الورقة للتعبئة السريعة</p>
             <p className="mt-0.5">İDELBİ GIDA • 58mm Thermal</p>
           </div>
         </div>
