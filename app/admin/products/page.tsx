@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect, useRef } from 'react';
 import { supabase } from '@/lib/supabase';
-import { Plus, Trash2, ShoppingBag, Loader2, Image as ImageIcon, Upload, AlertCircle, RefreshCw, GripVertical, Eye, EyeOff, X } from 'lucide-react';
+import { Plus, Trash2, ShoppingBag, Loader2, Image as ImageIcon, Upload, AlertCircle, RefreshCw, GripVertical, Eye, EyeOff, X, Pencil } from 'lucide-react';
 
 interface Category {
   id: string;
@@ -39,57 +39,75 @@ const MOCK_PRODUCTS: Product[] = [
 const compressImage = (file: File, maxWidth = 800): Promise<Blob | File> => {
   return new Promise((resolve, reject) => {
     const reader = new FileReader();
-    reader.readAsDataURL(file);
     reader.onload = (event) => {
       const img = new Image();
-      img.src = event.target?.result as string;
       img.onload = () => {
-        const canvas = document.createElement('canvas');
-        let width = img.width;
-        let height = img.height;
+        const draw = () => {
+          const canvas = document.createElement('canvas');
+          let width = img.width;
+          let height = img.height;
 
-        // Resize if larger than maxWidth
-        if (width > maxWidth || height > maxWidth) {
-          if (width > height) {
-            height = Math.round((height * maxWidth) / width);
-            width = maxWidth;
-          } else {
-            width = Math.round((width * maxWidth) / height);
-            height = maxWidth;
-          }
-        }
-
-        canvas.width = width;
-        canvas.height = height;
-
-        const ctx = canvas.getContext('2d');
-        if (!ctx) {
-          resolve(file);
-          return;
-        }
-
-        ctx.drawImage(img, 0, 0, width, height);
-
-        canvas.toBlob(
-          (blob) => {
-            if (blob) {
-              const baseName = file.name.substring(0, file.name.lastIndexOf('.')) || file.name;
-              const compressedFile = new File([blob], `${baseName.replace(/\s+/g, '_')}_opt_${Date.now()}.jpg`, {
-                type: 'image/jpeg',
-                lastModified: Date.now(),
-              });
-              resolve(compressedFile);
+          // Resize if larger than maxWidth
+          if (width > maxWidth || height > maxWidth) {
+            if (width > height) {
+              height = Math.round((height * maxWidth) / width);
+              width = maxWidth;
             } else {
-              resolve(file);
+              width = Math.round((width * maxWidth) / height);
+              height = maxWidth;
             }
-          },
-          'image/jpeg',
-          0.75 // 75% quality is perfect for web speed
-        );
+          }
+
+          canvas.width = width;
+          canvas.height = height;
+
+          const ctx = canvas.getContext('2d');
+          if (!ctx) {
+            resolve(file);
+            return;
+          }
+
+          // Fill canvas background with white (prevents transparent PNGs from rendering with black backgrounds in JPEG)
+          ctx.fillStyle = '#FFFFFF';
+          ctx.fillRect(0, 0, width, height);
+
+          ctx.drawImage(img, 0, 0, width, height);
+
+          canvas.toBlob(
+            (blob) => {
+              if (blob) {
+                const baseName = file.name.substring(0, file.name.lastIndexOf('.')) || file.name;
+                const compressedFile = new File([blob], `${baseName.replace(/\s+/g, '_')}_opt_${Date.now()}.jpg`, {
+                  type: 'image/jpeg',
+                  lastModified: Date.now(),
+                });
+                resolve(compressedFile);
+              } else {
+                resolve(file);
+              }
+            },
+            'image/jpeg',
+            0.75 // 75% quality is perfect for web speed
+          );
+        };
+
+        // Ensure the image is fully decoded before drawing to canvas to prevent blank/black image issues
+        if ('decode' in img) {
+          img.decode()
+            .then(draw)
+            .catch((err) => {
+              console.warn('Image decode failed, drawing immediately:', err);
+              draw();
+            });
+        } else {
+          draw();
+        }
       };
       img.onerror = (err) => reject(err);
+      img.src = event.target?.result as string;
     };
     reader.onerror = (err) => reject(err);
+    reader.readAsDataURL(file);
   });
 };
 
@@ -103,6 +121,16 @@ export default function AdminProducts() {
   const [categoryId, setCategoryId] = useState('');
   const [imageFile, setImageFile] = useState<File | null>(null);
   const [imagePreview, setImagePreview] = useState<string | null>(null);
+
+  // Edit product states
+  const [editingProduct, setEditingProduct] = useState<Product | null>(null);
+  const [editName, setEditName] = useState('');
+  const [editPrice, setEditPrice] = useState('');
+  const [editCategoryId, setEditCategoryId] = useState('');
+  const [editImageFile, setEditImageFile] = useState<File | null>(null);
+  const [editImagePreview, setEditImagePreview] = useState<string | null>(null);
+  const [editImageAction, setEditImageAction] = useState<'keep' | 'new' | 'remove'>('keep');
+  const [editErrorMsg, setEditErrorMsg] = useState('');
 
   // Status
   const [loading, setLoading] = useState(true);
@@ -292,6 +320,180 @@ export default function AdminProducts() {
         setImagePreview(reader.result as string);
       };
       reader.readAsDataURL(file);
+    }
+  };
+
+  const handleEditImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    setEditErrorMsg('');
+    
+    if (file) {
+      const maxSizeBytes = 3 * 1024 * 1024;
+      if (file.size > maxSizeBytes) {
+        alert("حجم الصورة كبير جداً! الحد الأقصى المسموح به هو 3 ميجابايت لضمان سرعة تحميل صفحة المتجر للزبائن. يرجى اختيار صورة أصغر أو مضغوطة.");
+        setEditErrorMsg("حجم الصورة المحدد أكبر من 3 ميجابايت. يرجى استخدام صورة أصغر.");
+        return;
+      }
+
+      const allowedTypes = ['image/jpeg', 'image/png', 'image/webp', 'image/gif'];
+      const fileExtension = file.name.split('.').pop()?.toLowerCase();
+      
+      if (!allowedTypes.includes(file.type) || fileExtension === 'heic' || fileExtension === 'heif') {
+        alert("صيغة الصورة غير مدعومة! يرجى اختيار صورة بصيغة JPG أو PNG أو WEBP. (صيغ الكاميرا الخام مثل HEIC / HEIF غير مدعومة مباشرة في متصفحات الويب).");
+        setEditErrorMsg("صيغة الصورة غير مدعومة. يرجى استخدام صيغة متوافقة مع الويب (JPG, PNG, WEBP).");
+        return;
+      }
+
+      setEditImageFile(file);
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        setEditImagePreview(reader.result as string);
+      };
+      reader.readAsDataURL(file);
+    }
+  };
+
+  const handleCloseEdit = () => {
+    setEditingProduct(null);
+    setEditName('');
+    setEditPrice('');
+    setEditCategoryId('');
+    setEditImageFile(null);
+    setEditImagePreview(null);
+    setEditImageAction('keep');
+    setEditErrorMsg('');
+  };
+
+  const handleStartEdit = (product: Product) => {
+    setEditingProduct(product);
+    setEditName(product.name);
+    setEditPrice(product.price !== null && product.price !== undefined ? product.price.toString() : '');
+    setEditCategoryId(product.category_id);
+    setEditImageFile(null);
+    setEditImagePreview(null);
+    setEditImageAction(product.image_url ? 'keep' : 'new');
+    setEditErrorMsg('');
+  };
+
+  const handleSaveEdit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!editingProduct || !editName.trim() || !editCategoryId) return;
+
+    setEditErrorMsg('');
+    setSubmitting(true);
+
+    try {
+      const isUrlConfigured = process.env.NEXT_PUBLIC_SUPABASE_URL && !process.env.NEXT_PUBLIC_SUPABASE_URL.includes('placeholder');
+      let finalImageUrl = editingProduct.image_url;
+
+      if (isUrlConfigured) {
+        if (editImageAction === 'remove') {
+          if (editingProduct.image_url) {
+            try {
+              const fileName = editingProduct.image_url.split('/').pop();
+              if (fileName) {
+                await supabase.storage.from('product-images').remove([fileName]);
+              }
+            } catch (storageErr) {
+              console.warn('Could not delete product image from storage bucket:', storageErr);
+            }
+          }
+          finalImageUrl = null;
+        } else if (editImageAction === 'new' && editImageFile) {
+          let fileToUpload: File | Blob = editImageFile;
+          let fileName = `product-${Date.now()}.jpg`;
+
+          try {
+            const compressed = await compressImage(editImageFile);
+            fileToUpload = compressed;
+            if (compressed instanceof File) {
+              fileName = compressed.name;
+            } else {
+              fileName = `product-${Date.now()}.jpg`;
+            }
+          } catch (compressErr) {
+            console.warn('Image compression failed, uploading original image:', compressErr);
+            const fileExt = editImageFile.name.split('.').pop();
+            fileName = `product-${Date.now()}.${fileExt}`;
+          }
+
+          const filePath = `${fileName}`;
+
+          if (editingProduct.image_url) {
+            try {
+              const oldFileName = editingProduct.image_url.split('/').pop();
+              if (oldFileName) {
+                await supabase.storage.from('product-images').remove([oldFileName]);
+              }
+            } catch (storageErr) {
+              console.warn('Could not delete old product image from storage bucket:', storageErr);
+            }
+          }
+
+          const { error: uploadError } = await supabase.storage
+            .from('product-images')
+            .upload(filePath, fileToUpload, {
+              cacheControl: '31536000',
+              upsert: true
+            });
+
+          if (uploadError) {
+            console.error('Image upload failed:', uploadError);
+            throw new Error(`فشل رفع الصورة إلى السحابة: ${uploadError.message}. يرجى محاولة استخدام صورة أخرى أو بحجم أصغر.`);
+          }
+
+          const { data } = supabase.storage
+            .from('product-images')
+            .getPublicUrl(filePath);
+          
+          finalImageUrl = data.publicUrl;
+        }
+
+        const parsedPrice = editPrice.trim() ? parseFloat(editPrice) : null;
+        const { data: updatedProd, error: updateError } = await supabase
+          .from('products')
+          .update({
+            name: editName.trim(),
+            price: parsedPrice,
+            category_id: editCategoryId,
+            image_url: finalImageUrl
+          })
+          .eq('id', editingProduct.id)
+          .select('*, categories(name)')
+          .single();
+
+        if (updateError) throw updateError;
+
+        const typedProd: Product = {
+          ...updatedProd,
+          categories: updatedProd.categories ? { name: updatedProd.categories.name } : null
+        };
+
+        setProducts((prev) =>
+          prev.map((prod) => (prod.id === editingProduct.id ? typedProd : prod))
+        );
+      } else {
+        const matchingCat = categories.find(c => c.id === editCategoryId);
+        const mockUpdatedProd: Product = {
+          ...editingProduct,
+          name: editName.trim(),
+          price: editPrice.trim() ? parseFloat(editPrice) : null,
+          category_id: editCategoryId,
+          image_url: editImageAction === 'remove' ? null : (editImageAction === 'new' ? editImagePreview : editingProduct.image_url),
+          categories: matchingCat ? { name: matchingCat.name } : null
+        };
+
+        setProducts((prev) =>
+          prev.map((prod) => (prod.id === editingProduct.id ? mockUpdatedProd : prod))
+        );
+      }
+
+      handleCloseEdit();
+    } catch (err: any) {
+      console.error(err);
+      setEditErrorMsg(err.message || 'حدث خطأ غير متوقع أثناء تعديل المنتج.');
+    } finally {
+      setSubmitting(false);
     }
   };
 
@@ -714,6 +916,14 @@ export default function AdminProducts() {
                       <td className="py-3 text-center">
                         <div className="flex items-center justify-center gap-1.5">
                           <button
+                            onClick={() => handleStartEdit(product)}
+                            className="p-1.5 bg-slate-50 hover:bg-emerald-50 border border-slate-200 hover:border-emerald-200 text-slate-555 hover:text-emerald-600 rounded-lg transition-all cursor-pointer"
+                            title="تعديل المنتج"
+                          >
+                            <Pencil className="w-4 h-4" />
+                          </button>
+                          
+                          <button
                             onClick={() => handleToggleVisibility(product.id, !!product.is_hidden)}
                             disabled={togglingId === product.id}
                             className={`p-1.5 border rounded-lg transition-all cursor-pointer ${
@@ -766,6 +976,216 @@ export default function AdminProducts() {
           )}
         </div>
       </div>
+
+      {/* Edit Product Modal */}
+      {editingProduct && (
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-xs z-50 flex items-center justify-center p-4 overflow-y-auto">
+          <div 
+            className="bg-white border border-slate-200 rounded-3xl p-6 w-full max-w-md space-y-4 shadow-xl relative text-right"
+            onClick={(e) => e.stopPropagation()}
+          >
+            {/* Close Button */}
+            <button 
+              onClick={() => handleCloseEdit()}
+              className="absolute top-4 left-4 bg-slate-100 hover:bg-slate-200 active:scale-95 text-slate-500 p-2 rounded-full transition-all cursor-pointer flex items-center justify-center border-none"
+              title="إغلاق"
+            >
+              <X className="w-4 h-4" />
+            </button>
+
+            <div className="flex items-center gap-2.5 pb-2.5 border-b border-slate-100 justify-end">
+              <h2 className="text-sm font-bold text-slate-800">تعديل المنتج</h2>
+              <Pencil className="w-5 h-5 text-emerald-600" />
+            </div>
+
+            <form onSubmit={handleSaveEdit} className="space-y-4">
+              {/* Product Name */}
+              <div className="space-y-1.5">
+                <label className="block text-xs font-bold text-slate-600">اسم المنتج</label>
+                <input
+                  type="text"
+                  required
+                  value={editName}
+                  onChange={(e) => setEditName(e.target.value)}
+                  placeholder="اسم السلعة"
+                  className="w-full bg-slate-50 border border-slate-200 outline-none rounded-xl px-4 py-3 text-sm text-slate-850 placeholder-slate-400 focus:bg-white focus:border-[#128C7E] focus:ring-1 focus:ring-[#128C7E] transition-all text-right"
+                  disabled={submitting}
+                />
+              </div>
+
+              {/* Product Price */}
+              <div className="space-y-1.5">
+                <label className="block text-xs font-bold text-slate-600">
+                  السعر (بالليرة التركية TL) <span className="text-slate-400 font-normal">(اختياري - يترك فارغاً للسعر عند الطلب)</span>
+                </label>
+                <input
+                  type="number"
+                  step="0.01"
+                  min="0"
+                  value={editPrice}
+                  onChange={(e) => setEditPrice(e.target.value)}
+                  placeholder="يحدد عند الطلب"
+                  className="w-full bg-slate-50 border border-slate-200 outline-none rounded-xl px-4 py-3 text-sm text-slate-850 placeholder-slate-400 focus:bg-white focus:border-[#128C7E] focus:ring-1 focus:ring-[#128C7E] transition-all text-right"
+                  disabled={submitting}
+                />
+              </div>
+
+              {/* Category selection */}
+              <div className="space-y-1.5">
+                <label className="block text-xs font-bold text-slate-600">قسم تصنيف المنتج</label>
+                <select
+                  required
+                  value={editCategoryId}
+                  onChange={(e) => setEditCategoryId(e.target.value)}
+                  className="w-full bg-slate-50 border border-slate-200 outline-none rounded-xl px-4 py-3 text-sm text-slate-850 focus:bg-white focus:border-[#128C7E] focus:ring-1 focus:ring-[#128C7E] transition-all text-right cursor-pointer"
+                  disabled={submitting}
+                >
+                  <option value="" disabled className="text-slate-400">اختر القسم المناسب...</option>
+                  {categories.map((cat) => (
+                    <option key={cat.id} value={cat.id} className="text-slate-800 bg-white">
+                      {cat.name}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              {/* Image Control */}
+              <div className="space-y-1.5 text-right">
+                <label className="block text-xs font-bold text-slate-600">صورة المنتج</label>
+                
+                {editImageAction === 'keep' && editingProduct.image_url && (
+                  <div className="relative w-full h-32 bg-slate-50 border border-slate-200 rounded-xl overflow-hidden flex items-center justify-center">
+                    <img 
+                      src={editingProduct.image_url} 
+                      alt="Current" 
+                      className="w-full h-full object-cover" 
+                    />
+                    <div className="absolute inset-0 bg-black/45 flex items-center justify-center gap-3">
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setEditImageAction('new');
+                          setEditImagePreview(null);
+                        }}
+                        className="bg-white/20 hover:bg-white/30 text-white border border-white/20 px-3 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer"
+                      >
+                        تغيير الصورة
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setEditImageAction('remove');
+                          setEditImagePreview(null);
+                        }}
+                        className="bg-red-650 hover:bg-red-755 text-white px-3 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer border-none"
+                      >
+                        حذف الصورة
+                      </button>
+                    </div>
+                  </div>
+                )}
+
+                {(editImageAction === 'new' || !editingProduct.image_url || editImageAction === 'remove') && (
+                  <div className="space-y-2">
+                    {editImageAction === 'remove' && (
+                      <div className="bg-rose-50 border border-rose-100 text-rose-800 p-2.5 rounded-xl text-xs font-bold flex items-center justify-between">
+                        <span>سيتم حذف الصورة الحالية عند حفظ التعديلات.</span>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setEditImageAction('keep');
+                            setEditImagePreview(null);
+                          }}
+                          className="bg-slate-200 hover:bg-slate-350 text-slate-700 px-2 py-1 rounded-md text-[10px] transition-all cursor-pointer border-none"
+                        >
+                          تراجع
+                        </button>
+                      </div>
+                    )}
+
+                    {(editImageAction === 'new' || !editingProduct.image_url) && (
+                      <div className="w-full bg-slate-50 border border-dashed border-slate-200 hover:border-slate-350 rounded-xl p-4 flex flex-col items-center justify-center gap-2 cursor-pointer transition-all min-h-32 relative overflow-hidden">
+                        <input
+                          type="file"
+                          accept="image/jpeg,image/png,image/webp,image/gif"
+                          onChange={handleEditImageChange}
+                          className="absolute inset-0 opacity-0 cursor-pointer w-full h-full z-20"
+                          disabled={submitting}
+                        />
+                        {editImagePreview ? (
+                          <div className="absolute inset-0 w-full h-full flex items-center justify-center bg-white">
+                            <img 
+                              src={editImagePreview} 
+                              alt="New Preview" 
+                              className="w-full h-full object-cover" 
+                            />
+                            <div className="absolute inset-0 bg-black/40 flex items-center justify-center text-white opacity-0 hover:opacity-100 transition-opacity gap-1.5 text-xs font-bold">
+                              <Upload className="w-4 h-4" />
+                              <span>تغيير الصورة</span>
+                            </div>
+                          </div>
+                        ) : (
+                          <>
+                            <ImageIcon className="w-8 h-8 text-slate-400" />
+                            <span className="text-xs font-bold text-slate-500">انقر لتحميل صورة جديدة</span>
+                            <span className="text-[10px] text-slate-400">صيغ JPG, PNG (حد أقصى 3 ميجا)</span>
+                          </>
+                        )}
+                      </div>
+                    )}
+
+                    {editImageAction === 'new' && editingProduct.image_url && !editImagePreview && (
+                      <div className="text-left">
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setEditImageAction('keep');
+                            setEditImageFile(null);
+                            setEditImagePreview(null);
+                          }}
+                          className="text-xs font-bold text-[#128C7E] hover:underline bg-transparent border-none cursor-pointer"
+                        >
+                          إلغاء التغيير والاحتفاظ بالصورة الحالية
+                        </button>
+                      </div>
+                    )}
+                  </div>
+                )}
+              </div>
+
+              {editErrorMsg && (
+                <div className="bg-rose-500/10 border border-rose-500/20 text-rose-800 p-3 rounded-xl text-xs font-semibold leading-relaxed">
+                  {editErrorMsg}
+                </div>
+              )}
+
+              {/* Action Buttons */}
+              <div className="flex gap-2.5 pt-2 justify-end">
+                <button
+                  type="button"
+                  onClick={() => handleCloseEdit()}
+                  disabled={submitting}
+                  className="bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold py-2.5 px-4 rounded-xl text-xs transition-all cursor-pointer border-none"
+                >
+                  إلغاء
+                </button>
+                <button
+                  type="submit"
+                  disabled={submitting || !editName.trim() || !editCategoryId}
+                  className="bg-emerald-650 hover:bg-emerald-700 disabled:bg-slate-100 disabled:text-slate-400 text-white font-bold py-2.5 px-4 rounded-xl text-xs flex items-center justify-center gap-1.5 transition-all shadow-md cursor-pointer border-none"
+                  style={{ backgroundColor: '#128C7E' }}
+                >
+                  {submitting ? (
+                    <Loader2 className="w-4 h-4 animate-spin" />
+                  ) : (
+                    <span>حفظ التعديلات</span>
+                  )}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
 
       {/* Full-Screen Image Preview Modal */}
       {activePreviewImage && (
