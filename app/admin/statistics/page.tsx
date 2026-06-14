@@ -813,22 +813,46 @@ export default function AdminStatistics() {
           @media print {
             @page {
               size: 80mm auto;
-              margin: 0 !important;
+              margin: 0mm !important;
             }
             html, body {
               margin: 0 !important;
               padding: 0 !important;
               width: 80mm !important;
+              max-width: 80mm !important;
+              min-width: 80mm !important;
               background-color: #fff !important;
               color: #000 !important;
+              overflow: visible !important;
+              -webkit-print-color-adjust: exact !important;
+              print-color-adjust: exact !important;
             }
-            /* Reset dashboard layout wrappers to prevent them from squishing the print width */
-            .min-h-screen {
+            /* Hide EVERYTHING by default */
+            body > * {
+              display: none !important;
+            }
+            body > #__next,
+            body > div[id] {
+              display: block !important;
+            }
+            /* Reset ALL layout wrappers aggressively */
+            aside, nav, header, footer,
+            [class*="sidebar"], [class*="Sidebar"],
+            [class*="nav-"], [class*="navigation"] {
+              display: none !important;
+              width: 0 !important;
+              height: 0 !important;
+              overflow: hidden !important;
+            }
+            .min-h-screen, div.min-h-screen {
               display: block !important;
               padding: 0 !important;
               margin: 0 !important;
               min-height: 0 !important;
               background: transparent !important;
+              width: 80mm !important;
+              max-width: 80mm !important;
+              flex-direction: column !important;
             }
             main {
               padding: 0 !important;
@@ -836,12 +860,40 @@ export default function AdminStatistics() {
               overflow: visible !important;
               display: block !important;
               width: 80mm !important;
+              max-width: 80mm !important;
+              min-width: 80mm !important;
+              flex: none !important;
             }
-            main > div {
-              max-width: none !important;
-              width: 100% !important;
+            main > div, main > div > div {
+              max-width: 80mm !important;
+              width: 80mm !important;
               padding: 0 !important;
               margin: 0 !important;
+              box-sizing: border-box !important;
+            }
+            /* Force thermal container to fill full 80mm width */
+            .thermal-container {
+              display: block !important;
+              width: 80mm !important;
+              max-width: 80mm !important;
+              min-width: 80mm !important;
+              padding: 2mm !important;
+              margin: 0 !important;
+              box-sizing: border-box !important;
+              font-size: 13px !important;
+              line-height: 1.5 !important;
+              overflow: visible !important;
+            }
+            .thermal-container table {
+              width: 100% !important;
+              table-layout: fixed !important;
+            }
+            /* Ensure all flex/grid parents flatten */
+            div[class*="flex"], div[class*="grid"] {
+              display: block !important;
+            }
+            .thermal-container div[class*="flex"] {
+              display: flex !important;
             }
           }
         `}} />
