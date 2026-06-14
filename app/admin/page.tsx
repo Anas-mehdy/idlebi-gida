@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { supabase } from '@/lib/supabase';
-import { ShoppingBag, Users, CheckSquare, ClipboardList, TrendingUp, DollarSign, Clock, AlertCircle, Trash2, Save, Copy, X, CalendarClock, Printer, Plus, Search, Download, ChevronDown, ChevronUp } from 'lucide-react';
+import { ShoppingBag, Users, CheckSquare, ClipboardList, TrendingUp, DollarSign, Clock, AlertCircle, Trash2, Save, Copy, X, CalendarClock, Printer, Plus, Search, Download, ChevronDown, ChevronUp, Edit2 } from 'lucide-react';
 import html2canvas from 'html2canvas-pro';
 import { jsPDF } from 'jspdf';
 
@@ -74,6 +74,8 @@ export default function AdminDashboard() {
   const [customProductQty, setCustomProductQty] = useState<{[orderId: string]: number}>({});
   const [customProductPrice, setCustomProductPrice] = useState<{[orderId: string]: string}>({});
   const [editedQuantities, setEditedQuantities] = useState<{[itemId: string]: number}>({});
+  const [editingCustomerId, setEditingCustomerId] = useState<string | null>(null);
+  const [tempCustomerName, setTempCustomerName] = useState<string>('');
 
   const toggleOrderExpand = (orderId: string) => {
     setExpandedOrders(prev => ({
@@ -351,6 +353,48 @@ export default function AdminDashboard() {
     } catch (err: any) {
       console.error(err);
       alert('حدث خطأ أثناء إلغاء الطلبية.');
+    } finally {
+      setIsUpdating(false);
+    }
+  };
+
+  const handleSaveCustomerName = async (orderId: string) => {
+    const newName = tempCustomerName.trim();
+    if (!newName) {
+      alert('لا يمكن أن يكون اسم الزبون فارغاً.');
+      return;
+    }
+
+    setIsUpdating(true);
+    try {
+      const isUrlConfigured = process.env.NEXT_PUBLIC_SUPABASE_URL && !process.env.NEXT_PUBLIC_SUPABASE_URL.includes('placeholder');
+      
+      if (isUrlConfigured) {
+        const { error } = await supabase
+          .from('orders')
+          .update({ customer_name: newName })
+          .eq('id', orderId);
+
+        if (error) throw error;
+      }
+
+      // Update local state
+      const updatedOrders = orders.map(o => {
+        if (o.id === orderId) {
+          return {
+            ...o,
+            customer_name: newName
+          };
+        }
+        return o;
+      });
+
+      setOrders(updatedOrders);
+      setEditingCustomerId(null);
+      alert('تم تحديث اسم الزبون بنجاح!');
+    } catch (err: any) {
+      console.error(err);
+      alert('حدث خطأ أثناء تعديل اسم الزبون.');
     } finally {
       setIsUpdating(false);
     }
@@ -926,14 +970,63 @@ export default function AdminDashboard() {
                           <ChevronDown className="w-4 h-4" />
                         )}
                       </button>
-                      <div>
-                        <h3 
-                          className="text-sm font-bold text-slate-800 cursor-pointer hover:text-[#128C7E] transition-colors flex items-center gap-1.5"
-                          onClick={() => toggleOrderExpand(order.id)}
-                        >
-                          {order.customer_name}
-                        </h3>
-                        <div className="flex items-center gap-1.5 text-[10px] text-slate-500 mt-1">
+                      <div className="space-y-1">
+                        {editingCustomerId === order.id ? (
+                          <div className="flex items-center gap-1.5" onClick={(e) => e.stopPropagation()}>
+                            <input
+                              type="text"
+                              value={tempCustomerName}
+                              onChange={(e) => setTempCustomerName(e.target.value)}
+                              className="bg-white border border-slate-300 outline-none rounded-xl px-2.5 py-1 text-xs text-slate-800 focus:border-[#128C7E] focus:ring-1 focus:ring-[#128C7E] font-bold"
+                              autoFocus
+                              onKeyDown={(e) => {
+                                if (e.key === 'Enter') {
+                                  handleSaveCustomerName(order.id);
+                                } else if (e.key === 'Escape') {
+                                  setEditingCustomerId(null);
+                                }
+                              }}
+                            />
+                            <button
+                              type="button"
+                              onClick={() => handleSaveCustomerName(order.id)}
+                              className="p-1.5 text-emerald-600 hover:bg-emerald-50 border border-emerald-100 rounded-lg transition-colors cursor-pointer"
+                              title="حفظ الاسم"
+                            >
+                              <CheckSquare className="w-3.5 h-3.5" />
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => setEditingCustomerId(null)}
+                              className="p-1.5 text-slate-450 hover:bg-slate-100 border border-slate-200 rounded-lg transition-colors cursor-pointer"
+                              title="إلغاء"
+                            >
+                              <X className="w-3.5 h-3.5" />
+                            </button>
+                          </div>
+                        ) : (
+                          <div className="flex items-center gap-1.5 group">
+                            <h3 
+                              className="text-sm font-bold text-slate-800 cursor-pointer hover:text-[#128C7E] transition-colors"
+                              onClick={() => toggleOrderExpand(order.id)}
+                            >
+                              {order.customer_name}
+                            </h3>
+                            <button
+                              type="button"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                setEditingCustomerId(order.id);
+                                setTempCustomerName(order.customer_name);
+                              }}
+                              className="p-1 text-slate-400 hover:text-[#128C7E] hover:bg-slate-100 border border-slate-200 rounded-lg transition-colors cursor-pointer opacity-0 group-hover:opacity-100 focus:opacity-100 shrink-0"
+                              title="تعديل اسم الزبون"
+                            >
+                              <Edit2 className="w-3 h-3" />
+                            </button>
+                          </div>
+                        )}
+                        <div className="flex items-center gap-1.5 text-[10px] text-slate-500">
                           <Clock className="w-3.5 h-3.5 text-slate-400" />
                           <span>ساعة الاستلام: {formatTime(order.created_at)}</span>
                         </div>
@@ -1515,14 +1608,63 @@ export default function AdminDashboard() {
                           <ChevronDown className="w-4 h-4" />
                         )}
                       </button>
-                      <div>
-                        <h3 
-                          className="text-sm font-bold text-slate-800 cursor-pointer hover:text-[#128C7E] transition-colors flex items-center gap-1.5"
-                          onClick={() => toggleOrderExpand(order.id)}
-                        >
-                          {order.customer_name}
-                        </h3>
-                        <div className="flex items-center gap-1.5 text-[10px] text-slate-500 mt-1">
+                      <div className="space-y-1">
+                        {editingCustomerId === order.id ? (
+                          <div className="flex items-center gap-1.5" onClick={(e) => e.stopPropagation()}>
+                            <input
+                              type="text"
+                              value={tempCustomerName}
+                              onChange={(e) => setTempCustomerName(e.target.value)}
+                              className="bg-white border border-slate-300 outline-none rounded-xl px-2.5 py-1 text-xs text-slate-800 focus:border-[#128C7E] focus:ring-1 focus:ring-[#128C7E] font-bold"
+                              autoFocus
+                              onKeyDown={(e) => {
+                                if (e.key === 'Enter') {
+                                  handleSaveCustomerName(order.id);
+                                } else if (e.key === 'Escape') {
+                                  setEditingCustomerId(null);
+                                }
+                              }}
+                            />
+                            <button
+                              type="button"
+                              onClick={() => handleSaveCustomerName(order.id)}
+                              className="p-1.5 text-emerald-600 hover:bg-emerald-50 border border-emerald-100 rounded-lg transition-colors cursor-pointer"
+                              title="حفظ الاسم"
+                            >
+                              <CheckSquare className="w-3.5 h-3.5" />
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => setEditingCustomerId(null)}
+                              className="p-1.5 text-slate-450 hover:bg-slate-100 border border-slate-200 rounded-lg transition-colors cursor-pointer"
+                              title="إلغاء"
+                            >
+                              <X className="w-3.5 h-3.5" />
+                            </button>
+                          </div>
+                        ) : (
+                          <div className="flex items-center gap-1.5 group">
+                            <h3 
+                              className="text-sm font-bold text-slate-800 cursor-pointer hover:text-[#128C7E] transition-colors"
+                              onClick={() => toggleOrderExpand(order.id)}
+                            >
+                              {order.customer_name}
+                            </h3>
+                            <button
+                              type="button"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                setEditingCustomerId(order.id);
+                                setTempCustomerName(order.customer_name);
+                              }}
+                              className="p-1 text-slate-400 hover:text-[#128C7E] hover:bg-slate-100 border border-slate-200 rounded-lg transition-colors cursor-pointer opacity-0 group-hover:opacity-100 focus:opacity-100 shrink-0"
+                              title="تعديل اسم الزبون"
+                            >
+                              <Edit2 className="w-3 h-3" />
+                            </button>
+                          </div>
+                        )}
+                        <div className="flex items-center gap-1.5 text-[10px] text-slate-500">
                           <Clock className="w-3.5 h-3.5 text-slate-400" />
                           <span>ساعة الاستلام: {formatTime(order.created_at)}</span>
                         </div>
