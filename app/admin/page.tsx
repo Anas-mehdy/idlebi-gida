@@ -66,12 +66,35 @@ export default function AdminDashboard() {
   const [printType, setPrintType] = useState<'aggregation' | 'invoice' | 'receipt' | 'aggregation_receipt'>('aggregation');
   const [activePrintOrder, setActivePrintOrder] = useState<Order | null>(null);
   const [expandedOrders, setExpandedOrders] = useState<Record<string, boolean>>({});
+  const [excludedAggregatedItems, setExcludedAggregatedItems] = useState<Record<string, boolean>>({});
 
   const toggleOrderExpand = (orderId: string) => {
     setExpandedOrders(prev => ({
       ...prev,
       [orderId]: !prev[orderId]
     }));
+  };
+
+  const toggleAggregatedItem = (productName: string) => {
+    setExcludedAggregatedItems(prev => ({
+      ...prev,
+      [productName]: !prev[productName]
+    }));
+  };
+
+  const printedAggregatedItems = aggregatedItems.filter(item => !excludedAggregatedItems[item.productName]);
+  const allSelected = aggregatedItems.length > 0 && aggregatedItems.every(item => !excludedAggregatedItems[item.productName]);
+
+  const toggleSelectAllAggregatedItems = () => {
+    if (allSelected) {
+      const newExcluded: Record<string, boolean> = {};
+      aggregatedItems.forEach(item => {
+        newExcluded[item.productName] = true;
+      });
+      setExcludedAggregatedItems(newExcluded);
+    } else {
+      setExcludedAggregatedItems({});
+    }
   };
 
 
@@ -1127,6 +1150,13 @@ export default function AdminDashboard() {
             {aggregatedItems.length > 0 && (
               <>
                 <button
+                  onClick={toggleSelectAllAggregatedItems}
+                  className="bg-slate-100 hover:bg-slate-200 border border-slate-200 text-slate-700 font-bold px-3 py-2 rounded-xl text-xs flex items-center gap-1 cursor-pointer transition-all active:scale-95 shadow-2xs"
+                >
+                  <span>{allSelected ? 'إلغاء تحديد الكل' : 'تحديد الكل'}</span>
+                </button>
+
+                <button
                   onClick={handlePrintAggregation}
                   className="bg-slate-100 hover:bg-slate-200 border border-slate-200 text-slate-700 font-bold px-3.5 py-2.5 rounded-xl text-xs flex items-center gap-1.5 cursor-pointer transition-all active:scale-95 shadow-2xs"
                   title="طباعة ورقة تجميع السلع للمستودع A4"
@@ -1162,36 +1192,45 @@ export default function AdminDashboard() {
         {aggregatedItems.length > 0 ? (
           <div className="space-y-4">
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-              {aggregatedItems.map((item, idx) => (
-                <div 
-                  key={idx}
-                  className="bg-slate-50 p-4 rounded-2xl border border-slate-200/60 flex items-center justify-between hover:border-slate-300 transition-colors"
-                >
-                  <div className="flex items-center gap-3">
-                    {item.imageUrl ? (
-                      <img 
-                        src={item.imageUrl} 
-                        onClick={() => setActivePreviewImage(item.imageUrl || null)}
-                        className="w-14 h-14 rounded-xl object-cover shrink-0 border border-slate-205 cursor-zoom-in hover:brightness-95 transition-all" 
-                        alt={item.productName} 
+              {aggregatedItems.map((item, idx) => {
+                const isChecked = !excludedAggregatedItems[item.productName];
+                return (
+                  <div 
+                    key={idx}
+                    className="bg-slate-50 p-4 rounded-2xl border border-slate-200/60 flex items-center justify-between hover:border-slate-300 transition-colors"
+                  >
+                    <div className="flex items-center gap-3">
+                      <input
+                        type="checkbox"
+                        checked={isChecked}
+                        onChange={() => toggleAggregatedItem(item.productName)}
+                        className="w-4 h-4 rounded text-[#128C7E] focus:ring-[#128C7E] border-slate-350 cursor-pointer"
                       />
-                    ) : (
-                      <ShoppingBag className="w-14 h-14 p-2.5 bg-white text-slate-400 border border-slate-200 rounded-xl shrink-0" />
-                    )}
-                    <span className="text-sm font-semibold text-slate-700">{item.productName}</span>
+                      {item.imageUrl ? (
+                        <img 
+                          src={item.imageUrl} 
+                          onClick={() => setActivePreviewImage(item.imageUrl || null)}
+                          className="w-14 h-14 rounded-xl object-cover shrink-0 border border-slate-205 cursor-zoom-in hover:brightness-95 transition-all" 
+                          alt={item.productName} 
+                        />
+                      ) : (
+                        <ShoppingBag className="w-14 h-14 p-2.5 bg-white text-slate-400 border border-slate-200 rounded-xl shrink-0" />
+                      )}
+                      <span className="text-sm font-semibold text-slate-700">{item.productName}</span>
+                    </div>
+                    <span className="bg-white text-emerald-600 font-extrabold px-3 py-1.5 rounded-xl text-sm border border-slate-200 shrink-0">
+                      {item.totalQty} علبة / صندوق
+                    </span>
                   </div>
-                  <span className="bg-white text-emerald-600 font-extrabold px-3 py-1.5 rounded-xl text-sm border border-slate-200 shrink-0">
-                    {item.totalQty} علبة / صندوق
-                  </span>
-                </div>
-              ))}
+                );
+              })}
             </div>
             
             {/* إجمالي عدد الصناديق لتجميع الطلبيات الإجمالي */}
             <div className="flex justify-between items-center text-xs font-extrabold text-[#128C7E] bg-emerald-50/30 border border-emerald-100/80 rounded-xl px-4 py-3 shadow-2xs">
-              <span>إجمالي عدد الصناديق المطلوب تجهيزها اليوم:</span>
+              <span>إجمالي عدد الصناديق للمنتجات المحددة:</span>
               <span className="font-mono text-sm bg-[#128C7E]/10 px-2.5 py-0.5 rounded-lg text-emerald-700">
-                {aggregatedItems.reduce((sum, item) => sum + item.totalQty, 0)} صندوق
+                {printedAggregatedItems.reduce((sum, item) => sum + item.totalQty, 0)} صندوق
               </span>
             </div>
           </div>
@@ -1585,7 +1624,7 @@ export default function AdminDashboard() {
           {/* Brand & Sheet Header */}
           <div className="border-b-2 border-slate-900 pb-4 mb-6 text-center sm:text-right">
             <h1 className="text-2xl font-black text-slate-800">idelbi gida | إدلب غذائيات</h1>
-            <p className="text-xs text-slate-500 font-bold mt-1">جدول تجميع الطلبيات الإجمالي اليومي للمستودع</p>
+            <p className="text-xs text-slate-500 font-bold mt-1">جدول تجميع الطلبيات الإجمالي اليومي للمستودع (المنتجات المحددة)</p>
             <p className="text-[10px] text-slate-400 font-bold mt-1">تاريخ الطباعة: {new Date().toLocaleString('ar-EG', { dateStyle: 'long', timeStyle: 'short' })}</p>
           </div>
 
@@ -1593,13 +1632,13 @@ export default function AdminDashboard() {
           <table className="w-full border-collapse border border-slate-300 text-sm">
             <thead>
               <tr className="bg-slate-150">
-                <th className="border border-slate-300 px-4 py-2 text-right font-black">#</th>
+                <th className="border border-slate-300 px-4 py-2 text-right font-black">م</th>
                 <th className="border border-slate-300 px-4 py-2 text-right font-black">اسم المنتج</th>
                 <th className="border border-slate-300 px-4 py-2 text-center font-black">الكمية المطلوبة</th>
               </tr>
             </thead>
             <tbody>
-              {aggregatedItems.map((item, idx) => (
+              {printedAggregatedItems.map((item, idx) => (
                 <tr key={idx} className="hover:bg-slate-50/50">
                   <td className="border border-slate-300 px-4 py-2.5 font-bold font-mono">{idx + 1}</td>
                   <td className="border border-slate-300 px-4 py-2.5 font-bold">{item.productName}</td>
@@ -1612,7 +1651,7 @@ export default function AdminDashboard() {
           {/* Aggregate Boxes Total */}
           <div className="mt-6 border-t-2 border-slate-900 pt-4 flex justify-between items-center font-black text-lg">
             <span>إجمالي عدد الصناديق المطلوب تجهيزها:</span>
-            <span>{aggregatedItems.reduce((sum, item) => sum + item.totalQty, 0)} صندوق</span>
+            <span>{printedAggregatedItems.reduce((sum, item) => sum + item.totalQty, 0)} صندوق</span>
           </div>
 
           <div className="mt-12 text-center text-[10px] text-slate-400 border-t border-slate-200 pt-4 font-bold">
@@ -1848,7 +1887,7 @@ export default function AdminDashboard() {
               </tr>
             </thead>
             <tbody>
-              {aggregatedItems.map((item, idx) => (
+              {printedAggregatedItems.map((item, idx) => (
                 <tr key={idx} className="border-b border-dashed border-black/30">
                   <td className="py-2 font-bold font-mono text-[13px]">{idx + 1}</td>
                   <td className="py-2 font-bold text-[13px]">{item.productName}</td>
@@ -1862,7 +1901,7 @@ export default function AdminDashboard() {
           <div className="border-t-2 border-black pt-2.5 text-[13px] font-bold">
             <div className="flex justify-between items-center text-sm font-black">
               <span>إجمالي الصناديق المطلوبة:</span>
-              <span className="font-mono text-lg">{aggregatedItems.reduce((sum, item) => sum + item.totalQty, 0)} صندوق</span>
+              <span className="font-mono text-lg">{printedAggregatedItems.reduce((sum, item) => sum + item.totalQty, 0)} صندوق</span>
             </div>
           </div>
 
