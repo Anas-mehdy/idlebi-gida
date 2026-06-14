@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect, useRef } from 'react';
 import { supabase } from '@/lib/supabase';
-import { Plus, Trash2, ShoppingBag, Loader2, Image as ImageIcon, Upload, AlertCircle, RefreshCw, GripVertical, Eye, EyeOff, X, Pencil } from 'lucide-react';
+import { Plus, Trash2, ShoppingBag, Loader2, Image as ImageIcon, Upload, AlertCircle, RefreshCw, GripVertical, Eye, EyeOff, X, Pencil, Search } from 'lucide-react';
 
 interface Category {
   id: string;
@@ -144,6 +144,7 @@ export default function AdminProducts() {
   const [dragOverId, setDragOverId] = useState<string | null>(null);
   const [savingOrder, setSavingOrder] = useState(false);
   const [selectedFilterCategory, setSelectedFilterCategory] = useState('all');
+  const [searchQuery, setSearchQuery] = useState('');
   const [activePreviewImage, setActivePreviewImage] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -152,9 +153,11 @@ export default function AdminProducts() {
   const [salesHistory, setSalesHistory] = useState<any[]>([]);
   const [loadingHistory, setLoadingHistory] = useState(false);
 
-  const filteredDisplayProducts = selectedFilterCategory === 'all'
-    ? products
-    : products.filter((p) => p.category_id === selectedFilterCategory);
+  const filteredDisplayProducts = products.filter((p) => {
+    const matchesCategory = selectedFilterCategory === 'all' || p.category_id === selectedFilterCategory;
+    const matchesSearch = p.name.toLowerCase().includes(searchQuery.toLowerCase());
+    return matchesCategory && matchesSearch;
+  });
 
   const fetchData = async () => {
     try {
@@ -891,25 +894,40 @@ export default function AdminProducts() {
 
         {/* Products Table/List */}
         <div className="bg-white border border-slate-200 rounded-3xl p-5 lg:col-span-2 space-y-4 shadow-sm">
-          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 pb-3.5 border-b border-slate-100">
+          <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4 pb-3.5 border-b border-slate-100">
             <div className="flex items-center gap-2.5">
               <ShoppingBag className="w-5 h-5 text-emerald-600" />
               <h2 className="text-sm font-bold text-slate-800">المنتجات المتوفرة حالياً ({filteredDisplayProducts.length})</h2>
             </div>
             
-            {/* Category Filter Dropdown */}
-            <div className="flex items-center gap-2">
-              <span className="text-xs text-slate-500 font-bold">عرض القسم:</span>
-              <select
-                value={selectedFilterCategory}
-                onChange={(e) => setSelectedFilterCategory(e.target.value)}
-                className="bg-slate-50 border border-slate-200 outline-none rounded-xl px-3 py-1.5 text-xs text-slate-800 cursor-pointer focus:border-emerald-600 transition-colors"
-              >
-                <option value="all">كل الأقسام</option>
-                {categories.map((c) => (
-                  <option key={c.id} value={c.id}>{c.name}</option>
-                ))}
-              </select>
+            {/* Filters (Search & Category) */}
+            <div className="flex flex-col sm:flex-row sm:items-center gap-3 w-full md:w-auto">
+              {/* Search Bar */}
+              <div className="relative w-full sm:w-56">
+                <Search className="w-4 h-4 text-slate-400 absolute right-3 top-1/2 -translate-y-1/2" />
+                <input
+                  type="text"
+                  placeholder="ابحث عن اسم منتج..."
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  className="w-full bg-slate-50 border border-slate-250 outline-none rounded-xl pr-9 pl-4 py-1.5 text-xs text-slate-800 placeholder-slate-400 focus:bg-white focus:border-[#128C7E] focus:ring-1 focus:ring-[#128C7E] transition-all text-right"
+                />
+              </div>
+
+              {/* Category Filter Dropdown */}
+              <div className="flex items-center gap-2 shrink-0">
+                <span className="text-xs text-slate-500 font-bold">عرض القسم:</span>
+                <select
+                  value={selectedFilterCategory}
+                  onChange={(e) => setSelectedFilterCategory(e.target.value)}
+                  className="bg-slate-50 border border-slate-200 outline-none rounded-xl px-3 py-1.5 text-xs text-slate-800 cursor-pointer focus:border-emerald-600 transition-colors"
+                >
+                  <option value="all">كل الأقسام</option>
+                  {categories.map((c) => (
+                    <option key={c.id} value={c.id}>{c.name}</option>
+                  ))}
+                </select>
+              </div>
             </div>
           </div>
 
