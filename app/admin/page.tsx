@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { supabase } from '@/lib/supabase';
-import { ShoppingBag, Users, CheckSquare, ClipboardList, TrendingUp, DollarSign, Clock, AlertCircle, Trash2, Save, Copy, X, CalendarClock, Printer, Plus, Search, Download } from 'lucide-react';
+import { ShoppingBag, Users, CheckSquare, ClipboardList, TrendingUp, DollarSign, Clock, AlertCircle, Trash2, Save, Copy, X, CalendarClock, Printer, Plus, Search, Download, ChevronDown, ChevronUp } from 'lucide-react';
 import html2canvas from 'html2canvas-pro';
 import { jsPDF } from 'jspdf';
 
@@ -65,6 +65,14 @@ export default function AdminDashboard() {
   const [prodSearchQuery, setProdSearchQuery] = useState<{[orderId: string]: string}>({});
   const [printType, setPrintType] = useState<'aggregation' | 'invoice' | 'receipt' | 'aggregation_receipt'>('aggregation');
   const [activePrintOrder, setActivePrintOrder] = useState<Order | null>(null);
+  const [expandedOrders, setExpandedOrders] = useState<Record<string, boolean>>({});
+
+  const toggleOrderExpand = (orderId: string) => {
+    setExpandedOrders(prev => ({
+      ...prev,
+      [orderId]: !prev[orderId]
+    }));
+  };
 
 
   // Seed data for admin preview
@@ -777,17 +785,36 @@ export default function AdminDashboard() {
                 className="bg-slate-50 border border-slate-200 rounded-2xl p-5 space-y-4 hover:border-slate-300 transition-all"
               >
                 {/* Order Header Info */}
-                <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 pb-3 border-b border-slate-200">
+                <div className={`flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 ${expandedOrders[order.id] ? 'pb-3 border-b border-slate-200' : ''}`}>
                   <div className="flex justify-between items-start w-full sm:w-auto">
-                    <div>
-                      <h3 className="text-sm font-bold text-slate-800">{order.customer_name}</h3>
-                      <div className="flex items-center gap-1.5 text-[10px] text-slate-500 mt-1">
-                        <Clock className="w-3.5 h-3.5 text-slate-400" />
-                        <span>ساعة الاستلام: {formatTime(order.created_at)}</span>
+                    <div className="flex items-center gap-2.5">
+                      {/* Collapse/Expand Arrow Button */}
+                      <button
+                        onClick={() => toggleOrderExpand(order.id)}
+                        className="p-1 rounded-lg text-slate-500 hover:bg-slate-200 active:scale-95 transition-all cursor-pointer flex items-center justify-center shrink-0 border border-slate-200"
+                        title={expandedOrders[order.id] ? "إغلاق التفاصيل" : "عرض التفاصيل"}
+                      >
+                        {expandedOrders[order.id] ? (
+                          <ChevronUp className="w-4 h-4" />
+                        ) : (
+                          <ChevronDown className="w-4 h-4" />
+                        )}
+                      </button>
+                      <div>
+                        <h3 
+                          className="text-sm font-bold text-slate-800 cursor-pointer hover:text-[#128C7E] transition-colors flex items-center gap-1.5"
+                          onClick={() => toggleOrderExpand(order.id)}
+                        >
+                          {order.customer_name}
+                        </h3>
+                        <div className="flex items-center gap-1.5 text-[10px] text-slate-500 mt-1">
+                          <Clock className="w-3.5 h-3.5 text-slate-400" />
+                          <span>ساعة الاستلام: {formatTime(order.created_at)}</span>
+                        </div>
                       </div>
                     </div>
                     {/* On mobile, show the price badge here to save space on the button group */}
-                    <span className="sm:hidden bg-white border border-slate-200 text-emerald-600 font-extrabold px-2.5 py-1.5 rounded-xl text-xs self-center">
+                    <span className="sm:hidden bg-white border border-slate-200 text-emerald-600 font-extrabold px-2.5 py-1.5 rounded-xl text-xs self-center ml-2">
                       {Number(order.total_price).toFixed(2)} TL
                     </span>
                   </div>
@@ -826,7 +853,10 @@ export default function AdminDashboard() {
                   </div>
                 </div>
 
-                {/* Item Details */}
+                {/* Collapsible Order Details */}
+                {!!expandedOrders[order.id] && (
+                  <>
+                    {/* Item Details */}
                 <div className="space-y-2">
                   {order.order_items.map((item) => (
                     <div key={item.id} className="flex justify-between items-center text-xs text-slate-600">
@@ -1066,6 +1096,8 @@ export default function AdminDashboard() {
                     * قم بحفظ الأسعار أولاً لتفعيل المشاركة والطباعة.
                   </span>
                 </div>
+                  </>
+                )}
               </div>
             ))}
           </div>
@@ -1192,17 +1224,36 @@ export default function AdminDashboard() {
                 className="bg-amber-50/10 border border-amber-200/50 rounded-2xl p-5 space-y-4 hover:border-amber-300/60 transition-all"
               >
                 {/* Order Header Info */}
-                <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 pb-3 border-b border-amber-100/50">
+                <div className={`flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 ${expandedOrders[order.id] ? 'pb-3 border-b border-amber-100/50' : ''}`}>
                   <div className="flex justify-between items-start w-full sm:w-auto">
-                    <div>
-                      <h3 className="text-sm font-bold text-slate-800">{order.customer_name}</h3>
-                      <div className="flex items-center gap-1.5 text-[10px] text-slate-500 mt-1">
-                        <Clock className="w-3.5 h-3.5 text-slate-400" />
-                        <span>ساعة الاستلام: {formatTime(order.created_at)}</span>
+                    <div className="flex items-center gap-2.5">
+                      {/* Collapse/Expand Arrow Button */}
+                      <button
+                        onClick={() => toggleOrderExpand(order.id)}
+                        className="p-1 rounded-lg text-slate-500 hover:bg-amber-100/30 active:scale-95 transition-all cursor-pointer flex items-center justify-center shrink-0 border border-amber-200/50"
+                        title={expandedOrders[order.id] ? "إغلاق التفاصيل" : "عرض التفاصيل"}
+                      >
+                        {expandedOrders[order.id] ? (
+                          <ChevronUp className="w-4 h-4" />
+                        ) : (
+                          <ChevronDown className="w-4 h-4" />
+                        )}
+                      </button>
+                      <div>
+                        <h3 
+                          className="text-sm font-bold text-slate-800 cursor-pointer hover:text-[#128C7E] transition-colors flex items-center gap-1.5"
+                          onClick={() => toggleOrderExpand(order.id)}
+                        >
+                          {order.customer_name}
+                        </h3>
+                        <div className="flex items-center gap-1.5 text-[10px] text-slate-500 mt-1">
+                          <Clock className="w-3.5 h-3.5 text-slate-400" />
+                          <span>ساعة الاستلام: {formatTime(order.created_at)}</span>
+                        </div>
                       </div>
                     </div>
                     {/* On mobile, show the price badge here to save space on the button group */}
-                    <span className="sm:hidden bg-white border border-slate-200 text-emerald-600 font-extrabold px-2.5 py-1.5 rounded-xl text-xs self-center">
+                    <span className="sm:hidden bg-white border border-slate-200 text-emerald-600 font-extrabold px-2.5 py-1.5 rounded-xl text-xs self-center ml-2">
                       {Number(order.total_price).toFixed(2)} TL
                     </span>
                   </div>
@@ -1241,7 +1292,10 @@ export default function AdminDashboard() {
                   </div>
                 </div>
 
-                {/* Item Details */}
+                {/* Collapsible Order Details */}
+                {!!expandedOrders[order.id] && (
+                  <>
+                    {/* Item Details */}
                 <div className="space-y-2">
                   {order.order_items.map((item) => (
                     <div key={item.id} className="flex justify-between items-center text-xs text-slate-600">
@@ -1481,6 +1535,8 @@ export default function AdminDashboard() {
                     * يمكنك تنشيط الطلبية لتعود لقائمة التوزيع الفعالة.
                   </span>
                 </div>
+                  </>
+                )}
               </div>
             ))}
           </div>
