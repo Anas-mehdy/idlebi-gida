@@ -599,13 +599,14 @@ export default function AdminDashboard() {
       }
 
       const canvas = await html2canvas(input, {
-        scale: 2, // higher resolution
+        scale: 1.5, // optimal resolution (great text quality, much smaller memory footprint)
         useCORS: true,
         logging: false,
         backgroundColor: '#ffffff'
       });
 
-      const imgData = canvas.toDataURL('image/png');
+      // Compress canvas to JPEG with 75% quality (massively smaller than lossless PNG)
+      const imgData = canvas.toDataURL('image/jpeg', 0.75);
       
       // Calculate A4 dimensions (210mm x 297mm)
       const pdf = new jsPDF('p', 'mm', 'a4');
@@ -615,13 +616,16 @@ export default function AdminDashboard() {
       let heightLeft = imgHeight;
       let position = 0;
 
-      pdf.addImage(imgData, 'PNG', 0, position, imgWidth, imgHeight);
+      // Unique alias to cache the image in PDF resources and avoid duplicate binary bloat on multi-page exports
+      const imageAlias = `invoice-${order.id}`;
+
+      pdf.addImage(imgData, 'JPEG', 0, position, imgWidth, imgHeight, imageAlias, 'FAST');
       heightLeft -= pageHeight;
 
       while (heightLeft >= 0) {
         position = heightLeft - imgHeight;
         pdf.addPage();
-        pdf.addImage(imgData, 'PNG', 0, position, imgWidth, imgHeight);
+        pdf.addImage(imgData, 'JPEG', 0, position, imgWidth, imgHeight, imageAlias, 'FAST');
         heightLeft -= pageHeight;
       }
 
