@@ -1702,6 +1702,27 @@ export default function AdminDashboard() {
               background-color: #fff !important;
               color: #000 !important;
             }
+            /* Reset dashboard layout wrappers to prevent them from squishing the print width */
+            .min-h-screen {
+              display: block !important;
+              padding: 0 !important;
+              margin: 0 !important;
+              min-height: 0 !important;
+              background: transparent !important;
+            }
+            main {
+              padding: 0 !important;
+              margin: 0 !important;
+              overflow: visible !important;
+              display: block !important;
+              width: 80mm !important;
+            }
+            main > div {
+              max-width: none !important;
+              width: 100% !important;
+              padding: 0 !important;
+              margin: 0 !important;
+            }
           }
         `}} />
       )}
