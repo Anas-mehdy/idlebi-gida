@@ -52,7 +52,8 @@ export default function AdminStatistics() {
   const [isUpdating, setIsUpdating] = useState(false);
 
   // Filters
-  const [dateFilter, setDateFilter] = useState('');
+  const [startDateFilter, setStartDateFilter] = useState('');
+  const [endDateFilter, setEndDateFilter] = useState('');
   const [customerFilter, setCustomerFilter] = useState('');
 
   // SEED DATA FOR DEMO MODE
@@ -280,7 +281,15 @@ export default function AdminStatistics() {
   // Filter logic on the fly
   const filteredOrders = orders.filter((order) => {
     const orderDate = new Date(order.created_at).toISOString().split('T')[0];
-    const matchesDate = !dateFilter || orderDate === dateFilter;
+    
+    let matchesDate = true;
+    if (startDateFilter) {
+      matchesDate = matchesDate && orderDate >= startDateFilter;
+    }
+    if (endDateFilter) {
+      matchesDate = matchesDate && orderDate <= endDateFilter;
+    }
+
     const matchesCustomer = !customerFilter || order.customer_name.toLowerCase().includes(customerFilter.toLowerCase());
     return matchesDate && matchesCustomer;
   });
@@ -369,10 +378,10 @@ export default function AdminStatistics() {
 
       {/* Dynamic Filters Form Bar */}
       <div className="bg-white border border-slate-200 rounded-3xl p-5 shadow-sm">
-        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4 items-end">
+        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4 items-end">
           
           {/* Customer Search input */}
-          <div className="space-y-1.5">
+          <div className="space-y-1.5 lg:col-span-1">
             <label className="block text-xs font-bold text-slate-600">بحث باسم المشتري / المحل</label>
             <div className="relative">
               <span className="absolute inset-y-0 right-3 flex items-center text-slate-400">
@@ -383,40 +392,60 @@ export default function AdminStatistics() {
                 placeholder="ابحث عن زبون..."
                 value={customerFilter}
                 onChange={(e) => setCustomerFilter(e.target.value)}
-                className="w-full bg-slate-50 border border-slate-250 outline-none rounded-xl pr-9 pl-4 py-2.5 text-xs text-slate-800 placeholder-slate-400 focus:bg-white focus:border-emerald-600 focus:ring-1 focus:ring-emerald-600 transition-all text-right"
+                className="w-full bg-slate-50 border border-slate-250 outline-none rounded-xl pr-9 pl-4 py-2.5 text-xs text-slate-800 placeholder-slate-400 focus:bg-white focus:border-emerald-600 focus:ring-1 focus:ring-emerald-600 transition-all text-right font-bold"
               />
             </div>
           </div>
 
-          {/* Date Picker Input */}
+          {/* Start Date Picker Input */}
           <div className="space-y-1.5">
-            <label className="block text-xs font-bold text-slate-600">تاريخ تسليم الطلبية</label>
+            <label className="block text-xs font-bold text-slate-600">من تاريخ</label>
             <div className="relative">
               <span className="absolute inset-y-0 right-3 flex items-center text-slate-400 pointer-events-none">
                 <Calendar className="w-4 h-4" />
               </span>
               <input
                 type="date"
-                value={dateFilter}
-                onChange={(e) => setDateFilter(e.target.value)}
+                value={startDateFilter}
+                onChange={(e) => setStartDateFilter(e.target.value)}
                 onClick={(e) => e.currentTarget.showPicker()}
-                className="w-full bg-slate-50 border border-slate-250 outline-none rounded-xl pr-9 pl-4 py-2.5 text-xs text-slate-800 focus:bg-white focus:border-emerald-600 focus:ring-1 focus:ring-emerald-600 transition-all text-right cursor-pointer"
+                className="w-full bg-slate-50 border border-slate-250 outline-none rounded-xl pr-9 pl-4 py-2.5 text-xs text-slate-800 focus:bg-white focus:border-emerald-600 focus:ring-1 focus:ring-emerald-600 transition-all text-right cursor-pointer font-bold"
+              />
+            </div>
+          </div>
+
+          {/* End Date Picker Input */}
+          <div className="space-y-1.5">
+            <label className="block text-xs font-bold text-slate-600">إلى تاريخ</label>
+            <div className="relative">
+              <span className="absolute inset-y-0 right-3 flex items-center text-slate-400 pointer-events-none">
+                <Calendar className="w-4 h-4" />
+              </span>
+              <input
+                type="date"
+                value={endDateFilter}
+                onChange={(e) => setEndDateFilter(e.target.value)}
+                onClick={(e) => e.currentTarget.showPicker()}
+                className="w-full bg-slate-50 border border-slate-250 outline-none rounded-xl pr-9 pl-4 py-2.5 text-xs text-slate-800 focus:bg-white focus:border-emerald-600 focus:ring-1 focus:ring-emerald-600 transition-all text-right cursor-pointer font-bold"
               />
             </div>
           </div>
 
           {/* Clear Button */}
-          {(dateFilter || customerFilter) && (
+          {(startDateFilter || endDateFilter || customerFilter) ? (
             <button
               onClick={() => {
-                setDateFilter('');
+                setStartDateFilter('');
+                setEndDateFilter('');
                 setCustomerFilter('');
               }}
-              className="h-10 bg-slate-55 hover:bg-slate-100 border border-slate-200 text-slate-600 hover:text-slate-900 rounded-xl text-xs font-bold flex items-center justify-center gap-1.5 transition-all cursor-pointer w-full sm:col-span-2 md:col-span-1 shadow-sm"
+              className="h-10 bg-slate-50 hover:bg-slate-100 border border-slate-200 text-slate-600 hover:text-slate-900 rounded-xl text-xs font-bold flex items-center justify-center gap-1.5 transition-all cursor-pointer w-full shadow-sm"
             >
               <X className="w-4.5 h-4.5" />
               <span>إعادة تعيين الفلاتر</span>
             </button>
+          ) : (
+            <div className="hidden lg:block h-10"></div>
           )}
 
         </div>
