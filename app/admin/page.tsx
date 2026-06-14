@@ -68,6 +68,12 @@ export default function AdminDashboard() {
   const [expandedOrders, setExpandedOrders] = useState<Record<string, boolean>>({});
   const [excludedAggregatedItems, setExcludedAggregatedItems] = useState<Record<string, boolean>>({});
 
+  // States for adding custom products not in the store
+  const [showCustomAddForm, setShowCustomAddForm] = useState<{[orderId: string]: boolean}>({});
+  const [customProductName, setCustomProductName] = useState<{[orderId: string]: string}>({});
+  const [customProductQty, setCustomProductQty] = useState<{[orderId: string]: number}>({});
+  const [customProductPrice, setCustomProductPrice] = useState<{[orderId: string]: string}>({});
+
   const toggleOrderExpand = (orderId: string) => {
     setExpandedOrders(prev => ({
       ...prev,
@@ -557,6 +563,99 @@ export default function AdminDashboard() {
     }
   };
 
+  // DB Mutation: Add custom item to order (not in database products store)
+  const handleAddCustomOrderItem = async (orderId: string) => {
+    const name = (customProductName[orderId] || '').trim();
+    if (!name) {
+      alert('يرجى إدخال اسم المنتج.');
+      return;
+    }
+    const qty = customProductQty[orderId] || 1;
+    const priceStr = customProductPrice[orderId];
+    const price = priceStr ? parseFloat(priceStr) : 0;
+    if (qty <= 0) {
+      alert('الكمية يجب أن تكون أكبر من الصفر.');
+      return;
+    }
+
+    setIsUpdating(true);
+    try {
+      const isUrlConfigured = process.env.NEXT_PUBLIC_SUPABASE_URL && !process.env.NEXT_PUBLIC_SUPABASE_URL.includes('placeholder');
+      
+      const order = orders.find(o => o.id === orderId);
+      if (!order) return;
+
+      const newTotalPrice = order.order_items.reduce((sum, item) => sum + (item.quantity * (item.price_at_purchase || 0)), 0) + (qty * price);
+
+      let insertedId = 'temp-' + Date.now();
+
+      if (isUrlConfigured) {
+        const { data: insertData, error: insertError } = await supabase
+          .from('order_items')
+          .insert({
+            order_id: orderId,
+            product_id: null,
+            quantity: qty,
+            price_at_purchase: price,
+            product_name: name,
+            product_image: null
+          })
+          .select();
+
+        if (insertError) throw insertError;
+        if (insertData && insertData[0]) {
+          insertedId = insertData[0].id;
+        }
+
+        // Update orders.total_price
+        const { error: orderError } = await supabase
+          .from('orders')
+          .update({ total_price: newTotalPrice })
+          .eq('id', orderId);
+        if (orderError) throw orderError;
+      }
+
+      // Local state update
+      const updatedOrders = orders.map(o => {
+        if (o.id === orderId) {
+          const newItems = [...o.order_items];
+          newItems.push({
+            id: insertedId,
+            order_id: orderId,
+            product_id: null,
+            quantity: qty,
+            price_at_purchase: price,
+            product_name: name,
+            product_image: null,
+            products: null
+          });
+          return {
+            ...o,
+            total_price: newTotalPrice,
+            order_items: newItems
+          };
+        }
+        return o;
+      });
+
+      setOrders(updatedOrders);
+      calculateStats(updatedOrders);
+
+      // Clear add form states for this order
+      setShowCustomAddForm(prev => ({ ...prev, [orderId]: false }));
+      setCustomProductName(prev => ({ ...prev, [orderId]: '' }));
+      setCustomProductQty(prev => ({ ...prev, [orderId]: 1 }));
+      setCustomProductPrice(prev => ({ ...prev, [orderId]: '' }));
+
+      alert('تم إضافة المنتج المخصص بنجاح وتحديث إجمالي الفاتورة!');
+    } catch (err: any) {
+      console.error(err);
+      alert('حدث خطأ أثناء إضافة المنتج المخصص.');
+    } finally {
+      setIsUpdating(false);
+    }
+  };
+
   // DB Mutation: Delete item from order
   const handleDeleteOrderItem = async (orderId: string, itemId: string) => {
     const confirmAction = window.confirm('هل أنت متأكد من حذف هذا البند من الفاتورة؟');
@@ -936,16 +1035,26 @@ export default function AdminDashboard() {
 
                   {/* زر ونموذج إضافة منتج للفاتورة */}
                   <div className="mt-3 pt-2 border-t border-dashed border-slate-200">
-                    {!showAddForm[order.id] ? (
-                      <button
-                        type="button"
-                        onClick={() => setShowAddForm(prev => ({ ...prev, [order.id]: true }))}
-                        className="w-full py-2 border border-dashed border-slate-350 hover:border-[#128C7E] rounded-xl text-xs text-slate-600 hover:text-[#128C7E] bg-white transition-all flex items-center justify-center gap-1 cursor-pointer font-bold"
-                      >
-                        <Plus className="w-4 h-4" />
-                        <span>إضافة منتج للفاتورة</span>
-                      </button>
-                    ) : (
+                    {!showAddForm[order.id] && !showCustomAddForm[order.id] ? (
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                        <button
+                          type="button"
+                          onClick={() => setShowAddForm(prev => ({ ...prev, [order.id]: true }))}
+                          className="w-full py-2 border border-dashed border-slate-350 hover:border-[#128C7E] rounded-xl text-xs text-slate-600 hover:text-[#128C7E] bg-white transition-all flex items-center justify-center gap-1 cursor-pointer font-bold"
+                        >
+                          <Plus className="w-4 h-4" />
+                          <span>إضافة منتج للفاتورة</span>
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setShowCustomAddForm(prev => ({ ...prev, [order.id]: true }))}
+                          className="w-full py-2 border border-dashed border-slate-350 hover:border-amber-500 rounded-xl text-xs text-slate-600 hover:text-amber-600 bg-white transition-all flex items-center justify-center gap-1 cursor-pointer font-bold"
+                        >
+                          <Plus className="w-4 h-4" />
+                          <span>اضافة منتج غير موجود بالمتجر</span>
+                        </button>
+                      </div>
+                    ) : showAddForm[order.id] ? (
                       <div className="bg-slate-100 border border-slate-200 rounded-xl p-3.5 space-y-3.5 shadow-2xs relative">
                         <div className="flex items-center justify-between">
                           <span className="text-xs font-extrabold text-slate-700">إضافة بند جديد للفاتورة</span>
@@ -1054,7 +1163,93 @@ export default function AdminDashboard() {
                               setAddPriceForOrder(prev => ({ ...prev, [order.id]: '' }));
                               setProdSearchQuery(prev => ({ ...prev, [order.id]: '' }));
                             }}
-                            className="flex-1 bg-white hover:bg-slate-200 border border-slate-350 text-slate-650 font-bold px-3 py-1.5 rounded-xl text-xs transition-all cursor-pointer"
+                            className="flex-1 bg-white hover:bg-slate-200 border border-slate-350 text-slate-655 font-bold px-3 py-1.5 rounded-xl text-xs transition-all cursor-pointer"
+                          >
+                            إلغاء
+                          </button>
+                        </div>
+                      </div>
+                    ) : (
+                      <div className="bg-amber-50/40 border border-amber-200 rounded-xl p-3.5 space-y-3.5 shadow-2xs relative">
+                        <div className="flex items-center justify-between">
+                          <span className="text-xs font-extrabold text-amber-800">إضافة منتج غير موجود بالمتجر</span>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setShowCustomAddForm(prev => ({ ...prev, [order.id]: false }));
+                              setCustomProductName(prev => ({ ...prev, [order.id]: '' }));
+                              setCustomProductQty(prev => ({ ...prev, [order.id]: 1 }));
+                              setCustomProductPrice(prev => ({ ...prev, [order.id]: '' }));
+                            }}
+                            className="p-1 hover:bg-amber-100/50 rounded-lg transition-colors cursor-pointer text-amber-500 hover:text-amber-700"
+                          >
+                            <X className="w-4 h-4" />
+                          </button>
+                        </div>
+
+                        {/* اسم المنتج المخصص */}
+                        <div className="space-y-1">
+                          <label className="text-[10px] text-amber-700 font-bold block">اسم المنتج المخصص</label>
+                          <input
+                            type="text"
+                            placeholder="مثال: منتج مخصص للزبون..."
+                            value={customProductName[order.id] || ''}
+                            onChange={(e) => {
+                              setCustomProductName(prev => ({ ...prev, [order.id]: e.target.value }));
+                            }}
+                            className="w-full bg-white border border-amber-200 outline-none rounded-xl px-3 py-1.5 text-xs text-slate-855 focus:border-amber-500 focus:ring-1 focus:ring-amber-500 transition-all font-bold"
+                          />
+                        </div>
+
+                        {/* الكمية والسعر */}
+                        <div className="grid grid-cols-2 gap-2.5">
+                          <div className="space-y-1">
+                            <label className="text-[10px] text-amber-700 font-bold block">الكمية (صناديق)</label>
+                            <input
+                              type="number"
+                              min="1"
+                              value={customProductQty[order.id] || 1}
+                              onChange={(e) => {
+                                setCustomProductQty(prev => ({ ...prev, [order.id]: parseInt(e.target.value) || 1 }));
+                              }}
+                              className="w-full bg-white border border-amber-200 outline-none rounded-xl px-2.5 py-1.5 text-xs text-slate-855 focus:border-amber-500 focus:ring-1 focus:ring-amber-500 transition-all text-center font-bold font-mono"
+                            />
+                          </div>
+                          <div className="space-y-1">
+                            <label className="text-[10px] text-amber-700 font-bold block">السعر للصندوق (TL)</label>
+                            <input
+                              type="number"
+                              step="0.01"
+                              min="0"
+                              value={customProductPrice[order.id] || ''}
+                              placeholder="مثال: 45.00"
+                              onChange={(e) => {
+                                setCustomProductPrice(prev => ({ ...prev, [order.id]: e.target.value }));
+                              }}
+                              className="w-full bg-white border border-amber-200 outline-none rounded-xl px-2.5 py-1.5 text-xs text-slate-855 focus:border-amber-500 focus:ring-1 focus:ring-amber-500 transition-all text-center font-bold font-mono"
+                            />
+                          </div>
+                        </div>
+
+                        {/* زري الإضافة والإلغاء */}
+                        <div className="flex gap-2 pt-1">
+                          <button
+                            type="button"
+                            onClick={() => handleAddCustomOrderItem(order.id)}
+                            disabled={isUpdating || !(customProductName[order.id] || '').trim()}
+                            className="flex-1 bg-amber-500 hover:bg-amber-600 disabled:bg-slate-300 disabled:text-slate-500 text-white font-bold px-3 py-1.5 rounded-xl text-xs transition-all cursor-pointer"
+                          >
+                            إضافة البند
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setShowCustomAddForm(prev => ({ ...prev, [order.id]: false }));
+                              setCustomProductName(prev => ({ ...prev, [order.id]: '' }));
+                              setCustomProductQty(prev => ({ ...prev, [order.id]: 1 }));
+                              setCustomProductPrice(prev => ({ ...prev, [order.id]: '' }));
+                            }}
+                            className="flex-1 bg-white hover:bg-slate-100 border border-slate-205 text-slate-500 hover:text-slate-700 font-bold px-3 py-1.5 rounded-xl text-xs transition-all cursor-pointer"
                           >
                             إلغاء
                           </button>
@@ -1391,16 +1586,26 @@ export default function AdminDashboard() {
 
                   {/* زر ونموذج إضافة منتج للفاتورة */}
                   <div className="mt-3 pt-2 border-t border-dashed border-slate-200">
-                    {!showAddForm[order.id] ? (
-                      <button
-                        type="button"
-                        onClick={() => setShowAddForm(prev => ({ ...prev, [order.id]: true }))}
-                        className="w-full py-2 border border-dashed border-slate-350 hover:border-[#128C7E] rounded-xl text-xs text-slate-600 hover:text-[#128C7E] bg-white transition-all flex items-center justify-center gap-1 cursor-pointer font-bold"
-                      >
-                        <Plus className="w-4 h-4" />
-                        <span>إضافة منتج للفاتورة</span>
-                      </button>
-                    ) : (
+                    {!showAddForm[order.id] && !showCustomAddForm[order.id] ? (
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                        <button
+                          type="button"
+                          onClick={() => setShowAddForm(prev => ({ ...prev, [order.id]: true }))}
+                          className="w-full py-2 border border-dashed border-slate-350 hover:border-[#128C7E] rounded-xl text-xs text-slate-600 hover:text-[#128C7E] bg-white transition-all flex items-center justify-center gap-1 cursor-pointer font-bold"
+                        >
+                          <Plus className="w-4 h-4" />
+                          <span>إضافة منتج للفاتورة</span>
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setShowCustomAddForm(prev => ({ ...prev, [order.id]: true }))}
+                          className="w-full py-2 border border-dashed border-slate-350 hover:border-amber-500 rounded-xl text-xs text-slate-600 hover:text-amber-600 bg-white transition-all flex items-center justify-center gap-1 cursor-pointer font-bold"
+                        >
+                          <Plus className="w-4 h-4" />
+                          <span>اضافة منتج غير موجود بالمتجر</span>
+                        </button>
+                      </div>
+                    ) : showAddForm[order.id] ? (
                       <div className="bg-slate-100 border border-slate-200 rounded-xl p-3.5 space-y-3.5 shadow-2xs relative">
                         <div className="flex items-center justify-between">
                           <span className="text-xs font-extrabold text-slate-700">إضافة بند جديد للفاتورة</span>
@@ -1413,7 +1618,7 @@ export default function AdminDashboard() {
                               setAddPriceForOrder(prev => ({ ...prev, [order.id]: '' }));
                               setProdSearchQuery(prev => ({ ...prev, [order.id]: '' }));
                             }}
-                            className="p-1 hover:bg-slate-250 rounded-lg transition-colors cursor-pointer text-slate-400 hover:text-slate-650"
+                            className="p-1 hover:bg-slate-250 rounded-lg transition-colors cursor-pointer text-slate-400 hover:text-slate-600"
                           >
                             <X className="w-4 h-4" />
                           </button>
@@ -1509,7 +1714,93 @@ export default function AdminDashboard() {
                               setAddPriceForOrder(prev => ({ ...prev, [order.id]: '' }));
                               setProdSearchQuery(prev => ({ ...prev, [order.id]: '' }));
                             }}
-                            className="flex-1 bg-white hover:bg-slate-200 border border-slate-350 text-slate-650 font-bold px-3 py-1.5 rounded-xl text-xs transition-all cursor-pointer"
+                            className="flex-1 bg-white hover:bg-slate-200 border border-slate-350 text-slate-655 font-bold px-3 py-1.5 rounded-xl text-xs transition-all cursor-pointer"
+                          >
+                            إلغاء
+                          </button>
+                        </div>
+                      </div>
+                    ) : (
+                      <div className="bg-amber-50/40 border border-amber-200 rounded-xl p-3.5 space-y-3.5 shadow-2xs relative">
+                        <div className="flex items-center justify-between">
+                          <span className="text-xs font-extrabold text-amber-800">إضافة منتج غير موجود بالمتجر</span>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setShowCustomAddForm(prev => ({ ...prev, [order.id]: false }));
+                              setCustomProductName(prev => ({ ...prev, [order.id]: '' }));
+                              setCustomProductQty(prev => ({ ...prev, [order.id]: 1 }));
+                              setCustomProductPrice(prev => ({ ...prev, [order.id]: '' }));
+                            }}
+                            className="p-1 hover:bg-amber-100/50 rounded-lg transition-colors cursor-pointer text-amber-500 hover:text-amber-700"
+                          >
+                            <X className="w-4 h-4" />
+                          </button>
+                        </div>
+
+                        {/* اسم المنتج المخصص */}
+                        <div className="space-y-1">
+                          <label className="text-[10px] text-amber-700 font-bold block">اسم المنتج المخصص</label>
+                          <input
+                            type="text"
+                            placeholder="مثال: منتج مخصص للزبون..."
+                            value={customProductName[order.id] || ''}
+                            onChange={(e) => {
+                              setCustomProductName(prev => ({ ...prev, [order.id]: e.target.value }));
+                            }}
+                            className="w-full bg-white border border-amber-200 outline-none rounded-xl px-3 py-1.5 text-xs text-slate-855 focus:border-amber-500 focus:ring-1 focus:ring-amber-500 transition-all font-bold"
+                          />
+                        </div>
+
+                        {/* الكمية والسعر */}
+                        <div className="grid grid-cols-2 gap-2.5">
+                          <div className="space-y-1">
+                            <label className="text-[10px] text-amber-700 font-bold block">الكمية (صناديق)</label>
+                            <input
+                              type="number"
+                              min="1"
+                              value={customProductQty[order.id] || 1}
+                              onChange={(e) => {
+                                setCustomProductQty(prev => ({ ...prev, [order.id]: parseInt(e.target.value) || 1 }));
+                              }}
+                              className="w-full bg-white border border-amber-200 outline-none rounded-xl px-2.5 py-1.5 text-xs text-slate-855 focus:border-amber-500 focus:ring-1 focus:ring-amber-500 transition-all text-center font-bold font-mono"
+                            />
+                          </div>
+                          <div className="space-y-1">
+                            <label className="text-[10px] text-amber-700 font-bold block">السعر للصندوق (TL)</label>
+                            <input
+                              type="number"
+                              step="0.01"
+                              min="0"
+                              value={customProductPrice[order.id] || ''}
+                              placeholder="مثال: 45.00"
+                              onChange={(e) => {
+                                setCustomProductPrice(prev => ({ ...prev, [order.id]: e.target.value }));
+                              }}
+                              className="w-full bg-white border border-amber-200 outline-none rounded-xl px-2.5 py-1.5 text-xs text-slate-855 focus:border-amber-500 focus:ring-1 focus:ring-amber-500 transition-all text-center font-bold font-mono"
+                            />
+                          </div>
+                        </div>
+
+                        {/* زري الإضافة والإلغاء */}
+                        <div className="flex gap-2 pt-1">
+                          <button
+                            type="button"
+                            onClick={() => handleAddCustomOrderItem(order.id)}
+                            disabled={isUpdating || !(customProductName[order.id] || '').trim()}
+                            className="flex-1 bg-amber-500 hover:bg-amber-600 disabled:bg-slate-300 disabled:text-slate-500 text-white font-bold px-3 py-1.5 rounded-xl text-xs transition-all cursor-pointer"
+                          >
+                            إضافة البند
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setShowCustomAddForm(prev => ({ ...prev, [order.id]: false }));
+                              setCustomProductName(prev => ({ ...prev, [order.id]: '' }));
+                              setCustomProductQty(prev => ({ ...prev, [order.id]: 1 }));
+                              setCustomProductPrice(prev => ({ ...prev, [order.id]: '' }));
+                            }}
+                            className="flex-1 bg-white hover:bg-slate-100 border border-slate-205 text-slate-500 hover:text-slate-700 font-bold px-3 py-1.5 rounded-xl text-xs transition-all cursor-pointer"
                           >
                             إلغاء
                           </button>
