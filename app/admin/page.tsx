@@ -76,6 +76,8 @@ export default function AdminDashboard() {
   const [editedQuantities, setEditedQuantities] = useState<{[itemId: string]: number}>({});
   const [editingCustomerId, setEditingCustomerId] = useState<string | null>(null);
   const [tempCustomerName, setTempCustomerName] = useState<string>('');
+  const [lastSoldPrices, setLastSoldPrices] = useState<Record<string, number>>({});
+  const [focusedItemId, setFocusedItemId] = useState<string | null>(null);
 
   const toggleOrderExpand = (orderId: string) => {
     setExpandedOrders(prev => ({
@@ -192,6 +194,34 @@ export default function AdminDashboard() {
         setAllProducts(prodData || []);
       }
 
+      // Fetch all historical sold prices to build suggestions mapping
+      const { data: recentItemsData, error: recentItemsError } = await supabase
+        .from('order_items')
+        .select(`
+          product_id,
+          product_name,
+          price_at_purchase,
+          orders (
+            created_at
+          )
+        `)
+        .not('price_at_purchase', 'is', null)
+        .gt('price_at_purchase', 0);
+
+      if (!recentItemsError && recentItemsData) {
+        const validItems = recentItemsData.filter((item: any) => item.orders?.created_at);
+        validItems.sort((a: any, b: any) => new Date(a.orders.created_at).getTime() - new Date(b.orders.created_at).getTime());
+        
+        const pricesMap: Record<string, number> = {};
+        validItems.forEach((item: any) => {
+          const key = item.product_id || item.product_name;
+          if (key && Number(item.price_at_purchase) > 0) {
+            pricesMap[key] = Number(item.price_at_purchase);
+          }
+        });
+        setLastSoldPrices(pricesMap);
+      }
+
       setOrders(typedOrders);
       calculateStats(typedOrders);
       setUsingMockData(false);
@@ -211,6 +241,14 @@ export default function AdminDashboard() {
         { id: 'p8', name: 'لبن زبادي سوتاس 1.5 كغ', price: 75.00, image_url: null }
       ]);
       setUsingMockData(true);
+      // Build mock last sold prices for preview mode
+      const mockPricesMap: Record<string, number> = {
+        'p1': 45.00,
+        'p3': 85.00,
+        'p4': 25.00,
+        'p5': 55.00,
+      };
+      setLastSoldPrices(mockPricesMap);
     } finally {
       setLoading(false);
     }
@@ -460,6 +498,17 @@ export default function AdminDashboard() {
         }
         return o;
       });
+
+      // Update in-memory last sold prices
+      const updatedLastPrices = { ...lastSoldPrices };
+      itemsToUpdate.forEach(item => {
+        const productName = order.order_items.find(oi => oi.id === item.id)?.product_name || '';
+        const key = item.product_id || productName;
+        if (key && item.price_at_purchase > 0) {
+          updatedLastPrices[key] = item.price_at_purchase;
+        }
+      });
+      setLastSoldPrices(updatedLastPrices);
 
       setOrders(updatedOrders);
       calculateStats(updatedOrders);
@@ -1132,21 +1181,45 @@ export default function AdminDashboard() {
                           </button>
                         </div>
                         <span className="text-xs font-bold text-slate-500">صندوق ×</span>
-                        <input
-                          type="number"
-                          step="0.01"
-                          min="0"
-                          placeholder="السعر (TL)"
-                          value={editedPrices[item.id] !== undefined ? editedPrices[item.id] : (item.price_at_purchase !== null && item.price_at_purchase !== undefined && Number(item.price_at_purchase) > 0 ? item.price_at_purchase.toString() : '')}
-                          onChange={(e) => {
-                            setEditedPrices(prev => ({
-                              ...prev,
-                              [item.id]: e.target.value
-                            }));
-                          }}
-                          className="w-16 bg-white border border-slate-250 outline-none rounded-lg px-1.5 py-1 text-xs text-slate-800 focus:border-[#128C7E] focus:ring-1 focus:ring-[#128C7E] transition-all text-center font-bold"
-                          disabled={isUpdating}
-                        />
+                        <div className="relative">
+                          <input
+                            type="number"
+                            step="0.01"
+                            min="0"
+                            placeholder="السعر (TL)"
+                            value={editedPrices[item.id] !== undefined ? editedPrices[item.id] : (item.price_at_purchase !== null && item.price_at_purchase !== undefined && Number(item.price_at_purchase) > 0 ? item.price_at_purchase.toString() : '')}
+                            onFocus={() => setFocusedItemId(item.id)}
+                            onBlur={() => {
+                              setTimeout(() => setFocusedItemId(null), 200);
+                            }}
+                            onChange={(e) => {
+                              setEditedPrices(prev => ({
+                                ...prev,
+                                [item.id]: e.target.value
+                              }));
+                            }}
+                            className="w-16 bg-white border border-slate-250 outline-none rounded-lg px-1.5 py-1 text-xs text-slate-800 focus:border-[#128C7E] focus:ring-1 focus:ring-[#128C7E] transition-all text-center font-bold font-mono"
+                            disabled={isUpdating}
+                          />
+                          {focusedItemId === item.id && lastSoldPrices[item.product_id || item.product_name || ''] !== undefined && (
+                            <button
+                              type="button"
+                              onMouseDown={(e) => {
+                                e.preventDefault();
+                                const suggestedPrice = lastSoldPrices[item.product_id || item.product_name || ''];
+                                setEditedPrices(prev => ({
+                                  ...prev,
+                                  [item.id]: suggestedPrice.toString()
+                                }));
+                                setFocusedItemId(null);
+                              }}
+                              className="absolute z-10 bottom-full mb-1.5 right-0 bg-[#128C7E] text-white hover:bg-[#128C7E]/95 text-[10px] font-bold py-1 px-2 rounded-lg shadow-md cursor-pointer flex items-center gap-1 whitespace-nowrap border border-emerald-500"
+                            >
+                              <span>السعر الأخير:</span>
+                              <span className="font-mono">{lastSoldPrices[item.product_id || item.product_name || '']} TL</span>
+                            </button>
+                          )}
+                        </div>
                         <span className="text-[10px] text-slate-450 font-bold">TL</span>
                         
                         <button
@@ -1770,21 +1843,45 @@ export default function AdminDashboard() {
                           </button>
                         </div>
                         <span className="text-xs font-bold text-slate-500">صندوق ×</span>
-                        <input
-                          type="number"
-                          step="0.01"
-                          min="0"
-                          placeholder="السعر (TL)"
-                          value={editedPrices[item.id] !== undefined ? editedPrices[item.id] : (item.price_at_purchase !== null && item.price_at_purchase !== undefined && Number(item.price_at_purchase) > 0 ? item.price_at_purchase.toString() : '')}
-                          onChange={(e) => {
-                            setEditedPrices(prev => ({
-                              ...prev,
-                              [item.id]: e.target.value
-                            }));
-                          }}
-                          className="w-16 bg-white border border-slate-250 outline-none rounded-lg px-1.5 py-1 text-xs text-slate-800 focus:border-[#128C7E] focus:ring-1 focus:ring-[#128C7E] transition-all text-center font-bold"
-                          disabled={isUpdating}
-                        />
+                        <div className="relative">
+                          <input
+                            type="number"
+                            step="0.01"
+                            min="0"
+                            placeholder="السعر (TL)"
+                            value={editedPrices[item.id] !== undefined ? editedPrices[item.id] : (item.price_at_purchase !== null && item.price_at_purchase !== undefined && Number(item.price_at_purchase) > 0 ? item.price_at_purchase.toString() : '')}
+                            onFocus={() => setFocusedItemId(item.id)}
+                            onBlur={() => {
+                              setTimeout(() => setFocusedItemId(null), 200);
+                            }}
+                            onChange={(e) => {
+                              setEditedPrices(prev => ({
+                                ...prev,
+                                [item.id]: e.target.value
+                              }));
+                            }}
+                            className="w-16 bg-white border border-slate-250 outline-none rounded-lg px-1.5 py-1 text-xs text-slate-800 focus:border-[#128C7E] focus:ring-1 focus:ring-[#128C7E] transition-all text-center font-bold font-mono"
+                            disabled={isUpdating}
+                          />
+                          {focusedItemId === item.id && lastSoldPrices[item.product_id || item.product_name || ''] !== undefined && (
+                            <button
+                              type="button"
+                              onMouseDown={(e) => {
+                                e.preventDefault();
+                                const suggestedPrice = lastSoldPrices[item.product_id || item.product_name || ''];
+                                setEditedPrices(prev => ({
+                                  ...prev,
+                                  [item.id]: suggestedPrice.toString()
+                                }));
+                                setFocusedItemId(null);
+                              }}
+                              className="absolute z-10 bottom-full mb-1.5 right-0 bg-[#128C7E] text-white hover:bg-[#128C7E]/95 text-[10px] font-bold py-1 px-2 rounded-lg shadow-md cursor-pointer flex items-center gap-1 whitespace-nowrap border border-emerald-500"
+                            >
+                              <span>السعر الأخير:</span>
+                              <span className="font-mono">{lastSoldPrices[item.product_id || item.product_name || '']} TL</span>
+                            </button>
+                          )}
+                        </div>
                         <span className="text-[10px] text-slate-450 font-bold">TL</span>
                         
                         <button
