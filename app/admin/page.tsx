@@ -35,6 +35,12 @@ interface AggregatedItem {
   imageUrl?: string | null;
 }
 
+interface Customer {
+  id: string;
+  name: string;
+  created_at: string;
+}
+
 const formatTime = (dateStr: string) => {
   try {
     const date = new Date(dateStr);
@@ -76,6 +82,7 @@ export default function AdminDashboard() {
   const [editedQuantities, setEditedQuantities] = useState<{[itemId: string]: number}>({});
   const [editingCustomerId, setEditingCustomerId] = useState<string | null>(null);
   const [tempCustomerName, setTempCustomerName] = useState<string>('');
+  const [approvedCustomers, setApprovedCustomers] = useState<Customer[]>([]);
   const [lastSoldPrices, setLastSoldPrices] = useState<Record<string, number>>({});
   const [focusedItemId, setFocusedItemId] = useState<string | null>(null);
 
@@ -222,6 +229,19 @@ export default function AdminDashboard() {
         setLastSoldPrices(pricesMap);
       }
 
+      // Fetch approved customers
+      const { data: custData, error: custError } = await supabase
+        .from('customers')
+        .select('*')
+        .order('name', { ascending: true });
+      if (!custError) {
+        setApprovedCustomers(custData || []);
+      } else {
+        console.warn('DB customers error, loading local storage', custError);
+        const localCustomers = JSON.parse(localStorage.getItem('idlebi_customers') || '[]');
+        setApprovedCustomers(localCustomers);
+      }
+
       setOrders(typedOrders);
       calculateStats(typedOrders);
       setUsingMockData(false);
@@ -240,6 +260,21 @@ export default function AdminDashboard() {
         { id: 'p7', name: 'جبنة بيضاء بينار 500 غ', price: 110.00, image_url: null },
         { id: 'p8', name: 'لبن زبادي سوتاس 1.5 كغ', price: 75.00, image_url: null }
       ]);
+
+      const localCustomers = JSON.parse(localStorage.getItem('idlebi_customers') || '[]');
+      if (localCustomers.length === 0) {
+        const seed = [
+          { id: 'c1', name: 'سوبر ماركت الياسمين', created_at: new Date().toISOString() },
+          { id: 'c2', name: 'بقالة النور', created_at: new Date().toISOString() },
+          { id: 'c3', name: 'أسواق أورفا الغذائية', created_at: new Date().toISOString() },
+          { id: 'c4', name: 'مطعم السلام الدمشقي', created_at: new Date().toISOString() }
+        ];
+        localStorage.setItem('idlebi_customers', JSON.stringify(seed));
+        setApprovedCustomers(seed);
+      } else {
+        setApprovedCustomers(localCustomers);
+      }
+
       setUsingMockData(true);
       // Build mock last sold prices for preview mode
       const mockPricesMap: Record<string, number> = {
@@ -1022,20 +1057,22 @@ export default function AdminDashboard() {
                       <div className="space-y-1">
                         {editingCustomerId === order.id ? (
                           <div className="flex items-center gap-1.5" onClick={(e) => e.stopPropagation()}>
-                            <input
-                              type="text"
+                            <select
                               value={tempCustomerName}
                               onChange={(e) => setTempCustomerName(e.target.value)}
-                              className="bg-white border border-slate-300 outline-none rounded-xl px-2.5 py-1 text-xs text-slate-800 focus:border-[#128C7E] focus:ring-1 focus:ring-[#128C7E] font-bold"
+                              className="bg-white border border-slate-300 outline-none rounded-xl px-2.5 py-1 text-[11px] text-slate-800 focus:border-[#128C7E] focus:ring-1 focus:ring-[#128C7E] font-bold max-w-[200px]"
                               autoFocus
-                              onKeyDown={(e) => {
-                                if (e.key === 'Enter') {
-                                  handleSaveCustomerName(order.id);
-                                } else if (e.key === 'Escape') {
-                                  setEditingCustomerId(null);
-                                }
-                              }}
-                            />
+                            >
+                              <option value="" disabled>اختر زبوناً...</option>
+                              {!approvedCustomers.some(c => c.name === order.customer_name) && (
+                                <option value={order.customer_name}>{order.customer_name} (غير مسجل)</option>
+                              )}
+                              {approvedCustomers.map((cust) => (
+                                <option key={cust.id} value={cust.name}>
+                                  {cust.name}
+                                </option>
+                              ))}
+                            </select>
                             <button
                               type="button"
                               onClick={() => handleSaveCustomerName(order.id)}
@@ -1684,20 +1721,22 @@ export default function AdminDashboard() {
                       <div className="space-y-1">
                         {editingCustomerId === order.id ? (
                           <div className="flex items-center gap-1.5" onClick={(e) => e.stopPropagation()}>
-                            <input
-                              type="text"
+                            <select
                               value={tempCustomerName}
                               onChange={(e) => setTempCustomerName(e.target.value)}
-                              className="bg-white border border-slate-300 outline-none rounded-xl px-2.5 py-1 text-xs text-slate-800 focus:border-[#128C7E] focus:ring-1 focus:ring-[#128C7E] font-bold"
+                              className="bg-white border border-slate-300 outline-none rounded-xl px-2.5 py-1 text-[11px] text-slate-800 focus:border-[#128C7E] focus:ring-1 focus:ring-[#128C7E] font-bold max-w-[200px]"
                               autoFocus
-                              onKeyDown={(e) => {
-                                if (e.key === 'Enter') {
-                                  handleSaveCustomerName(order.id);
-                                } else if (e.key === 'Escape') {
-                                  setEditingCustomerId(null);
-                                }
-                              }}
-                            />
+                            >
+                              <option value="" disabled>اختر زبوناً...</option>
+                              {!approvedCustomers.some(c => c.name === order.customer_name) && (
+                                <option value={order.customer_name}>{order.customer_name} (غير مسجل)</option>
+                              )}
+                              {approvedCustomers.map((cust) => (
+                                <option key={cust.id} value={cust.name}>
+                                  {cust.name}
+                                </option>
+                              ))}
+                            </select>
                             <button
                               type="button"
                               onClick={() => handleSaveCustomerName(order.id)}

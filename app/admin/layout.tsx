@@ -4,7 +4,7 @@ import React, { useState, useEffect } from 'react';
 import { useRouter, usePathname } from 'next/navigation';
 import Link from 'next/link';
 import { supabase } from '@/lib/supabase';
-import { LayoutDashboard, FolderKanban, ShoppingBag, Settings, LogOut, Store, Menu, X, User, TrendingUp } from 'lucide-react';
+import { LayoutDashboard, FolderKanban, ShoppingBag, Settings, LogOut, Store, Menu, X, User, TrendingUp, Users } from 'lucide-react';
 
 export default function AdminLayout({ children }: { children: React.ReactNode }) {
   const router = useRouter();
@@ -68,6 +68,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
     { href: '/admin/products', label: 'إدارة المنتجات', icon: ShoppingBag },
     { href: '/admin/settings', label: 'إعدادات الواتساب', icon: Settings },
     { href: '/admin/statistics', label: 'الإحصائيات والأرشيف', icon: TrendingUp },
+    { href: '/admin/customers', label: 'قائمة الزبائن', icon: Users },
   ];
 
   if (pathname === '/admin/login') {
