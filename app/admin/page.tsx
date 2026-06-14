@@ -73,6 +73,7 @@ export default function AdminDashboard() {
   const [customProductName, setCustomProductName] = useState<{[orderId: string]: string}>({});
   const [customProductQty, setCustomProductQty] = useState<{[orderId: string]: number}>({});
   const [customProductPrice, setCustomProductPrice] = useState<{[orderId: string]: string}>({});
+  const [editedQuantities, setEditedQuantities] = useState<{[itemId: string]: number}>({});
 
   const toggleOrderExpand = (orderId: string) => {
     setExpandedOrders(prev => ({
@@ -366,11 +367,12 @@ export default function AdminDashboard() {
       const itemsToUpdate = order.order_items.map(item => {
         const newPriceStr = editedPrices[item.id];
         const newPrice = newPriceStr !== undefined && newPriceStr !== '' ? parseFloat(newPriceStr) : (item.price_at_purchase || 0);
+        const newQty = editedQuantities[item.id] !== undefined ? editedQuantities[item.id] : item.quantity;
         return {
           id: item.id,
           order_id: orderId,
           product_id: item.product_id,
-          quantity: item.quantity,
+          quantity: newQty,
           price_at_purchase: newPrice
         };
       });
@@ -403,9 +405,11 @@ export default function AdminDashboard() {
             order_items: o.order_items.map(item => {
               const newPriceStr = editedPrices[item.id];
               const newPrice = newPriceStr !== undefined && newPriceStr !== '' ? parseFloat(newPriceStr) : item.price_at_purchase;
+              const newQty = editedQuantities[item.id] !== undefined ? editedQuantities[item.id] : item.quantity;
               return {
                 ...item,
-                price_at_purchase: newPrice
+                price_at_purchase: newPrice,
+                quantity: newQty
               };
             })
           };
@@ -415,10 +419,10 @@ export default function AdminDashboard() {
 
       setOrders(updatedOrders);
       calculateStats(updatedOrders);
-      alert('تم حفظ الأسعار وتحديث إجمالي الفاتورة بنجاح!');
+      alert('تم حفظ التعديلات وتحديث إجمالي الفاتورة بنجاح!');
     } catch (err: any) {
       console.error(err);
-      alert('حدث خطأ أثناء حفظ أسعار الفاتورة.');
+      alert('حدث خطأ أثناء حفظ الفاتورة.');
     } finally {
       setIsUpdating(false);
     }
@@ -995,8 +999,46 @@ export default function AdminDashboard() {
                         )}
                         <span>{item.product_name || item.products?.name || 'منتج غير متوفر'}</span>
                       </div>
-                      <div className="flex items-center gap-1.5 shrink-0">
-                        <span className="text-xs font-bold text-slate-500">{item.quantity} صندوق ×</span>
+                      <div className="flex items-center gap-2 shrink-0">
+                        {/* Quantity Counter */}
+                        <div className="flex items-center border border-slate-250 rounded-lg overflow-hidden bg-white" dir="ltr">
+                          <button
+                            type="button"
+                            onClick={() => {
+                              const currentQty = editedQuantities[item.id] !== undefined ? editedQuantities[item.id] : item.quantity;
+                              if (currentQty > 1) {
+                                setEditedQuantities(prev => ({ ...prev, [item.id]: currentQty - 1 }));
+                              }
+                            }}
+                            className="px-2 py-1 bg-slate-50 hover:bg-slate-100 active:bg-slate-200 text-slate-600 font-extrabold cursor-pointer border-r border-slate-200 transition-colors"
+                            disabled={isUpdating}
+                          >
+                            -
+                          </button>
+                          <input
+                            type="number"
+                            min="1"
+                            value={editedQuantities[item.id] !== undefined ? editedQuantities[item.id] : item.quantity}
+                            onChange={(e) => {
+                              const val = parseInt(e.target.value) || 1;
+                              setEditedQuantities(prev => ({ ...prev, [item.id]: val }));
+                            }}
+                            className="w-8 text-center text-xs font-bold font-mono outline-none border-none py-1 text-slate-800"
+                            disabled={isUpdating}
+                          />
+                          <button
+                            type="button"
+                            onClick={() => {
+                              const currentQty = editedQuantities[item.id] !== undefined ? editedQuantities[item.id] : item.quantity;
+                              setEditedQuantities(prev => ({ ...prev, [item.id]: currentQty + 1 }));
+                            }}
+                            className="px-2 py-1 bg-slate-50 hover:bg-slate-100 active:bg-slate-200 text-slate-600 font-extrabold cursor-pointer border-l border-slate-200 transition-colors"
+                            disabled={isUpdating}
+                          >
+                            +
+                          </button>
+                        </div>
+                        <span className="text-xs font-bold text-slate-500">صندوق ×</span>
                         <input
                           type="number"
                           step="0.01"
@@ -1009,7 +1051,7 @@ export default function AdminDashboard() {
                               [item.id]: e.target.value
                             }));
                           }}
-                          className="w-20 bg-white border border-slate-250 outline-none rounded-lg px-2 py-1 text-xs text-slate-800 focus:border-[#128C7E] focus:ring-1 focus:ring-[#128C7E] transition-all text-center font-bold"
+                          className="w-16 bg-white border border-slate-250 outline-none rounded-lg px-1.5 py-1 text-xs text-slate-800 focus:border-[#128C7E] focus:ring-1 focus:ring-[#128C7E] transition-all text-center font-bold"
                           disabled={isUpdating}
                         />
                         <span className="text-[10px] text-slate-450 font-bold">TL</span>
@@ -1266,10 +1308,10 @@ export default function AdminDashboard() {
                       onClick={() => handleSavePrices(order.id)}
                       disabled={isUpdating}
                       className="col-span-2 sm:col-auto bg-emerald-50 hover:bg-emerald-100 border border-emerald-250 text-emerald-700 font-bold px-3 py-2 sm:py-1.5 rounded-xl text-xs flex items-center justify-center gap-1 cursor-pointer transition-all active:scale-95 shadow-sm w-full sm:w-auto"
-                      title="حفظ الأسعار المدخلة وتحديث الإجمالي"
+                      title="حفظ التعديلات المدخلة وتحديث الفاتورة"
                     >
                       <Save className="w-3.5 h-3.5" />
-                      <span>حفظ الأسعار</span>
+                      <span>حفظ التعديلات</span>
                     </button>
                     
                     <button
@@ -1546,8 +1588,46 @@ export default function AdminDashboard() {
                         )}
                         <span>{item.product_name || item.products?.name || 'منتج غير متوفر'}</span>
                       </div>
-                      <div className="flex items-center gap-1.5 shrink-0">
-                        <span className="text-xs font-bold text-slate-500">{item.quantity} صندوق ×</span>
+                      <div className="flex items-center gap-2 shrink-0">
+                        {/* Quantity Counter */}
+                        <div className="flex items-center border border-slate-250 rounded-lg overflow-hidden bg-white" dir="ltr">
+                          <button
+                            type="button"
+                            onClick={() => {
+                              const currentQty = editedQuantities[item.id] !== undefined ? editedQuantities[item.id] : item.quantity;
+                              if (currentQty > 1) {
+                                setEditedQuantities(prev => ({ ...prev, [item.id]: currentQty - 1 }));
+                              }
+                            }}
+                            className="px-2 py-1 bg-slate-50 hover:bg-slate-100 active:bg-slate-200 text-slate-600 font-extrabold cursor-pointer border-r border-slate-200 transition-colors"
+                            disabled={isUpdating}
+                          >
+                            -
+                          </button>
+                          <input
+                            type="number"
+                            min="1"
+                            value={editedQuantities[item.id] !== undefined ? editedQuantities[item.id] : item.quantity}
+                            onChange={(e) => {
+                              const val = parseInt(e.target.value) || 1;
+                              setEditedQuantities(prev => ({ ...prev, [item.id]: val }));
+                            }}
+                            className="w-8 text-center text-xs font-bold font-mono outline-none border-none py-1 text-slate-800"
+                            disabled={isUpdating}
+                          />
+                          <button
+                            type="button"
+                            onClick={() => {
+                              const currentQty = editedQuantities[item.id] !== undefined ? editedQuantities[item.id] : item.quantity;
+                              setEditedQuantities(prev => ({ ...prev, [item.id]: currentQty + 1 }));
+                            }}
+                            className="px-2 py-1 bg-slate-50 hover:bg-slate-100 active:bg-slate-200 text-slate-600 font-extrabold cursor-pointer border-l border-slate-200 transition-colors"
+                            disabled={isUpdating}
+                          >
+                            +
+                          </button>
+                        </div>
+                        <span className="text-xs font-bold text-slate-500">صندوق ×</span>
                         <input
                           type="number"
                           step="0.01"
@@ -1560,7 +1640,7 @@ export default function AdminDashboard() {
                               [item.id]: e.target.value
                             }));
                           }}
-                          className="w-20 bg-white border border-slate-250 outline-none rounded-lg px-2 py-1 text-xs text-slate-800 focus:border-[#128C7E] focus:ring-1 focus:ring-[#128C7E] transition-all text-center font-bold"
+                          className="w-16 bg-white border border-slate-250 outline-none rounded-lg px-1.5 py-1 text-xs text-slate-800 focus:border-[#128C7E] focus:ring-1 focus:ring-[#128C7E] transition-all text-center font-bold"
                           disabled={isUpdating}
                         />
                         <span className="text-[10px] text-slate-450 font-bold">TL</span>
@@ -1817,10 +1897,10 @@ export default function AdminDashboard() {
                       onClick={() => handleSavePrices(order.id)}
                       disabled={isUpdating}
                       className="col-span-2 sm:col-auto bg-emerald-50 hover:bg-emerald-100 border border-emerald-250 text-emerald-700 font-bold px-3 py-2 sm:py-1.5 rounded-xl text-xs flex items-center justify-center gap-1 cursor-pointer transition-all active:scale-95 shadow-sm w-full sm:w-auto"
-                      title="حفظ الأسعار المدخلة وتحديث الإجمالي"
+                      title="حفظ التعديلات المدخلة وتحديث الفاتورة"
                     >
                       <Save className="w-3.5 h-3.5" />
-                      <span>حفظ الأسعار</span>
+                      <span>حفظ التعديلات</span>
                     </button>
                     
                     <button
