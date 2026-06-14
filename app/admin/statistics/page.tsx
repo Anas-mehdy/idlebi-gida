@@ -342,8 +342,9 @@ export default function AdminStatistics() {
   };
 
   return (
-    <div className="space-y-6">
-      {/* Offline Demo Banner */}
+    <>
+      <div className="space-y-6 print:hidden">
+        {/* Offline Demo Banner */}
       {usingMockData && (
         <div className="bg-amber-50 border border-amber-200 text-amber-800 px-4 py-3 rounded-2xl text-xs flex items-center gap-2.5 shadow-sm">
           <AlertCircle className="w-5 h-5 shrink-0 text-amber-600" />
@@ -675,6 +676,7 @@ export default function AdminStatistics() {
           </div>
         </div>
       )}
+      </div>
 
       {/* 3. Print-only Layout: Customer Invoice Print Sheet */}
       {activePrintOrder && (
@@ -881,6 +883,6 @@ export default function AdminStatistics() {
           </div>
         </div>
       )}
-    </div>
+    </>
   );
 }
