@@ -1687,31 +1687,50 @@ export default function AdminDashboard() {
         </div>
       )}
 
+      {/* Dynamic Style for 58mm Thermal Printing */}
+      {(printType === 'receipt' || printType === 'aggregation_receipt') && (
+        <style dangerouslySetInnerHTML={{ __html: `
+          @media print {
+            @page {
+              size: 58mm auto;
+              margin: 0 !important;
+            }
+            html, body {
+              margin: 0 !important;
+              padding: 0 !important;
+              width: 58mm !important;
+              background-color: #fff !important;
+              color: #000 !important;
+            }
+          }
+        `}} />
+      )}
+
       {/* 4. Print-only Layout: 58mm Thermal Receipt Print Sheet */}
       {printType === 'receipt' && activePrintOrder && (
-        <div className="hidden print:block font-mono text-right text-xs bg-white text-black p-1 w-[58mm] mx-auto leading-relaxed" dir="rtl">
+        <div className="hidden print:block thermal-container font-sans text-right text-xs bg-white text-black p-2.5 w-full max-w-[58mm] mx-auto leading-relaxed" dir="rtl">
           {/* Header */}
           <div className="text-center border-b border-dashed border-black pb-2 mb-2">
-            <h1 className="text-sm font-bold uppercase">İDELBİ GIDA</h1>
-            <p className="text-[9px] mt-0.5 font-bold">İDELBİ GIDA TİCARET L.Ş.</p>
-            <p className="text-[8px] text-slate-600">Esenler, İstanbul</p>
-            <p className="text-[9px] font-bold mt-1 border border-black py-0.5 px-2 inline-block rounded">إيصال مبيعات</p>
+            <h1 className="text-base font-bold uppercase tracking-wide">İDELBİ GIDA</h1>
+            <p className="text-xs mt-0.5 font-semibold">İDELBİ GIDA TİCARET L.Ş.</p>
+            <p className="text-[10px] text-black">Esenler, İstanbul</p>
+            <p className="text-xs font-black mt-1.5 border border-black py-0.5 px-2.5 inline-block rounded">إيصال مبيعات</p>
           </div>
 
           {/* Metadata */}
-          <div className="text-[9px] space-y-0.5 mb-2 pb-1.5 border-b border-dashed border-black">
+          <div className="text-xs space-y-1 mb-2 pb-2 border-b border-dashed border-black">
             <p><strong>العميل:</strong> {activePrintOrder.customer_name}</p>
-            <p><strong>التاريخ:</strong> {new Date(activePrintOrder.created_at).toLocaleDateString('ar-EG', { dateStyle: 'short' })}</p>
-            <p><strong>رقم الفاتورة:</strong> #{activePrintOrder.id.substring(0, 8).toUpperCase()}</p>
+            <p><strong>التاريخ:</strong> <span className="font-mono">{new Date(activePrintOrder.created_at).toLocaleDateString('ar-EG', { dateStyle: 'short' })}</span></p>
+            <p><strong>رقم الفاتورة:</strong> <span className="font-mono">#{activePrintOrder.id.substring(0, 8).toUpperCase()}</span></p>
           </div>
 
           {/* Items Table */}
-          <table className="w-full text-[9px] mb-2 border-collapse">
+          <table className="w-full text-xs mb-2 border-collapse">
             <thead>
               <tr className="border-b border-black text-right">
-                <th className="pb-1 font-bold">الصنف</th>
-                <th className="pb-1 text-center w-10 font-bold">الكمية</th>
-                <th className="pb-1 text-left w-14 font-bold">الإجمالي</th>
+                <th className="pb-1 font-bold w-[55%]">الصنف</th>
+                <th className="pb-1 text-center w-[20%] font-bold">الكمية</th>
+                <th className="pb-1 text-left w-[25%] font-bold">الإجمالي</th>
               </tr>
             </thead>
             <tbody>
@@ -1720,13 +1739,13 @@ export default function AdminDashboard() {
                 const qty = item.quantity;
                 const total = price * qty;
                 return (
-                  <tr key={item.id} className="border-b border-dashed border-slate-200">
-                    <td className="py-1">
-                      <div className="font-bold">{item.product_name || item.products?.name || 'مادة'}</div>
-                      <div className="text-[8px] text-slate-500 font-sans">{price.toFixed(2)} TL</div>
+                  <tr key={item.id} className="border-b border-dashed border-black/30">
+                    <td className="py-1.5 pr-0.5">
+                      <div className="font-bold text-xs">{item.product_name || item.products?.name || 'مادة'}</div>
+                      <div className="text-[10px] text-black/70 font-mono mt-0.5">{price.toFixed(2)} TL</div>
                     </td>
-                    <td className="py-1 text-center font-bold font-mono">{qty}</td>
-                    <td className="py-1 text-left font-bold font-mono">{total.toFixed(2)} TL</td>
+                    <td className="py-1.5 text-center font-bold font-mono text-xs">{qty}</td>
+                    <td className="py-1.5 text-left font-bold font-mono text-xs">{total.toFixed(2)} TL</td>
                   </tr>
                 );
               })}
@@ -1734,68 +1753,68 @@ export default function AdminDashboard() {
           </table>
 
           {/* Summary */}
-          <div className="border-t border-black pt-1.5 space-y-1 text-[10px] font-bold">
+          <div className="border-t border-black pt-2 space-y-1.5 text-xs font-bold">
             <div className="flex justify-between">
               <span>إجمالي الصناديق:</span>
-              <span>{activePrintOrder.order_items.reduce((sum, item) => sum + item.quantity, 0)} صندوق</span>
+              <span className="font-mono">{activePrintOrder.order_items.reduce((sum, item) => sum + item.quantity, 0)} صندوق</span>
             </div>
-            <div className="flex justify-between text-[11px] border-t border-dashed border-black pt-1">
+            <div className="flex justify-between text-sm border-t border-dashed border-black pt-1.5 font-black">
               <span>المجموع الكلي:</span>
-              <span>{Number(activePrintOrder.total_price).toFixed(2)} TL</span>
+              <span className="font-mono text-base">{Number(activePrintOrder.total_price).toFixed(2)} TL</span>
             </div>
           </div>
 
           {/* Footer */}
-          <div className="text-center mt-4 pt-2 border-t border-dashed border-black text-[8px] text-slate-500">
-            <p>شكراً لتعاملكم معنا</p>
-            <p className="mt-0.5">İDELBİ GIDA • 58mm Thermal</p>
+          <div className="text-center mt-6 pt-2 border-t border-dashed border-black text-[10px] text-black/80">
+            <p className="font-semibold">شكراً لتعاملكم معنا</p>
+            <p className="mt-1 font-mono text-[9px] text-black/60">İDELBİ GIDA • 58mm Thermal</p>
           </div>
         </div>
       )}
 
       {/* 5. Print-only Layout: 58mm Thermal Daily Aggregation Print Sheet */}
       {printType === 'aggregation_receipt' && (
-        <div className="hidden print:block font-mono text-right text-xs bg-white text-black p-1 w-[58mm] mx-auto leading-relaxed" dir="rtl">
+        <div className="hidden print:block thermal-container font-sans text-right text-xs bg-white text-black p-2.5 w-full max-w-[58mm] mx-auto leading-relaxed" dir="rtl">
           {/* Header */}
-          <div className="text-center border-b border-black pb-2 mb-2">
-            <h1 className="text-sm font-bold uppercase">idelbi gida | إدلب غذائيات</h1>
-            <p className="text-[9px] mt-0.5 font-bold">تجميع المستودع اليومي</p>
-            <p className="text-[8px] text-slate-600">تاريخ الطباعة: {new Date().toLocaleDateString('ar-EG', { dateStyle: 'short' })}</p>
-            <p className="text-[9px] font-bold mt-1 border border-black py-0.5 px-2 inline-block rounded">ورقة التجميع 58 مم</p>
+          <div className="text-center border-b border-dashed border-black pb-2 mb-2">
+            <h1 className="text-base font-bold uppercase tracking-wide">idelbi gida | إدلب غذائيات</h1>
+            <p className="text-xs mt-0.5 font-semibold">تجميع المستودع اليومي</p>
+            <p className="text-[10px] text-black">تاريخ الطباعة: <span className="font-mono">{new Date().toLocaleDateString('ar-EG', { dateStyle: 'short' })}</span></p>
+            <p className="text-xs font-black mt-1.5 border border-black py-0.5 px-2.5 inline-block rounded">ورقة التجميع 58 مم</p>
           </div>
 
           {/* Table */}
-          <table className="w-full text-[9px] mb-2 border-collapse">
+          <table className="w-full text-xs mb-2 border-collapse">
             <thead>
               <tr className="border-b border-black text-right">
-                <th className="pb-1 font-bold">#</th>
-                <th className="pb-1 font-bold">اسم المنتج</th>
-                <th className="pb-1 text-center w-16 font-bold">الكمية</th>
+                <th className="pb-1 font-bold w-[10%]">#</th>
+                <th className="pb-1 font-bold w-[65%]">اسم المنتج</th>
+                <th className="pb-1 text-center w-[25%] font-bold">الكمية</th>
               </tr>
             </thead>
             <tbody>
               {aggregatedItems.map((item, idx) => (
-                <tr key={idx} className="border-b border-dashed border-slate-200">
-                  <td className="py-1 font-bold font-mono">{idx + 1}</td>
-                  <td className="py-1 font-bold">{item.productName}</td>
-                  <td className="py-1 text-center font-black text-xs font-mono">{item.totalQty} علبة</td>
+                <tr key={idx} className="border-b border-dashed border-black/30">
+                  <td className="py-1.5 font-bold font-mono text-xs">{idx + 1}</td>
+                  <td className="py-1.5 font-bold text-xs">{item.productName}</td>
+                  <td className="py-1.5 text-center font-black text-sm font-mono whitespace-nowrap">{item.totalQty} علبة</td>
                 </tr>
               ))}
             </tbody>
           </table>
 
           {/* Summary */}
-          <div className="border-t border-black pt-1.5 text-[10px] font-bold">
-            <div className="flex justify-between">
+          <div className="border-t border-black pt-2 text-xs font-bold">
+            <div className="flex justify-between items-center text-sm font-black">
               <span>إجمالي الصناديق المطلوبة:</span>
-              <span>{aggregatedItems.reduce((sum, item) => sum + item.totalQty, 0)} صندوق</span>
+              <span className="font-mono text-base">{aggregatedItems.reduce((sum, item) => sum + item.totalQty, 0)} صندوق</span>
             </div>
           </div>
 
           {/* Footer */}
-          <div className="text-center mt-4 pt-2 border-t border-dashed border-black text-[8px] text-slate-500">
-            <p>تم توليد الورقة للتعبئة السريعة</p>
-            <p className="mt-0.5">İDELBİ GIDA • 58mm Thermal</p>
+          <div className="text-center mt-6 pt-2 border-t border-dashed border-black text-[10px] text-black/80">
+            <p className="font-semibold">تم توليد الورقة للتعبئة السريعة</p>
+            <p className="mt-1 font-mono text-[9px] text-black/60">İDELBİ GIDA • 58mm Thermal</p>
           </div>
         </div>
       )}
