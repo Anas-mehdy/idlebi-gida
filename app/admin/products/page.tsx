@@ -147,6 +147,11 @@ export default function AdminProducts() {
   const [activePreviewImage, setActivePreviewImage] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
+  // Sales history states
+  const [selectedProductForHistory, setSelectedProductForHistory] = useState<Product | null>(null);
+  const [salesHistory, setSalesHistory] = useState<any[]>([]);
+  const [loadingHistory, setLoadingHistory] = useState(false);
+
   const filteredDisplayProducts = selectedFilterCategory === 'all'
     ? products
     : products.filter((p) => p.category_id === selectedFilterCategory);
@@ -278,6 +283,73 @@ export default function AdminProducts() {
       alert('حدث خطأ أثناء حفظ الترتيب الجديد في قاعدة البيانات.');
     } finally {
       setSavingOrder(false);
+    }
+  };
+
+  const fetchSalesHistory = async (productId: string, productName: string) => {
+    try {
+      setLoadingHistory(true);
+      const isUrlConfigured = process.env.NEXT_PUBLIC_SUPABASE_URL && !process.env.NEXT_PUBLIC_SUPABASE_URL.includes('placeholder');
+      
+      if (isUrlConfigured) {
+        const { data, error } = await supabase
+          .from('order_items')
+          .select(`
+            quantity,
+            price_at_purchase,
+            product_name,
+            orders (
+              id,
+              customer_name,
+              created_at,
+              status
+            )
+          `)
+          .or(`product_id.eq.${productId},product_name.eq.${productName}`);
+        
+        if (error) throw error;
+        
+        const formatted = (data || [])
+          .filter((item: any) => item.orders)
+          .map((item: any) => ({
+            customer_name: item.orders.customer_name,
+            created_at: item.orders.created_at,
+            quantity: item.quantity,
+            price_at_purchase: item.price_at_purchase || 0,
+            status: item.orders.status,
+            order_id: item.orders.id
+          }))
+          .sort((a: any, b: any) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
+          
+        setSalesHistory(formatted);
+      } else {
+        const todayStr = new Date().toISOString();
+        const yesterdayStr = new Date(Date.now() - 86400000).toISOString();
+        const twoDaysAgoStr = new Date(Date.now() - 172800000).toISOString();
+        
+        const mockSales: Record<string, any[]> = {
+          'p1': [
+            { customer_name: 'سوبر ماركت الياسمين', created_at: todayStr, quantity: 5, price_at_purchase: 45.00, status: 'pending', order_id: 'm-ord1' },
+            { customer_name: 'بقالة النور', created_at: yesterdayStr, quantity: 10, price_at_purchase: 45.00, status: 'delivered', order_id: 'm-ord2' },
+            { customer_name: 'سوبر ماركت الياسمين', created_at: twoDaysAgoStr, quantity: 3, price_at_purchase: 40.00, status: 'delivered', order_id: 'prev-ord1' }
+          ],
+          'p3': [
+            { customer_name: 'بقالة النور', created_at: todayStr, quantity: 2, price_at_purchase: 85.00, status: 'pending', order_id: 'm-ord2' },
+            { customer_name: 'محلات الأمل (مؤجلة)', created_at: yesterdayStr, quantity: 4, price_at_purchase: 85.00, status: 'postponed', order_id: 'm-ord3' },
+            { customer_name: 'بقالة النور', created_at: twoDaysAgoStr, quantity: 1, price_at_purchase: 80.00, status: 'delivered', order_id: 'prev-ord2' }
+          ]
+        };
+        
+        setSalesHistory(mockSales[productId] || [
+          { customer_name: 'سوبر ماركت الياسمين', created_at: todayStr, quantity: 2, price_at_purchase: 50.00, status: 'delivered', order_id: 'mock-sample-1' },
+          { customer_name: 'أسواق أورفا الغذائية', created_at: yesterdayStr, quantity: 5, price_at_purchase: 48.00, status: 'delivered', order_id: 'mock-sample-2' }
+        ]);
+      }
+    } catch (err: any) {
+      console.error('Error fetching sales history:', err);
+      alert('حدث خطأ أثناء تحميل سجل مبيعات المنتج.');
+    } finally {
+      setLoadingHistory(false);
     }
   };
 
@@ -891,14 +963,22 @@ export default function AdminProducts() {
                               product.name.charAt(0)
                             )}
                           </div>
-                          <span className="text-sm font-bold text-slate-800 line-clamp-1 flex items-center gap-1.5">
-                            {product.name}
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setSelectedProductForHistory(product);
+                              fetchSalesHistory(product.id, product.name);
+                            }}
+                            className="text-sm font-bold text-slate-800 line-clamp-1 flex items-center gap-1.5 hover:text-[#128C7E] hover:underline transition-all cursor-pointer border-none bg-transparent text-right outline-none p-0"
+                            title="اضغط لعرض سجل مبيعات هذا المنتج بالتفصيل للزبائن"
+                          >
+                            <span>{product.name}</span>
                             {product.is_hidden && (
                               <span className="bg-amber-50 text-amber-700 text-[10px] font-black px-1.5 py-0.5 rounded-md border border-amber-250 shrink-0">
                                 مخفي
                               </span>
                             )}
-                          </span>
+                          </button>
                         </div>
                       </td>
                       <td className="py-3 text-sm text-slate-600">
@@ -1212,6 +1292,111 @@ export default function AdminProducts() {
               alt="Preview" 
               className="max-w-full max-h-[85vh] object-contain rounded-xl shadow-2xl border border-white/5 select-none"
             />
+          </div>
+        </div>
+      )}
+
+      {/* Sales History Modal */}
+      {selectedProductForHistory && (
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-xs z-50 flex items-center justify-center p-4 overflow-y-auto">
+          <div 
+            className="bg-white border border-slate-200 rounded-3xl p-6 w-full max-w-2xl space-y-4 shadow-xl relative text-right"
+            onClick={(e) => e.stopPropagation()}
+          >
+            {/* Close Button */}
+            <button 
+              onClick={() => {
+                setSelectedProductForHistory(null);
+                setSalesHistory([]);
+              }}
+              className="absolute top-4 left-4 bg-slate-100 hover:bg-slate-200 active:scale-95 text-slate-500 p-2 rounded-full transition-all cursor-pointer flex items-center justify-center border-none"
+              title="إغلاق"
+            >
+              <X className="w-4 h-4" />
+            </button>
+
+            <div className="flex items-center gap-2.5 pb-2.5 border-b border-slate-100 justify-end">
+              <div>
+                <h2 className="text-base font-bold text-slate-800">سجل مبيعات المنتج بالتفصيل</h2>
+                <p className="text-[11px] text-slate-500 mt-0.5">تفاصيل الزبائن الذين اشتروا هذا المنتج وأسعار البيع لهم</p>
+              </div>
+              <ShoppingBag className="w-6 h-6 text-[#128C7E] shrink-0" />
+            </div>
+
+            {/* Product Header Card */}
+            <div className="bg-slate-50 border border-slate-150 rounded-2xl p-4 flex flex-row-reverse items-center gap-4 text-right">
+              <div className="w-16 h-16 bg-white border border-slate-200 rounded-xl overflow-hidden shrink-0 flex items-center justify-center font-bold text-lg text-[#128C7E]">
+                {selectedProductForHistory.image_url ? (
+                  <img src={selectedProductForHistory.image_url} alt={selectedProductForHistory.name} className="w-full h-full object-cover" />
+                ) : (
+                  selectedProductForHistory.name.charAt(0)
+                )}
+              </div>
+              <div className="flex-1 space-y-1">
+                <h3 className="text-sm font-bold text-slate-800">{selectedProductForHistory.name}</h3>
+                <div className="flex flex-row-reverse flex-wrap items-center gap-x-4 gap-y-1 text-xs text-slate-500">
+                  <span>القسم: {categories.find(c => c.id === selectedProductForHistory.category_id)?.name || 'بدون قسم'}</span>
+                  <span>•</span>
+                  <span>السعر الافتراضي: {selectedProductForHistory.price ? `${Number(selectedProductForHistory.price).toFixed(2)} TL` : 'يحدد عند الطلب'}</span>
+                </div>
+              </div>
+            </div>
+
+            {/* History Table */}
+            <div className="space-y-2">
+              <h4 className="text-xs font-bold text-slate-700">عمليات البيع المسجلة:</h4>
+              
+              {loadingHistory ? (
+                <div className="py-12 text-center text-slate-500 flex flex-col items-center justify-center gap-3">
+                  <Loader2 className="w-6 h-6 animate-spin text-[#128C7E]" />
+                  <p className="text-xs font-bold">جاري تحميل سجل المبيعات...</p>
+                </div>
+              ) : salesHistory.length > 0 ? (
+                <div className="overflow-x-auto no-scrollbar border border-slate-150 rounded-2xl max-h-[300px]">
+                  <table className="w-full text-right border-collapse text-xs">
+                    <thead>
+                      <tr className="bg-slate-50 border-b border-slate-150 text-[11px] font-bold text-slate-500">
+                        <th className="py-2.5 px-3 text-right">الزبون</th>
+                        <th className="py-2.5 px-3 text-center">التاريخ</th>
+                        <th className="py-2.5 px-3 text-center">الكمية المباعة</th>
+                        <th className="py-2.5 px-3 text-left">سعر البيع</th>
+                        <th className="py-2.5 px-3 text-center">حالة الفاتورة</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-slate-100">
+                      {salesHistory.map((item, idx) => (
+                        <tr key={idx} className="hover:bg-slate-50/50">
+                          <td className="py-2.5 px-3 font-bold text-slate-800 text-right">{item.customer_name}</td>
+                          <td className="py-2.5 px-3 text-slate-500 text-center" dir="ltr">
+                            {new Date(item.created_at).toLocaleDateString('ar-EG', { year: 'numeric', month: 'numeric', day: 'numeric' })}
+                          </td>
+                          <td className="py-2.5 px-3 font-extrabold text-slate-700 text-center">{item.quantity} صندوق/قطعة</td>
+                          <td className="py-2.5 px-3 font-bold text-emerald-600 text-left">
+                            {item.price_at_purchase > 0 ? `${Number(item.price_at_purchase).toFixed(2)} TL` : 'غير مسعر'}
+                          </td>
+                          <td className="py-2.5 px-3 text-center">
+                            <span className={`inline-block px-2 py-0.5 rounded-full text-[9px] font-bold ${
+                              item.status === 'delivered' ? 'bg-emerald-50 text-emerald-700 border border-emerald-150' : 
+                              item.status === 'postponed' ? 'bg-amber-50 text-amber-700 border border-amber-150' :
+                              'bg-blue-50 text-blue-700 border border-blue-150'
+                            }`}>
+                              {item.status === 'delivered' ? 'تم تسليمها' : 
+                               item.status === 'postponed' ? 'مؤجلة' : 'قيد الانتظار'}
+                            </span>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              ) : (
+                <div className="text-center py-12 border border-dashed border-slate-200 rounded-2xl bg-slate-50/50 space-y-1">
+                  <ShoppingBag className="w-8 h-8 text-slate-300 mx-auto" />
+                  <p className="text-xs font-bold text-slate-600">لا توجد عمليات بيع مسجلة لهذا المنتج بعد.</p>
+                  <p className="text-[10px] text-slate-500">سيظهر هنا قائمة الزبائن والأسعار بمجرد بيع هذا المنتج في فواتيرهم.</p>
+                </div>
+              )}
+            </div>
           </div>
         </div>
       )}
