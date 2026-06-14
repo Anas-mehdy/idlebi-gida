@@ -1164,110 +1164,131 @@ export default function AdminDashboard() {
                     {/* Item Details */}
                 <div className="space-y-2">
                   {order.order_items.map((item) => (
-                    <div key={item.id} className="flex justify-between items-center text-xs text-slate-600">
-                      <div className="flex items-center gap-2">
-                        {item.product_image || item.products?.image_url ? (
-                          <img 
-                            src={item.product_image || item.products?.image_url || undefined} 
-                            onClick={() => setActivePreviewImage(item.product_image || item.products?.image_url || null)}
-                            className="w-14 h-14 rounded-lg object-cover shrink-0 border border-slate-200 cursor-zoom-in hover:brightness-95 transition-all" 
-                            alt={item.product_name || item.products?.name || ''} 
-                          />
-                        ) : (
-                          <ShoppingBag className="w-14 h-14 p-2.5 bg-white text-slate-400 border border-slate-200 rounded-lg shrink-0" />
-                        )}
-                        <span>{item.product_name || item.products?.name || 'منتج غير متوفر'}</span>
-                      </div>
-                      <div className="flex items-center gap-2 shrink-0">
-                        {/* Quantity Counter */}
-                        <div className="flex items-center border border-slate-250 rounded-lg overflow-hidden bg-white" dir="ltr">
-                          <button
-                            type="button"
-                            onClick={() => {
-                              const currentQty = editedQuantities[item.id] !== undefined ? editedQuantities[item.id] : item.quantity;
-                              if (currentQty > 1) {
-                                setEditedQuantities(prev => ({ ...prev, [item.id]: currentQty - 1 }));
-                              }
-                            }}
-                            className="px-2 py-1 bg-slate-50 hover:bg-slate-100 active:bg-slate-200 text-slate-600 font-extrabold cursor-pointer border-r border-slate-200 transition-colors"
-                            disabled={isUpdating}
-                          >
-                            -
-                          </button>
-                          <input
-                            type="number"
-                            min="1"
-                            value={editedQuantities[item.id] !== undefined ? editedQuantities[item.id] : item.quantity}
-                            onChange={(e) => {
-                              const val = parseInt(e.target.value) || 1;
-                              setEditedQuantities(prev => ({ ...prev, [item.id]: val }));
-                            }}
-                            className="w-8 text-center text-xs font-bold font-mono outline-none border-none py-1 text-slate-800"
-                            disabled={isUpdating}
-                          />
-                          <button
-                            type="button"
-                            onClick={() => {
-                              const currentQty = editedQuantities[item.id] !== undefined ? editedQuantities[item.id] : item.quantity;
-                              setEditedQuantities(prev => ({ ...prev, [item.id]: currentQty + 1 }));
-                            }}
-                            className="px-2 py-1 bg-slate-50 hover:bg-slate-100 active:bg-slate-200 text-slate-600 font-extrabold cursor-pointer border-l border-slate-200 transition-colors"
-                            disabled={isUpdating}
-                          >
-                            +
-                          </button>
-                        </div>
-                        <span className="text-xs font-bold text-slate-500">صندوق ×</span>
-                        <div className="relative">
-                          <input
-                            type="number"
-                            step="0.01"
-                            min="0"
-                            placeholder="السعر (TL)"
-                            value={editedPrices[item.id] !== undefined ? editedPrices[item.id] : (item.price_at_purchase !== null && item.price_at_purchase !== undefined && Number(item.price_at_purchase) > 0 ? item.price_at_purchase.toString() : '')}
-                            onFocus={() => setFocusedItemId(item.id)}
-                            onBlur={() => {
-                              setTimeout(() => setFocusedItemId(null), 200);
-                            }}
-                            onChange={(e) => {
-                              setEditedPrices(prev => ({
-                                ...prev,
-                                [item.id]: e.target.value
-                              }));
-                            }}
-                            className="w-16 bg-white border border-slate-250 outline-none rounded-lg px-1.5 py-1 text-xs text-slate-800 focus:border-[#128C7E] focus:ring-1 focus:ring-[#128C7E] transition-all text-center font-bold font-mono"
-                            disabled={isUpdating}
-                          />
-                          {focusedItemId === item.id && lastSoldPrices[item.product_id || item.product_name || ''] !== undefined && (
-                            <button
-                              type="button"
-                              onMouseDown={(e) => {
-                                e.preventDefault();
-                                const suggestedPrice = lastSoldPrices[item.product_id || item.product_name || ''];
-                                setEditedPrices(prev => ({
-                                  ...prev,
-                                  [item.id]: suggestedPrice.toString()
-                                }));
-                                setFocusedItemId(null);
-                              }}
-                              className="absolute z-10 bottom-full mb-1.5 right-0 bg-[#128C7E] text-white hover:bg-[#128C7E]/95 text-[10px] font-bold py-1 px-2 rounded-lg shadow-md cursor-pointer flex items-center gap-1 whitespace-nowrap border border-emerald-500"
-                            >
-                              <span>السعر الأخير:</span>
-                              <span className="font-mono">{lastSoldPrices[item.product_id || item.product_name || '']} TL</span>
-                            </button>
+                    <div key={item.id} className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-3 py-2.5 border-b border-slate-100 last:border-b-0 text-xs text-slate-600">
+                      {/* Product Image & Name */}
+                      <div className="flex items-center justify-between sm:justify-start gap-2 w-full sm:w-auto">
+                        <div className="flex items-center gap-2">
+                          {item.product_image || item.products?.image_url ? (
+                            <img 
+                              src={item.product_image || item.products?.image_url || undefined} 
+                              onClick={() => setActivePreviewImage(item.product_image || item.products?.image_url || null)}
+                              className="w-12 h-12 sm:w-14 sm:h-14 rounded-lg object-cover shrink-0 border border-slate-200 cursor-zoom-in hover:brightness-95 transition-all" 
+                              alt={item.product_name || item.products?.name || ''} 
+                            />
+                          ) : (
+                            <ShoppingBag className="w-12 h-12 sm:w-14 sm:h-14 p-2 sm:p-2.5 bg-white text-slate-400 border border-slate-200 rounded-lg shrink-0" />
                           )}
+                          <span className="font-bold text-slate-800 text-right">{item.product_name || item.products?.name || 'منتج غير متوفر'}</span>
                         </div>
-                        <span className="text-[10px] text-slate-450 font-bold">TL</span>
-                        
+                        {/* Mobile Delete Button */}
                         <button
                           type="button"
                           onClick={() => handleDeleteOrderItem(order.id, item.id)}
                           disabled={isUpdating}
-                          className="p-1 text-rose-500 hover:text-rose-700 hover:bg-rose-50 rounded-lg transition-colors cursor-pointer shrink-0 ml-1"
+                          className="sm:hidden p-1.5 text-rose-500 hover:text-rose-700 hover:bg-rose-50 rounded-lg transition-colors cursor-pointer shrink-0"
                           title="حذف هذا البند"
                         >
-                          <Trash2 className="w-4 h-4" />
+                          <Trash2 className="w-4.5 h-4.5" />
                         </button>
+                      </div>
+
+                      {/* Controls Group */}
+                      <div className="flex items-center justify-between sm:justify-end gap-2.5 w-full sm:w-auto bg-slate-50/50 sm:bg-transparent p-2 sm:p-0 rounded-xl border border-slate-100 sm:border-none">
+                        <div className="flex items-center gap-2">
+                          {/* Quantity Counter */}
+                          <div className="flex items-center border border-slate-250 rounded-lg overflow-hidden bg-white" dir="ltr">
+                            <button
+                              type="button"
+                              onClick={() => {
+                                const currentQty = editedQuantities[item.id] !== undefined ? editedQuantities[item.id] : item.quantity;
+                                if (currentQty > 1) {
+                                  setEditedQuantities(prev => ({ ...prev, [item.id]: currentQty - 1 }));
+                                }
+                              }}
+                              className="px-2.5 py-1 bg-slate-50 hover:bg-slate-100 active:bg-slate-200 text-slate-600 font-extrabold cursor-pointer border-r border-slate-200 transition-colors"
+                              disabled={isUpdating}
+                            >
+                              -
+                            </button>
+                            <input
+                              type="number"
+                              min="1"
+                              value={editedQuantities[item.id] !== undefined ? editedQuantities[item.id] : item.quantity}
+                              onChange={(e) => {
+                                const val = parseInt(e.target.value) || 1;
+                                setEditedQuantities(prev => ({ ...prev, [item.id]: val }));
+                              }}
+                              className="w-8 text-center text-xs font-bold font-mono outline-none border-none py-1 text-slate-800"
+                              disabled={isUpdating}
+                            />
+                            <button
+                              type="button"
+                              onClick={() => {
+                                const currentQty = editedQuantities[item.id] !== undefined ? editedQuantities[item.id] : item.quantity;
+                                setEditedQuantities(prev => ({ ...prev, [item.id]: currentQty + 1 }));
+                              }}
+                              className="px-2.5 py-1 bg-slate-50 hover:bg-slate-100 active:bg-slate-200 text-slate-600 font-extrabold cursor-pointer border-l border-slate-200 transition-colors"
+                              disabled={isUpdating}
+                            >
+                              +
+                            </button>
+                          </div>
+                          <span className="text-xs font-bold text-slate-500">صندوق ×</span>
+                        </div>
+
+                        <div className="flex items-center gap-1.5">
+                          <div className="relative">
+                            <input
+                              type="number"
+                              step="0.01"
+                              min="0"
+                              placeholder="السعر (TL)"
+                              value={editedPrices[item.id] !== undefined ? editedPrices[item.id] : (item.price_at_purchase !== null && item.price_at_purchase !== undefined && Number(item.price_at_purchase) > 0 ? item.price_at_purchase.toString() : '')}
+                              onFocus={() => setFocusedItemId(item.id)}
+                              onBlur={() => {
+                                setTimeout(() => setFocusedItemId(null), 200);
+                              }}
+                              onChange={(e) => {
+                                setEditedPrices(prev => ({
+                                  ...prev,
+                                  [item.id]: e.target.value
+                                }));
+                              }}
+                              className="w-16 bg-white border border-slate-250 outline-none rounded-lg px-1.5 py-1 text-xs text-slate-800 focus:border-[#128C7E] focus:ring-1 focus:ring-[#128C7E] transition-all text-center font-bold font-mono"
+                              disabled={isUpdating}
+                            />
+                            {focusedItemId === item.id && lastSoldPrices[item.product_id || item.product_name || ''] !== undefined && (
+                              <button
+                                type="button"
+                                onMouseDown={(e) => {
+                                  e.preventDefault();
+                                  const suggestedPrice = lastSoldPrices[item.product_id || item.product_name || ''];
+                                  setEditedPrices(prev => ({
+                                    ...prev,
+                                    [item.id]: suggestedPrice.toString()
+                                  }));
+                                  setFocusedItemId(null);
+                                }}
+                                className="absolute z-10 bottom-full mb-1.5 right-0 bg-[#128C7E] text-white hover:bg-[#128C7E]/95 text-[10px] font-bold py-1 px-2 rounded-lg shadow-md cursor-pointer flex items-center gap-1 whitespace-nowrap border border-emerald-500"
+                              >
+                                <span>السعر الأخير:</span>
+                                <span className="font-mono">{lastSoldPrices[item.product_id || item.product_name || '']} TL</span>
+                              </button>
+                            )}
+                          </div>
+                          <span className="text-[10px] text-slate-450 font-bold">TL</span>
+                          
+                          {/* Desktop Delete Button */}
+                          <button
+                            type="button"
+                            onClick={() => handleDeleteOrderItem(order.id, item.id)}
+                            disabled={isUpdating}
+                            className="hidden sm:block p-1 text-rose-500 hover:text-rose-700 hover:bg-rose-50 rounded-lg transition-colors cursor-pointer shrink-0 ml-1"
+                            title="حذف هذا البند"
+                          >
+                            <Trash2 className="w-4 h-4" />
+                          </button>
+                        </div>
                       </div>
                     </div>
                   ))}
@@ -1828,110 +1849,131 @@ export default function AdminDashboard() {
                     {/* Item Details */}
                 <div className="space-y-2">
                   {order.order_items.map((item) => (
-                    <div key={item.id} className="flex justify-between items-center text-xs text-slate-600">
-                      <div className="flex items-center gap-2">
-                        {item.product_image || item.products?.image_url ? (
-                          <img 
-                            src={item.product_image || item.products?.image_url || undefined} 
-                            onClick={() => setActivePreviewImage(item.product_image || item.products?.image_url || null)}
-                            className="w-14 h-14 rounded-lg object-cover shrink-0 border border-slate-200 cursor-zoom-in hover:brightness-95 transition-all" 
-                            alt={item.product_name || item.products?.name || ''} 
-                          />
-                        ) : (
-                          <ShoppingBag className="w-14 h-14 p-2.5 bg-white text-slate-400 border border-slate-200 rounded-lg shrink-0" />
-                        )}
-                        <span>{item.product_name || item.products?.name || 'منتج غير متوفر'}</span>
-                      </div>
-                      <div className="flex items-center gap-2 shrink-0">
-                        {/* Quantity Counter */}
-                        <div className="flex items-center border border-slate-250 rounded-lg overflow-hidden bg-white" dir="ltr">
-                          <button
-                            type="button"
-                            onClick={() => {
-                              const currentQty = editedQuantities[item.id] !== undefined ? editedQuantities[item.id] : item.quantity;
-                              if (currentQty > 1) {
-                                setEditedQuantities(prev => ({ ...prev, [item.id]: currentQty - 1 }));
-                              }
-                            }}
-                            className="px-2 py-1 bg-slate-50 hover:bg-slate-100 active:bg-slate-200 text-slate-600 font-extrabold cursor-pointer border-r border-slate-200 transition-colors"
-                            disabled={isUpdating}
-                          >
-                            -
-                          </button>
-                          <input
-                            type="number"
-                            min="1"
-                            value={editedQuantities[item.id] !== undefined ? editedQuantities[item.id] : item.quantity}
-                            onChange={(e) => {
-                              const val = parseInt(e.target.value) || 1;
-                              setEditedQuantities(prev => ({ ...prev, [item.id]: val }));
-                            }}
-                            className="w-8 text-center text-xs font-bold font-mono outline-none border-none py-1 text-slate-800"
-                            disabled={isUpdating}
-                          />
-                          <button
-                            type="button"
-                            onClick={() => {
-                              const currentQty = editedQuantities[item.id] !== undefined ? editedQuantities[item.id] : item.quantity;
-                              setEditedQuantities(prev => ({ ...prev, [item.id]: currentQty + 1 }));
-                            }}
-                            className="px-2 py-1 bg-slate-50 hover:bg-slate-100 active:bg-slate-200 text-slate-600 font-extrabold cursor-pointer border-l border-slate-200 transition-colors"
-                            disabled={isUpdating}
-                          >
-                            +
-                          </button>
-                        </div>
-                        <span className="text-xs font-bold text-slate-500">صندوق ×</span>
-                        <div className="relative">
-                          <input
-                            type="number"
-                            step="0.01"
-                            min="0"
-                            placeholder="السعر (TL)"
-                            value={editedPrices[item.id] !== undefined ? editedPrices[item.id] : (item.price_at_purchase !== null && item.price_at_purchase !== undefined && Number(item.price_at_purchase) > 0 ? item.price_at_purchase.toString() : '')}
-                            onFocus={() => setFocusedItemId(item.id)}
-                            onBlur={() => {
-                              setTimeout(() => setFocusedItemId(null), 200);
-                            }}
-                            onChange={(e) => {
-                              setEditedPrices(prev => ({
-                                ...prev,
-                                [item.id]: e.target.value
-                              }));
-                            }}
-                            className="w-16 bg-white border border-slate-250 outline-none rounded-lg px-1.5 py-1 text-xs text-slate-800 focus:border-[#128C7E] focus:ring-1 focus:ring-[#128C7E] transition-all text-center font-bold font-mono"
-                            disabled={isUpdating}
-                          />
-                          {focusedItemId === item.id && lastSoldPrices[item.product_id || item.product_name || ''] !== undefined && (
-                            <button
-                              type="button"
-                              onMouseDown={(e) => {
-                                e.preventDefault();
-                                const suggestedPrice = lastSoldPrices[item.product_id || item.product_name || ''];
-                                setEditedPrices(prev => ({
-                                  ...prev,
-                                  [item.id]: suggestedPrice.toString()
-                                }));
-                                setFocusedItemId(null);
-                              }}
-                              className="absolute z-10 bottom-full mb-1.5 right-0 bg-[#128C7E] text-white hover:bg-[#128C7E]/95 text-[10px] font-bold py-1 px-2 rounded-lg shadow-md cursor-pointer flex items-center gap-1 whitespace-nowrap border border-emerald-500"
-                            >
-                              <span>السعر الأخير:</span>
-                              <span className="font-mono">{lastSoldPrices[item.product_id || item.product_name || '']} TL</span>
-                            </button>
+                    <div key={item.id} className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-3 py-2.5 border-b border-slate-100 last:border-b-0 text-xs text-slate-600">
+                      {/* Product Image & Name */}
+                      <div className="flex items-center justify-between sm:justify-start gap-2 w-full sm:w-auto">
+                        <div className="flex items-center gap-2">
+                          {item.product_image || item.products?.image_url ? (
+                            <img 
+                              src={item.product_image || item.products?.image_url || undefined} 
+                              onClick={() => setActivePreviewImage(item.product_image || item.products?.image_url || null)}
+                              className="w-12 h-12 sm:w-14 sm:h-14 rounded-lg object-cover shrink-0 border border-slate-200 cursor-zoom-in hover:brightness-95 transition-all" 
+                              alt={item.product_name || item.products?.name || ''} 
+                            />
+                          ) : (
+                            <ShoppingBag className="w-12 h-12 sm:w-14 sm:h-14 p-2 sm:p-2.5 bg-white text-slate-400 border border-slate-200 rounded-lg shrink-0" />
                           )}
+                          <span className="font-bold text-slate-800 text-right">{item.product_name || item.products?.name || 'منتج غير متوفر'}</span>
                         </div>
-                        <span className="text-[10px] text-slate-450 font-bold">TL</span>
-                        
+                        {/* Mobile Delete Button */}
                         <button
                           type="button"
                           onClick={() => handleDeleteOrderItem(order.id, item.id)}
                           disabled={isUpdating}
-                          className="p-1 text-rose-500 hover:text-rose-700 hover:bg-rose-50 rounded-lg transition-colors cursor-pointer shrink-0 ml-1"
+                          className="sm:hidden p-1.5 text-rose-500 hover:text-rose-700 hover:bg-rose-50 rounded-lg transition-colors cursor-pointer shrink-0"
                           title="حذف هذا البند"
                         >
-                          <Trash2 className="w-4 h-4" />
+                          <Trash2 className="w-4.5 h-4.5" />
                         </button>
+                      </div>
+
+                      {/* Controls Group */}
+                      <div className="flex items-center justify-between sm:justify-end gap-2.5 w-full sm:w-auto bg-slate-50/50 sm:bg-transparent p-2 sm:p-0 rounded-xl border border-slate-100 sm:border-none">
+                        <div className="flex items-center gap-2">
+                          {/* Quantity Counter */}
+                          <div className="flex items-center border border-slate-250 rounded-lg overflow-hidden bg-white" dir="ltr">
+                            <button
+                              type="button"
+                              onClick={() => {
+                                const currentQty = editedQuantities[item.id] !== undefined ? editedQuantities[item.id] : item.quantity;
+                                if (currentQty > 1) {
+                                  setEditedQuantities(prev => ({ ...prev, [item.id]: currentQty - 1 }));
+                                }
+                              }}
+                              className="px-2.5 py-1 bg-slate-50 hover:bg-slate-100 active:bg-slate-200 text-slate-600 font-extrabold cursor-pointer border-r border-slate-200 transition-colors"
+                              disabled={isUpdating}
+                            >
+                              -
+                            </button>
+                            <input
+                              type="number"
+                              min="1"
+                              value={editedQuantities[item.id] !== undefined ? editedQuantities[item.id] : item.quantity}
+                              onChange={(e) => {
+                                const val = parseInt(e.target.value) || 1;
+                                setEditedQuantities(prev => ({ ...prev, [item.id]: val }));
+                              }}
+                              className="w-8 text-center text-xs font-bold font-mono outline-none border-none py-1 text-slate-800"
+                              disabled={isUpdating}
+                            />
+                            <button
+                              type="button"
+                              onClick={() => {
+                                const currentQty = editedQuantities[item.id] !== undefined ? editedQuantities[item.id] : item.quantity;
+                                setEditedQuantities(prev => ({ ...prev, [item.id]: currentQty + 1 }));
+                              }}
+                              className="px-2.5 py-1 bg-slate-50 hover:bg-slate-100 active:bg-slate-200 text-slate-600 font-extrabold cursor-pointer border-l border-slate-200 transition-colors"
+                              disabled={isUpdating}
+                            >
+                              +
+                            </button>
+                          </div>
+                          <span className="text-xs font-bold text-slate-500">صندوق ×</span>
+                        </div>
+
+                        <div className="flex items-center gap-1.5">
+                          <div className="relative">
+                            <input
+                              type="number"
+                              step="0.01"
+                              min="0"
+                              placeholder="السعر (TL)"
+                              value={editedPrices[item.id] !== undefined ? editedPrices[item.id] : (item.price_at_purchase !== null && item.price_at_purchase !== undefined && Number(item.price_at_purchase) > 0 ? item.price_at_purchase.toString() : '')}
+                              onFocus={() => setFocusedItemId(item.id)}
+                              onBlur={() => {
+                                setTimeout(() => setFocusedItemId(null), 200);
+                              }}
+                              onChange={(e) => {
+                                setEditedPrices(prev => ({
+                                  ...prev,
+                                  [item.id]: e.target.value
+                                }));
+                              }}
+                              className="w-16 bg-white border border-slate-250 outline-none rounded-lg px-1.5 py-1 text-xs text-slate-800 focus:border-[#128C7E] focus:ring-1 focus:ring-[#128C7E] transition-all text-center font-bold font-mono"
+                              disabled={isUpdating}
+                            />
+                            {focusedItemId === item.id && lastSoldPrices[item.product_id || item.product_name || ''] !== undefined && (
+                              <button
+                                type="button"
+                                onMouseDown={(e) => {
+                                  e.preventDefault();
+                                  const suggestedPrice = lastSoldPrices[item.product_id || item.product_name || ''];
+                                  setEditedPrices(prev => ({
+                                    ...prev,
+                                    [item.id]: suggestedPrice.toString()
+                                  }));
+                                  setFocusedItemId(null);
+                                }}
+                                className="absolute z-10 bottom-full mb-1.5 right-0 bg-[#128C7E] text-white hover:bg-[#128C7E]/95 text-[10px] font-bold py-1 px-2 rounded-lg shadow-md cursor-pointer flex items-center gap-1 whitespace-nowrap border border-emerald-500"
+                              >
+                                <span>السعر الأخير:</span>
+                                <span className="font-mono">{lastSoldPrices[item.product_id || item.product_name || '']} TL</span>
+                              </button>
+                            )}
+                          </div>
+                          <span className="text-[10px] text-slate-450 font-bold">TL</span>
+                          
+                          {/* Desktop Delete Button */}
+                          <button
+                            type="button"
+                            onClick={() => handleDeleteOrderItem(order.id, item.id)}
+                            disabled={isUpdating}
+                            className="hidden sm:block p-1 text-rose-500 hover:text-rose-700 hover:bg-rose-50 rounded-lg transition-colors cursor-pointer shrink-0 ml-1"
+                            title="حذف هذا البند"
+                          >
+                            <Trash2 className="w-4 h-4" />
+                          </button>
+                        </div>
                       </div>
                     </div>
                   ))}
