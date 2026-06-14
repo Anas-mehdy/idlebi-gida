@@ -2,7 +2,13 @@
 
 import React, { useState, useEffect } from 'react';
 import { supabase } from '@/lib/supabase';
-import { TrendingUp, DollarSign, FileText, Users, ShoppingBag, Calendar, Search, RefreshCw, X, AlertCircle, Loader2 } from 'lucide-react';
+import { 
+  TrendingUp, DollarSign, FileText, Users, ShoppingBag, Calendar, 
+  Search, RefreshCw, X, AlertCircle, Loader2,
+  Trash2, Copy, Download, Printer
+} from 'lucide-react';
+import { jsPDF } from 'jspdf';
+import html2canvas from 'html2canvas-pro';
 
 interface OrderItem {
   id: string;
@@ -39,6 +45,11 @@ export default function AdminStatistics() {
   const [loading, setLoading] = useState(true);
   const [usingMockData, setUsingMockData] = useState(false);
   const [activePreviewImage, setActivePreviewImage] = useState<string | null>(null);
+  
+  // Printing and updating states
+  const [printType, setPrintType] = useState<'aggregation' | 'invoice' | 'receipt' | 'aggregation_receipt'>('invoice');
+  const [activePrintOrder, setActivePrintOrder] = useState<Order | null>(null);
+  const [isUpdating, setIsUpdating] = useState(false);
 
   // Filters
   const [dateFilter, setDateFilter] = useState('');
@@ -146,6 +157,120 @@ export default function AdminStatistics() {
     } finally {
       setLoading(false);
     }
+  };
+
+  // Delete archived order
+  const handleDeleteOrder = async (orderId: string, customerName: string) => {
+    const confirmAction = window.confirm(`هل أنت متأكد من حذف هذه الفاتورة المؤرشفة لـ "${customerName}" نهائياً من النظام؟ لا يمكن التراجع عن هذه الخطوة.`);
+    if (!confirmAction) return;
+
+    setIsUpdating(true);
+    try {
+      const isUrlConfigured = process.env.NEXT_PUBLIC_SUPABASE_URL && !process.env.NEXT_PUBLIC_SUPABASE_URL.includes('placeholder');
+      
+      if (isUrlConfigured) {
+        const { error } = await supabase
+          .from('orders')
+          .delete()
+          .eq('id', orderId);
+
+        if (error) throw error;
+      } else {
+        console.log('Database not connected. Bypassing state delete in demo mode.');
+      }
+
+      // Remove order from state
+      const updatedOrders = orders.filter(o => o.id !== orderId);
+      setOrders(updatedOrders);
+      alert('تم حذف الفاتورة بنجاح!');
+    } catch (err: any) {
+      console.error(err);
+      alert('حدث خطأ أثناء حذف الفاتورة.');
+    } finally {
+      setIsUpdating(false);
+    }
+  };
+
+  // Copy Direct Link
+  const handleCopyInvoiceLink = (orderId: string, totalPrice: number) => {
+    if (totalPrice <= 0) {
+      alert('يرجى تسعير الفاتورة أولاً قبل نسخ الرابط.');
+      return;
+    }
+    const invoiceUrl = `${window.location.origin}/invoice/${orderId}`;
+    navigator.clipboard.writeText(invoiceUrl);
+    alert('تم نسخ رابط الفاتورة المباشر إلى الحافظة بنجاح!');
+  };
+
+  // Optimized PDF Download for WhatsApp sharing
+  const handleDownloadPDF = async (order: Order) => {
+    setIsUpdating(true);
+    try {
+      setPrintType('invoice');
+      setActivePrintOrder(order);
+
+      // Wait for DOM layout
+      await new Promise((resolve) => setTimeout(resolve, 400));
+
+      const input = document.getElementById('customer-invoice-print-sheet');
+      if (!input) {
+        alert('لم يتم العثور على هيكل الفاتورة للتحويل.');
+        return;
+      }
+
+      const canvas = await html2canvas(input, {
+        scale: 1.5,
+        useCORS: true,
+        logging: false,
+        backgroundColor: '#ffffff'
+      });
+
+      const imgData = canvas.toDataURL('image/jpeg', 0.75);
+      
+      const pdf = new jsPDF('p', 'mm', 'a4');
+      const imgWidth = 210;
+      const pageHeight = 297;
+      const imgHeight = (canvas.height * imgWidth) / canvas.width;
+      let heightLeft = imgHeight;
+      let position = 0;
+
+      const imageAlias = `invoice-${order.id}`;
+
+      pdf.addImage(imgData, 'JPEG', 0, position, imgWidth, imgHeight, imageAlias, 'FAST');
+      heightLeft -= pageHeight;
+
+      while (heightLeft >= 0) {
+        position = heightLeft - imgHeight;
+        pdf.addPage();
+        pdf.addImage(imgData, 'JPEG', 0, position, imgWidth, imgHeight, imageAlias, 'FAST');
+        heightLeft -= pageHeight;
+      }
+
+      pdf.save(`فاتورة_${order.customer_name.replace(/\s+/g, '_')}_${order.id.substring(0, 8)}.pdf`);
+    } catch (error) {
+      console.error('Error generating PDF:', error);
+      alert('حدث خطأ أثناء تصدير ملف PDF.');
+    } finally {
+      setIsUpdating(false);
+    }
+  };
+
+  // Print A4 Invoice
+  const handlePrintInvoice = (order: Order) => {
+    setPrintType('invoice');
+    setActivePrintOrder(order);
+    setTimeout(() => {
+      window.print();
+    }, 150);
+  };
+
+  // Print 80mm Receipt
+  const handlePrintReceipt = (order: Order) => {
+    setPrintType('receipt');
+    setActivePrintOrder(order);
+    setTimeout(() => {
+      window.print();
+    }, 150);
   };
 
   useEffect(() => {
@@ -410,6 +535,56 @@ export default function AdminStatistics() {
                     <span className="font-mono text-sm bg-[#128C7E]/10 px-2 py-0.5 rounded-lg">{order.order_items.reduce((sum, item) => sum + item.quantity, 0)} صندوق</span>
                   </div>
                 </div>
+
+                {/* Actions Buttons for Archived Orders */}
+                <div className="flex flex-wrap items-center gap-2 pt-3 border-t border-slate-200 print:hidden">
+                  <button
+                    onClick={() => handleDeleteOrder(order.id, order.customer_name)}
+                    disabled={isUpdating}
+                    className="col-span-2 sm:col-auto bg-red-50 hover:bg-red-100 border border-red-250 text-red-700 font-bold px-3 py-2 sm:py-1.5 rounded-xl text-xs flex items-center justify-center gap-1 cursor-pointer transition-all active:scale-95 shadow-sm disabled:opacity-50"
+                    title="حذف هذه الفاتورة نهائياً من الأرشيف"
+                  >
+                    <Trash2 className="w-3.5 h-3.5" />
+                    <span>حذف الفاتورة</span>
+                  </button>
+
+                  <button
+                    onClick={() => handleCopyInvoiceLink(order.id, order.total_price)}
+                    className="col-span-1 sm:col-auto bg-slate-50 hover:bg-slate-100 border border-slate-250 text-slate-600 hover:text-slate-800 font-bold px-3 py-2 sm:py-1.5 rounded-xl text-xs flex items-center justify-center gap-1 cursor-pointer transition-all active:scale-95 shadow-sm w-full sm:w-auto"
+                    title="نسخ رابط الفاتورة المباشر"
+                  >
+                    <Copy className="w-3.5 h-3.5" />
+                    <span>نسخ الرابط</span>
+                  </button>
+
+                  <button
+                    onClick={() => handleDownloadPDF(order)}
+                    disabled={isUpdating}
+                    className="col-span-1 sm:col-auto bg-teal-50 hover:bg-teal-100 border border-teal-250 text-teal-700 font-bold px-3 py-2 sm:py-1.5 rounded-xl text-xs flex items-center justify-center gap-1 cursor-pointer transition-all active:scale-95 shadow-sm disabled:opacity-50 w-full sm:w-auto"
+                    title="تحميل الفاتورة كـ PDF للواتساب"
+                  >
+                    <Download className="w-3.5 h-3.5" />
+                    <span>تصدير PDF<span className="hidden sm:inline"> للواتساب</span></span>
+                  </button>
+
+                  <button
+                    onClick={() => handlePrintInvoice(order)}
+                    className="col-span-1 sm:col-auto bg-blue-50 hover:bg-blue-100 border border-blue-250 text-blue-700 font-bold px-3 py-2 sm:py-1.5 rounded-xl text-xs flex items-center justify-center gap-1 cursor-pointer transition-all active:scale-95 shadow-sm w-full sm:w-auto"
+                    title="طباعة الفاتورة A4"
+                  >
+                    <Printer className="w-3.5 h-3.5" />
+                    <span>طباعة A4</span>
+                  </button>
+
+                  <button
+                    onClick={() => handlePrintReceipt(order)}
+                    className="col-span-1 sm:col-auto bg-amber-50 hover:bg-amber-100 border border-amber-250 text-amber-700 font-bold px-3 py-2 sm:py-1.5 rounded-xl text-xs flex items-center justify-center gap-1 cursor-pointer transition-all active:scale-95 shadow-sm w-full sm:w-auto"
+                    title="طباعة إيصال حراري 80 مم"
+                  >
+                    <Printer className="w-3.5 h-3.5" />
+                    <span>إيصال 80 مم</span>
+                  </button>
+                </div>
               </div>
             ))}
           </div>
@@ -497,6 +672,212 @@ export default function AdminStatistics() {
               alt="Preview" 
               className="max-w-full max-h-[85vh] object-contain rounded-xl shadow-2xl border border-white/5 select-none"
             />
+          </div>
+        </div>
+      )}
+
+      {/* 3. Print-only Layout: Customer Invoice Print Sheet */}
+      {activePrintOrder && (
+        <div 
+          id="customer-invoice-print-sheet" 
+          className={`absolute left-[-9999px] top-[-9999px] w-[790px] bg-white font-sans text-right p-8 ${printType === 'invoice' ? 'print:static print:block print:w-full print:p-0' : 'print:hidden'}`} 
+          dir="rtl"
+        >
+          {/* Header */}
+          <div className="border-b-2 border-slate-900 pb-4 mb-6">
+            <div className="flex justify-between items-start">
+              <div>
+                <h1 className="text-xl font-black text-slate-850">İDELBİ GIDA TİCARET LİMİTED ŞİRKETİ</h1>
+                <p className="text-xs text-slate-500 font-bold mt-1">Gıda Ürünleri İthalat İhracat ve Toptan Ticareti</p>
+                <p className="text-[11px] text-slate-400 mt-0.5">Esenler, İstanbul</p>
+              </div>
+              <div className="text-left font-mono text-xs text-slate-500">
+                <p>تاريخ الفاتورة: {new Date(activePrintOrder.created_at).toLocaleDateString('ar-EG', { dateStyle: 'long' })}</p>
+                <p>رقم الفاتورة: #{activePrintOrder.id.substring(0, 8).toUpperCase()}</p>
+              </div>
+            </div>
+            <div className="text-center mt-4">
+              <span className="text-2xl font-black border-2 border-slate-900 px-6 py-1.5 inline-block bg-slate-50 rounded-lg">فـاتـورة مـبـيـعـات</span>
+            </div>
+          </div>
+
+          {/* Customer Metadata */}
+          <div className="grid grid-cols-2 gap-4 bg-slate-50 border border-slate-200 rounded-xl p-4 mb-6 text-sm">
+            <div>
+              <span className="text-slate-500 font-bold">السيد / السادة: </span>
+              <span className="font-extrabold text-slate-800">{activePrintOrder.customer_name}</span>
+            </div>
+            <div className="text-left">
+              <span className="text-slate-550 font-bold">حالة الدفع: </span>
+              <span className="font-extrabold text-[#128C7E]">مسلمة / مؤرشفة</span>
+            </div>
+          </div>
+
+          {/* Pricing Grid */}
+          <table className="w-full border-collapse border border-slate-350 text-sm">
+            <thead>
+              <tr className="bg-slate-100 border-b border-slate-350">
+                <th className="border border-slate-350 px-3 py-2 text-center font-black w-12">م</th>
+                <th className="border border-slate-350 px-3 py-2 text-right font-black">الصنف (اسم المادة)</th>
+                <th className="border border-slate-350 px-3 py-2 text-center font-black w-24">الكمية</th>
+                <th className="border border-slate-350 px-3 py-2 text-center font-black w-32">السعر الإفرادي</th>
+                <th className="border border-slate-350 px-3 py-2 text-center font-black w-32">الإجمالي</th>
+              </tr>
+            </thead>
+            <tbody>
+              {activePrintOrder.order_items.map((item, idx) => {
+                const price = Number(item.price_at_purchase || 0);
+                const qty = item.quantity;
+                const total = price * qty;
+                return (
+                  <tr key={item.id} className="border-b border-slate-300">
+                    <td className="border border-slate-355 px-3 py-2.5 text-center font-bold font-mono">{idx + 1}</td>
+                    <td className="border border-slate-355 px-3 py-2.5 font-bold text-slate-800">{item.product_name || item.products?.name || 'منتج غير معروف'}</td>
+                    <td className="border border-slate-355 px-3 py-2.5 text-center font-black font-mono">{qty} صندوق</td>
+                    <td className="border border-slate-355 px-3 py-2.5 text-center font-extrabold font-mono">{price.toFixed(2)} TL</td>
+                    <td className="border border-slate-355 px-3 py-2.5 text-center font-black font-mono">{total.toFixed(2)} TL</td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+
+          {/* Summary / Total section */}
+          <div className="mt-6 border border-slate-350 rounded-xl p-4 bg-slate-50 flex justify-between items-center">
+            <div className="text-xs text-slate-550 font-bold">
+              <span>إجمالي الصناديق: </span>
+              <span className="font-extrabold text-slate-800 text-sm font-mono mr-1">
+                {activePrintOrder.order_items.reduce((sum, item) => sum + item.quantity, 0)} صندوق
+              </span>
+            </div>
+            <div className="text-right">
+              <span className="text-slate-700 font-black text-md">المجموع الكلي النهائي:</span>
+              <span className="text-xl font-black text-[#128C7E] font-mono mr-2 bg-emerald-50 border border-emerald-200 px-3 py-1 rounded-lg">
+                {Number(activePrintOrder.total_price).toFixed(2)} TL
+              </span>
+            </div>
+          </div>
+
+          {/* Signature / Notes */}
+          <div className="grid grid-cols-2 gap-4 mt-16 text-center text-xs">
+            <div>
+              <p className="text-slate-400 font-bold mb-8">توقيع المستلم</p>
+              <div className="border-b border-slate-300 w-40 mx-auto"></div>
+            </div>
+            <div>
+              <p className="text-slate-400 font-bold mb-8">خاتم وتوقيع الشركة</p>
+              <div className="border-b border-slate-300 w-40 mx-auto"></div>
+            </div>
+          </div>
+
+          <div className="mt-16 text-center text-[10px] text-slate-400 border-t border-slate-200 pt-4 font-bold">
+            * شكراً لتعاملكم معنا • تمنياتنا لكم بالرزق والتوفيق • İDELBİ GIDA
+          </div>
+        </div>
+      )}
+
+      {/* Dynamic Style for 80mm Thermal Printing */}
+      {(printType === 'receipt' || printType === 'aggregation_receipt') && (
+        <style dangerouslySetInnerHTML={{ __html: `
+          @media print {
+            @page {
+              size: 80mm auto;
+              margin: 0 !important;
+            }
+            html, body {
+              margin: 0 !important;
+              padding: 0 !important;
+              width: 80mm !important;
+              background-color: #fff !important;
+              color: #000 !important;
+            }
+            /* Reset dashboard layout wrappers to prevent them from squishing the print width */
+            .min-h-screen {
+              display: block !important;
+              padding: 0 !important;
+              margin: 0 !important;
+              min-height: 0 !important;
+              background: transparent !important;
+            }
+            main {
+              padding: 0 !important;
+              margin: 0 !important;
+              overflow: visible !important;
+              display: block !important;
+              width: 80mm !important;
+            }
+            main > div {
+              max-width: none !important;
+              width: 100% !important;
+              padding: 0 !important;
+              margin: 0 !important;
+            }
+          }
+        `}} />
+      )}
+
+      {/* 4. Print-only Layout: 80mm Thermal Receipt Print Sheet */}
+      {printType === 'receipt' && activePrintOrder && (
+        <div className="hidden print:block thermal-container font-sans text-right text-[13px] bg-white text-black p-3.5 w-full max-w-[80mm] mx-auto leading-relaxed" dir="rtl">
+          {/* Header */}
+          <div className="text-center border-b border-dashed border-black pb-2 mb-3">
+            <h1 className="text-lg font-black uppercase tracking-wide">İDELBİ GIDA</h1>
+            <p className="text-sm mt-0.5 font-bold">İDELBİ GIDA TİCARET L.Ş.</p>
+            <p className="text-xs text-black">Esenler, İstanbul</p>
+            <p className="text-xs font-black mt-2 border border-black py-0.5 px-3 inline-block rounded">إيصال مبيعات</p>
+          </div>
+
+          {/* Metadata */}
+          <div className="text-xs space-y-1 mb-3 pb-2 border-b border-dashed border-black">
+            <p><strong>العميل:</strong> {activePrintOrder.customer_name}</p>
+            <p><strong>التاريخ:</strong> <span className="font-mono">{new Date(activePrintOrder.created_at).toLocaleDateString('ar-EG', { dateStyle: 'short' })}</span></p>
+            <p><strong>رقم الفاتورة:</strong> <span className="font-mono">#{activePrintOrder.id.substring(0, 8).toUpperCase()}</span></p>
+          </div>
+
+          {/* Items Table */}
+          <table className="w-full text-[13px] mb-3 border-collapse">
+            <thead>
+              <tr className="border-b-2 border-black text-right font-bold">
+                <th className="pb-1.5 w-[55%]">الصنف</th>
+                <th className="pb-1.5 text-center w-[20%]">الكمية</th>
+                <th className="pb-1.5 text-left w-[25%]">الإجمالي</th>
+              </tr>
+            </thead>
+            <tbody>
+              {activePrintOrder.order_items.map((item) => {
+                const price = Number(item.price_at_purchase || 0);
+                const qty = item.quantity;
+                const total = price * qty;
+                return (
+                  <tr key={item.id} className="border-b border-dashed border-black/30">
+                    <td className="py-2 pr-0.5">
+                      <div className="font-bold text-[13px]">{item.product_name || item.products?.name || 'مادة'}</div>
+                      <div className="text-[11px] text-black/70 font-mono mt-0.5">{price.toFixed(2)} TL</div>
+                    </td>
+                    <td className="py-2 text-center font-bold font-mono text-[13px]">{qty}</td>
+                    <td className="py-2 text-left font-bold font-mono text-[13px]">{total.toFixed(2)} TL</td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+
+          {/* Summary */}
+          <div className="border-t-2 border-black pt-2.5 space-y-2 text-[13px] font-bold">
+            <div className="flex justify-between">
+              <span>إجمالي الصناديق:</span>
+              <span className="font-mono">{activePrintOrder.order_items.reduce((sum, item) => sum + item.quantity, 0)} صندوق</span>
+            </div>
+            <div className="flex justify-between text-sm border-t border-dashed border-black pt-2 font-black">
+              <span>المجموع الكلي:</span>
+              <span className="font-mono text-lg">{Number(activePrintOrder.total_price).toFixed(2)} TL</span>
+            </div>
+          </div>
+
+          {/* Footer */}
+          <div className="text-center mt-8 pt-2.5 border-t border-dashed border-black text-[11px] text-black/85">
+            <p className="font-bold">شكراً لتعاملكم معنا</p>
+            <p className="mt-1 font-mono text-[10px] text-black/60">İDELBİ GIDA • 80mm Thermal</p>
           </div>
         </div>
       )}
