@@ -742,7 +742,7 @@ export default function AdminDashboard() {
       )}
 
       {/* Overview Analytics Header */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
+      <div className="max-w-xs">
         <div 
           className="bg-white border border-slate-200 rounded-2xl p-5 flex items-center gap-4 shadow-sm"
           style={{ transform: 'translate3d(0, 0, 0)', backfaceVisibility: 'hidden' }}
@@ -753,32 +753,6 @@ export default function AdminDashboard() {
           <div>
             <p className="text-xs text-slate-500 font-bold">زبائن اليوم المعلقين</p>
             <h3 className="text-2xl font-black text-slate-850 mt-1">{orders.filter(o => o.status === 'pending').length} زبائن</h3>
-          </div>
-        </div>
-
-        <div 
-          className="bg-white border border-slate-200 rounded-2xl p-5 flex items-center gap-4 shadow-sm"
-          style={{ transform: 'translate3d(0, 0, 0)', backfaceVisibility: 'hidden' }}
-        >
-          <div className="bg-emerald-500/10 p-4 rounded-2xl text-emerald-600 border border-emerald-500/20">
-            <DollarSign className="w-6 h-6" />
-          </div>
-          <div>
-            <p className="text-xs text-slate-500 font-bold">إجمالي مبيعات اليوم المعلقة</p>
-            <h3 className="text-2xl font-black text-emerald-600 mt-1">{totalRevenueToday.toFixed(2)} TL</h3>
-          </div>
-        </div>
-
-        <div 
-          className="bg-white border border-slate-200 rounded-2xl p-5 flex items-center gap-4 shadow-sm"
-          style={{ transform: 'translate3d(0, 0, 0)', backfaceVisibility: 'hidden' }}
-        >
-          <div className="bg-emerald-500/10 p-4 rounded-2xl text-emerald-600 border border-emerald-500/20">
-            <ShoppingBag className="w-6 h-6" />
-          </div>
-          <div>
-            <p className="text-xs text-slate-500 font-bold">أنواع السلع المطلوبة</p>
-            <h3 className="text-2xl font-black text-slate-850 mt-1">{aggregatedItems.length} سلع مختلفة</h3>
           </div>
         </div>
       </div>
