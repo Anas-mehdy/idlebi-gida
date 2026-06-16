@@ -5,7 +5,7 @@ import { supabase } from '@/lib/supabase';
 import { 
   TrendingUp, DollarSign, FileText, Users, ShoppingBag, Calendar, 
   Search, RefreshCw, X, AlertCircle, Loader2,
-  Trash2, Copy, Download, Printer
+  Trash2, Copy, Download, Printer, Plus, Edit3, Save
 } from 'lucide-react';
 import { jsPDF } from 'jspdf';
 import html2canvas from 'html2canvas-pro';
@@ -50,6 +50,23 @@ export default function AdminStatistics() {
   const [printType, setPrintType] = useState<'aggregation' | 'invoice' | 'receipt' | 'aggregation_receipt'>('invoice');
   const [activePrintOrder, setActivePrintOrder] = useState<Order | null>(null);
   const [isUpdating, setIsUpdating] = useState(false);
+
+  // Editing states
+  const [editingOrderId, setEditingOrderId] = useState<string | null>(null);
+  const [editedPrices, setEditedPrices] = useState<{[itemId: string]: string}>({});
+  const [editedQuantities, setEditedQuantities] = useState<{[itemId: string]: number}>({});
+  const [allProducts, setAllProducts] = useState<any[]>([]);
+  const [showAddForm, setShowAddForm] = useState<{[orderId: string]: boolean}>({});
+  const [selectedProdForOrder, setSelectedProdForOrder] = useState<{[orderId: string]: string}>({});
+  const [addQtyForOrder, setAddQtyForOrder] = useState<{[orderId: string]: number}>({});
+  const [addPriceForOrder, setAddPriceForOrder] = useState<{[orderId: string]: string}>({});
+  const [prodSearchQuery, setProdSearchQuery] = useState<{[orderId: string]: string}>({});
+  const [showCustomAddForm, setShowCustomAddForm] = useState<{[orderId: string]: boolean}>({});
+  const [customProductName, setCustomProductName] = useState<{[orderId: string]: string}>({});
+  const [customProductQty, setCustomProductQty] = useState<{[orderId: string]: number}>({});
+  const [customProductPrice, setCustomProductPrice] = useState<{[orderId: string]: string}>({});
+  const [lastSoldPrices, setLastSoldPrices] = useState<Record<string, number>>({});
+  const [focusedItemId, setFocusedItemId] = useState<string | null>(null);
 
   // Filters
   const [startDateFilter, setStartDateFilter] = useState('');
@@ -274,8 +291,303 @@ export default function AdminStatistics() {
     }, 150);
   };
 
+  // Fetch all products for add-product forms
+  const fetchAllProducts = async () => {
+    try {
+      const isUrlConfigured = process.env.NEXT_PUBLIC_SUPABASE_URL && !process.env.NEXT_PUBLIC_SUPABASE_URL.includes('placeholder');
+      if (!isUrlConfigured) return;
+
+      const { data, error } = await supabase
+        .from('products')
+        .select('id, name, image_url')
+        .order('name');
+
+      if (error) throw error;
+      setAllProducts(data || []);
+    } catch (err) {
+      console.warn('Could not fetch products list.', err);
+    }
+  };
+
+  // Fetch last sold prices from order_items
+  const fetchLastSoldPrices = async () => {
+    try {
+      const isUrlConfigured = process.env.NEXT_PUBLIC_SUPABASE_URL && !process.env.NEXT_PUBLIC_SUPABASE_URL.includes('placeholder');
+      if (!isUrlConfigured) return;
+
+      const { data, error } = await supabase
+        .from('order_items')
+        .select('product_id, product_name, price_at_purchase')
+        .not('price_at_purchase', 'is', null)
+        .gt('price_at_purchase', 0);
+
+      if (!error && data) {
+        const pricesMap: Record<string, number> = {};
+        data.forEach((item: any) => {
+          const key = item.product_id || item.product_name;
+          if (key && Number(item.price_at_purchase) > 0) {
+            pricesMap[key] = Number(item.price_at_purchase);
+          }
+        });
+        setLastSoldPrices(pricesMap);
+      }
+    } catch (err) {
+      console.warn('Could not fetch last sold prices.', err);
+    }
+  };
+
+  // Save edited prices and quantities for a delivered order
+  const handleSaveArchivedPrices = async (orderId: string) => {
+    const order = orders.find(o => o.id === orderId);
+    if (!order) return;
+
+    setIsUpdating(true);
+    try {
+      const isUrlConfigured = process.env.NEXT_PUBLIC_SUPABASE_URL && !process.env.NEXT_PUBLIC_SUPABASE_URL.includes('placeholder');
+
+      const itemsToUpdate = order.order_items.map(item => {
+        const newPriceStr = editedPrices[item.id];
+        const newPrice = newPriceStr !== undefined && newPriceStr !== '' ? parseFloat(newPriceStr) : (item.price_at_purchase || 0);
+        const newQty = editedQuantities[item.id] !== undefined ? editedQuantities[item.id] : item.quantity;
+        return {
+          id: item.id,
+          order_id: orderId,
+          product_id: item.product_id,
+          quantity: newQty,
+          price_at_purchase: newPrice
+        };
+      });
+
+      const newTotalPrice = itemsToUpdate.reduce((sum, item) => sum + (item.quantity * item.price_at_purchase), 0);
+
+      if (isUrlConfigured) {
+        const { error: itemsError } = await supabase
+          .from('order_items')
+          .upsert(itemsToUpdate);
+        if (itemsError) throw itemsError;
+
+        const { error: orderError } = await supabase
+          .from('orders')
+          .update({ total_price: newTotalPrice })
+          .eq('id', orderId);
+        if (orderError) throw orderError;
+      }
+
+      // Update local state
+      const updatedOrders = orders.map(o => {
+        if (o.id === orderId) {
+          return {
+            ...o,
+            total_price: newTotalPrice,
+            order_items: o.order_items.map(item => {
+              const newPriceStr = editedPrices[item.id];
+              const newPrice = newPriceStr !== undefined && newPriceStr !== '' ? parseFloat(newPriceStr) : item.price_at_purchase;
+              const newQty = editedQuantities[item.id] !== undefined ? editedQuantities[item.id] : item.quantity;
+              return { ...item, price_at_purchase: newPrice, quantity: newQty };
+            })
+          };
+        }
+        return o;
+      });
+
+      // Update in-memory last sold prices
+      const updatedLastPrices = { ...lastSoldPrices };
+      itemsToUpdate.forEach(item => {
+        const productName = order.order_items.find(oi => oi.id === item.id)?.product_name || '';
+        const key = item.product_id || productName;
+        if (key && item.price_at_purchase > 0) {
+          updatedLastPrices[key] = item.price_at_purchase;
+        }
+      });
+      setLastSoldPrices(updatedLastPrices);
+
+      setOrders(updatedOrders);
+      setEditingOrderId(null);
+      setEditedPrices({});
+      setEditedQuantities({});
+      alert('تم حفظ التعديلات وتحديث إجمالي الفاتورة بنجاح!');
+    } catch (err: any) {
+      console.error(err);
+      alert('حدث خطأ أثناء حفظ الفاتورة.');
+    } finally {
+      setIsUpdating(false);
+    }
+  };
+
+  // Add item from store to archived order
+  const handleAddArchivedOrderItem = async (orderId: string) => {
+    const prodId = selectedProdForOrder[orderId];
+    if (!prodId) { alert('يرجى اختيار منتج أولاً.'); return; }
+    const qty = addQtyForOrder[orderId] || 1;
+    const priceStr = addPriceForOrder[orderId];
+    const price = priceStr ? parseFloat(priceStr) : 0;
+    if (qty <= 0) { alert('الكمية يجب أن تكون أكبر من الصفر.'); return; }
+
+    const selectedProduct = allProducts.find(p => p.id === prodId);
+    if (!selectedProduct) return;
+
+    setIsUpdating(true);
+    try {
+      const isUrlConfigured = process.env.NEXT_PUBLIC_SUPABASE_URL && !process.env.NEXT_PUBLIC_SUPABASE_URL.includes('placeholder');
+      const order = orders.find(o => o.id === orderId);
+      if (!order) return;
+
+      const existingItem = order.order_items.find(item => item.product_id === prodId);
+      let newTotalPrice = 0;
+      if (existingItem) {
+        newTotalPrice = order.order_items.reduce((sum, item) => {
+          const itemPrice = item.id === existingItem.id ? price : (item.price_at_purchase || 0);
+          const itemQty = item.id === existingItem.id ? (item.quantity + qty) : item.quantity;
+          return sum + (itemQty * itemPrice);
+        }, 0);
+      } else {
+        newTotalPrice = order.order_items.reduce((sum, item) => sum + (item.quantity * (item.price_at_purchase || 0)), 0) + (qty * price);
+      }
+
+      let insertedId = 'temp-' + Date.now();
+
+      if (isUrlConfigured) {
+        if (existingItem) {
+          const { error } = await supabase.from('order_items').update({ quantity: existingItem.quantity + qty, price_at_purchase: price }).eq('id', existingItem.id);
+          if (error) throw error;
+        } else {
+          const { data: insertData, error } = await supabase.from('order_items').insert({ order_id: orderId, product_id: prodId, quantity: qty, price_at_purchase: price, product_name: selectedProduct.name, product_image: selectedProduct.image_url }).select();
+          if (error) throw error;
+          if (insertData && insertData[0]) insertedId = insertData[0].id;
+        }
+        const { error: orderError } = await supabase.from('orders').update({ total_price: newTotalPrice }).eq('id', orderId);
+        if (orderError) throw orderError;
+      }
+
+      const updatedOrders = orders.map(o => {
+        if (o.id === orderId) {
+          let newItems = [...o.order_items];
+          if (existingItem) {
+            newItems = newItems.map(item => item.id === existingItem.id ? { ...item, quantity: item.quantity + qty, price_at_purchase: price } : item);
+          } else {
+            newItems.push({ id: insertedId, order_id: orderId, product_id: prodId, quantity: qty, price_at_purchase: price, product_name: selectedProduct.name, product_image: selectedProduct.image_url, products: { name: selectedProduct.name, image_url: selectedProduct.image_url } });
+          }
+          return { ...o, total_price: newTotalPrice, order_items: newItems };
+        }
+        return o;
+      });
+
+      setOrders(updatedOrders);
+      setShowAddForm(prev => ({ ...prev, [orderId]: false }));
+      setSelectedProdForOrder(prev => ({ ...prev, [orderId]: '' }));
+      setAddQtyForOrder(prev => ({ ...prev, [orderId]: 1 }));
+      setAddPriceForOrder(prev => ({ ...prev, [orderId]: '' }));
+      setProdSearchQuery(prev => ({ ...prev, [orderId]: '' }));
+      alert('تم إضافة المنتج بنجاح!');
+    } catch (err: any) {
+      console.error(err);
+      alert('حدث خطأ أثناء إضافة المنتج.');
+    } finally {
+      setIsUpdating(false);
+    }
+  };
+
+  // Add custom item to archived order
+  const handleAddCustomArchivedOrderItem = async (orderId: string) => {
+    const name = (customProductName[orderId] || '').trim();
+    if (!name) { alert('يرجى إدخال اسم المنتج.'); return; }
+    const qty = customProductQty[orderId] || 1;
+    const priceStr = customProductPrice[orderId];
+    const price = priceStr ? parseFloat(priceStr) : 0;
+    if (qty <= 0) { alert('الكمية يجب أن تكون أكبر من الصفر.'); return; }
+
+    setIsUpdating(true);
+    try {
+      const isUrlConfigured = process.env.NEXT_PUBLIC_SUPABASE_URL && !process.env.NEXT_PUBLIC_SUPABASE_URL.includes('placeholder');
+      const order = orders.find(o => o.id === orderId);
+      if (!order) return;
+
+      const newTotalPrice = order.order_items.reduce((sum, item) => sum + (item.quantity * (item.price_at_purchase || 0)), 0) + (qty * price);
+      let insertedId = 'temp-' + Date.now();
+
+      if (isUrlConfigured) {
+        const { data: insertData, error } = await supabase.from('order_items').insert({ order_id: orderId, product_id: null, quantity: qty, price_at_purchase: price, product_name: name, product_image: null }).select();
+        if (error) throw error;
+        if (insertData && insertData[0]) insertedId = insertData[0].id;
+
+        const { error: orderError } = await supabase.from('orders').update({ total_price: newTotalPrice }).eq('id', orderId);
+        if (orderError) throw orderError;
+      }
+
+      const updatedOrders = orders.map(o => {
+        if (o.id === orderId) {
+          const newItems = [...o.order_items];
+          newItems.push({ id: insertedId, order_id: orderId, product_id: null, quantity: qty, price_at_purchase: price, product_name: name, product_image: null, products: null });
+          return { ...o, total_price: newTotalPrice, order_items: newItems };
+        }
+        return o;
+      });
+
+      setOrders(updatedOrders);
+      setShowCustomAddForm(prev => ({ ...prev, [orderId]: false }));
+      setCustomProductName(prev => ({ ...prev, [orderId]: '' }));
+      setCustomProductQty(prev => ({ ...prev, [orderId]: 1 }));
+      setCustomProductPrice(prev => ({ ...prev, [orderId]: '' }));
+      alert('تم إضافة المنتج المخصص بنجاح!');
+    } catch (err: any) {
+      console.error(err);
+      alert('حدث خطأ أثناء إضافة المنتج المخصص.');
+    } finally {
+      setIsUpdating(false);
+    }
+  };
+
+  // Delete item from archived order
+  const handleDeleteArchivedOrderItem = async (orderId: string, itemId: string) => {
+    const confirmAction = window.confirm('هل أنت متأكد من حذف هذا البند من الفاتورة؟');
+    if (!confirmAction) return;
+
+    setIsUpdating(true);
+    try {
+      const isUrlConfigured = process.env.NEXT_PUBLIC_SUPABASE_URL && !process.env.NEXT_PUBLIC_SUPABASE_URL.includes('placeholder');
+      const order = orders.find(o => o.id === orderId);
+      if (!order) return;
+
+      const remainingItems = order.order_items.filter(item => item.id !== itemId);
+      const newTotalPrice = remainingItems.reduce((sum, item) => sum + (item.quantity * (item.price_at_purchase || 0)), 0);
+
+      if (isUrlConfigured) {
+        const { error: deleteError } = await supabase.from('order_items').delete().eq('id', itemId);
+        if (deleteError) throw deleteError;
+        const { error: orderError } = await supabase.from('orders').update({ total_price: newTotalPrice }).eq('id', orderId);
+        if (orderError) throw orderError;
+      }
+
+      const updatedOrders = orders.map(o => {
+        if (o.id === orderId) {
+          return { ...o, total_price: newTotalPrice, order_items: remainingItems };
+        }
+        return o;
+      });
+
+      setOrders(updatedOrders);
+      alert('تم حذف البند وتحديث إجمالي الفاتورة بنجاح!');
+    } catch (err: any) {
+      console.error(err);
+      alert('حدث خطأ أثناء حذف البند.');
+    } finally {
+      setIsUpdating(false);
+    }
+  };
+
+  // Cancel editing
+  const handleCancelEditing = () => {
+    setEditingOrderId(null);
+    setEditedPrices({});
+    setEditedQuantities({});
+    setShowAddForm({});
+    setShowCustomAddForm({});
+  };
+
   useEffect(() => {
     fetchHistoricalOrders();
+    fetchAllProducts();
+    fetchLastSoldPrices();
   }, []);
 
   // Filter logic on the fly
@@ -534,40 +846,291 @@ export default function AdminStatistics() {
 
                 {/* Item Details */}
                 <div className="space-y-2">
-                  {order.order_items.map((item) => (
-                    <div key={item.id} className="flex justify-between items-center text-xs text-slate-655">
-                      <div className="flex items-center gap-2">
-                        {item.product_image || item.products?.image_url ? (
-                          <img 
-                            src={item.product_image || item.products?.image_url || undefined} 
-                            onClick={() => setActivePreviewImage(item.product_image || item.products?.image_url || null)}
-                            className="w-14 h-14 rounded-lg object-cover shrink-0 border border-slate-200 cursor-zoom-in hover:brightness-95 transition-all" 
-                            alt={item.product_name || item.products?.name || ''} 
-                          />
-                        ) : (
-                          <ShoppingBag className="w-14 h-14 p-2.5 bg-white text-slate-400 border border-slate-200 rounded-lg shrink-0" />
-                        )}
-                        <span>{item.product_name || item.products?.name || 'منتج غير متوفر'}</span>
+                  {editingOrderId === order.id ? (
+                    /* === EDIT MODE === */
+                    <>
+                      {order.order_items.map((item) => (
+                        <div key={item.id} className="bg-white border border-slate-200 rounded-xl p-3 space-y-2.5">
+                          {/* Item Name Row */}
+                          <div className="flex items-center justify-between gap-2">
+                            <div className="flex items-center gap-2">
+                              {item.product_image || item.products?.image_url ? (
+                                <img 
+                                  src={item.product_image || item.products?.image_url || undefined} 
+                                  className="w-10 h-10 rounded-lg object-cover shrink-0 border border-slate-200" 
+                                  alt={item.product_name || item.products?.name || ''} 
+                                />
+                              ) : (
+                                <ShoppingBag className="w-10 h-10 p-1.5 bg-slate-50 text-slate-400 border border-slate-200 rounded-lg shrink-0" />
+                              )}
+                              <span className="font-bold text-xs text-slate-800">{item.product_name || item.products?.name || 'منتج غير متوفر'}</span>
+                            </div>
+                            <button
+                              type="button"
+                              onClick={() => handleDeleteArchivedOrderItem(order.id, item.id)}
+                              disabled={isUpdating}
+                              className="p-1.5 text-rose-500 hover:text-rose-700 hover:bg-rose-50 rounded-lg transition-colors cursor-pointer shrink-0"
+                              title="حذف هذا البند"
+                            >
+                              <Trash2 className="w-4 h-4" />
+                            </button>
+                          </div>
+
+                          {/* Controls Row */}
+                          <div className="flex items-center justify-between gap-2 flex-wrap">
+                            <div className="flex items-center gap-2">
+                              {/* Quantity Counter */}
+                              <div className="flex items-center border border-slate-250 rounded-lg overflow-hidden bg-white" dir="ltr">
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    const currentQty = editedQuantities[item.id] !== undefined ? editedQuantities[item.id] : item.quantity;
+                                    if (currentQty > 1) {
+                                      setEditedQuantities(prev => ({ ...prev, [item.id]: currentQty - 1 }));
+                                    }
+                                  }}
+                                  className="px-2.5 py-1 bg-slate-50 hover:bg-slate-100 active:bg-slate-200 text-slate-600 font-extrabold cursor-pointer border-r border-slate-200 transition-colors"
+                                  disabled={isUpdating}
+                                >
+                                  -
+                                </button>
+                                <input
+                                  type="number"
+                                  min="1"
+                                  value={editedQuantities[item.id] !== undefined ? editedQuantities[item.id] : item.quantity}
+                                  onChange={(e) => {
+                                    const val = parseInt(e.target.value) || 1;
+                                    setEditedQuantities(prev => ({ ...prev, [item.id]: val }));
+                                  }}
+                                  className="w-8 text-center text-xs font-bold font-mono outline-none border-none py-1 text-slate-800"
+                                  disabled={isUpdating}
+                                />
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    const currentQty = editedQuantities[item.id] !== undefined ? editedQuantities[item.id] : item.quantity;
+                                    setEditedQuantities(prev => ({ ...prev, [item.id]: currentQty + 1 }));
+                                  }}
+                                  className="px-2.5 py-1 bg-slate-50 hover:bg-slate-100 active:bg-slate-200 text-slate-600 font-extrabold cursor-pointer border-l border-slate-200 transition-colors"
+                                  disabled={isUpdating}
+                                >
+                                  +
+                                </button>
+                              </div>
+                              <span className="text-xs font-bold text-slate-500">صندوق ×</span>
+                            </div>
+
+                            <div className="flex items-center gap-1.5">
+                              <div className="relative">
+                                <input
+                                  type="number"
+                                  step="0.01"
+                                  min="0"
+                                  placeholder="السعر (TL)"
+                                  value={editedPrices[item.id] !== undefined ? editedPrices[item.id] : (item.price_at_purchase !== null && item.price_at_purchase !== undefined && Number(item.price_at_purchase) > 0 ? item.price_at_purchase.toString() : '')}
+                                  onFocus={() => setFocusedItemId(item.id)}
+                                  onBlur={() => { setTimeout(() => setFocusedItemId(null), 200); }}
+                                  onChange={(e) => {
+                                    setEditedPrices(prev => ({ ...prev, [item.id]: e.target.value }));
+                                  }}
+                                  className="w-16 bg-white border border-slate-250 outline-none rounded-lg px-1.5 py-1 text-xs text-slate-800 focus:border-[#128C7E] focus:ring-1 focus:ring-[#128C7E] transition-all text-center font-bold font-mono"
+                                  disabled={isUpdating}
+                                />
+                                {focusedItemId === item.id && lastSoldPrices[item.product_id || item.product_name || ''] !== undefined && (
+                                  <button
+                                    type="button"
+                                    onMouseDown={(e) => {
+                                      e.preventDefault();
+                                      const suggestedPrice = lastSoldPrices[item.product_id || item.product_name || ''];
+                                      setEditedPrices(prev => ({ ...prev, [item.id]: suggestedPrice.toString() }));
+                                      setFocusedItemId(null);
+                                    }}
+                                    className="absolute z-10 bottom-full mb-1.5 right-0 bg-[#128C7E] text-white hover:bg-[#128C7E]/95 text-[10px] font-bold py-1 px-2 rounded-lg shadow-md cursor-pointer flex items-center gap-1 whitespace-nowrap border border-emerald-500"
+                                  >
+                                    <span>السعر الأخير:</span>
+                                    <span className="font-mono">{lastSoldPrices[item.product_id || item.product_name || '']} TL</span>
+                                  </button>
+                                )}
+                              </div>
+                              <span className="text-[10px] text-slate-450 font-bold">TL</span>
+                            </div>
+                          </div>
+                        </div>
+                      ))}
+
+                      {/* إحصائية عدد الصناديق الإجمالي للفاتورة */}
+                      <div className="flex justify-between items-center text-xs font-extrabold text-[#128C7E] bg-emerald-50/30 border border-emerald-100/80 rounded-xl px-3.5 py-2 mt-2 shadow-2xs">
+                        <span>إجمالي عدد الصناديق المطلوبة:</span>
+                        <span className="font-mono text-sm bg-[#128C7E]/10 px-2 py-0.5 rounded-lg">
+                          {order.order_items.reduce((sum, item) => sum + (editedQuantities[item.id] !== undefined ? editedQuantities[item.id] : item.quantity), 0)} صندوق
+                        </span>
                       </div>
-                      <span className="font-semibold text-slate-800">
-                        {item.price_at_purchase !== null && item.price_at_purchase !== undefined && Number(item.price_at_purchase) > 0 ? (
-                          `${item.quantity} صندوق × ${Number(item.price_at_purchase).toFixed(2)} TL`
+
+                      {/* Add product forms */}
+                      <div className="mt-3 pt-2 border-t border-dashed border-slate-200">
+                        {!showAddForm[order.id] && !showCustomAddForm[order.id] ? (
+                          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                            <button
+                              type="button"
+                              onClick={() => setShowAddForm(prev => ({ ...prev, [order.id]: true }))}
+                              className="w-full py-2 border border-dashed border-slate-350 hover:border-[#128C7E] rounded-xl text-xs text-slate-600 hover:text-[#128C7E] bg-white transition-all flex items-center justify-center gap-1 cursor-pointer font-bold"
+                            >
+                              <Plus className="w-4 h-4" />
+                              <span>إضافة منتج للفاتورة</span>
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => setShowCustomAddForm(prev => ({ ...prev, [order.id]: true }))}
+                              className="w-full py-2 border border-dashed border-slate-350 hover:border-amber-500 rounded-xl text-xs text-slate-600 hover:text-amber-600 bg-white transition-all flex items-center justify-center gap-1 cursor-pointer font-bold"
+                            >
+                              <Plus className="w-4 h-4" />
+                              <span>اضافة منتج غير موجود بالمتجر</span>
+                            </button>
+                          </div>
+                        ) : showAddForm[order.id] ? (
+                          <div className="bg-slate-100 border border-slate-200 rounded-xl p-3.5 space-y-3.5 shadow-2xs relative">
+                            <div className="flex items-center justify-between">
+                              <span className="text-xs font-extrabold text-slate-700">إضافة بند جديد للفاتورة</span>
+                              <button type="button" onClick={() => { setShowAddForm(prev => ({ ...prev, [order.id]: false })); setSelectedProdForOrder(prev => ({ ...prev, [order.id]: '' })); setProdSearchQuery(prev => ({ ...prev, [order.id]: '' })); }} className="p-1 hover:bg-slate-250 rounded-lg transition-colors cursor-pointer text-slate-400 hover:text-slate-600">
+                                <X className="w-4 h-4" />
+                              </button>
+                            </div>
+                            {/* Search input */}
+                            <div className="space-y-1">
+                              <label className="text-[10px] text-slate-500 font-bold block">بحث عن المنتج في المتجر</label>
+                              <div className="relative">
+                                <Search className="w-3.5 h-3.5 text-slate-400 absolute right-2.5 top-1/2 -translate-y-1/2" />
+                                <input type="text" placeholder="اكتب اسم المنتج للتصفية..." value={prodSearchQuery[order.id] || ''} onChange={(e) => setProdSearchQuery(prev => ({ ...prev, [order.id]: e.target.value }))} className="w-full bg-white border border-slate-250 outline-none rounded-lg pr-8 pl-3 py-2 text-xs text-slate-800 placeholder-slate-400 text-right font-bold focus:border-emerald-600 focus:ring-1 focus:ring-emerald-600 transition-all" />
+                              </div>
+                            </div>
+                            {/* Product list */}
+                            <div className="max-h-32 overflow-y-auto space-y-1 border border-slate-200 rounded-lg bg-white p-1.5">
+                              {allProducts.filter(p => !prodSearchQuery[order.id] || p.name.toLowerCase().includes((prodSearchQuery[order.id] || '').toLowerCase())).map((product) => (
+                                <button key={product.id} type="button" onClick={() => setSelectedProdForOrder(prev => ({ ...prev, [order.id]: product.id }))} className={`w-full text-right px-2.5 py-2 rounded-lg text-xs font-bold flex items-center gap-2 transition-all cursor-pointer ${selectedProdForOrder[order.id] === product.id ? 'bg-[#128C7E]/10 text-[#128C7E] border border-emerald-200' : 'hover:bg-slate-50 text-slate-700'}`}>
+                                  {product.image_url ? <img src={product.image_url} className="w-8 h-8 rounded-md object-cover shrink-0 border border-slate-200" alt="" /> : <ShoppingBag className="w-8 h-8 p-1 bg-slate-50 text-slate-400 border border-slate-200 rounded-md shrink-0" />}
+                                  <span>{product.name}</span>
+                                </button>
+                              ))}
+                            </div>
+                            {/* Qty & Price */}
+                            <div className="grid grid-cols-2 gap-2">
+                              <div className="space-y-1">
+                                <label className="text-[10px] text-slate-500 font-bold block">الكمية</label>
+                                <input type="number" min="1" value={addQtyForOrder[order.id] || 1} onChange={(e) => setAddQtyForOrder(prev => ({ ...prev, [order.id]: parseInt(e.target.value) || 1 }))} className="w-full bg-white border border-slate-250 outline-none rounded-lg px-3 py-2 text-xs text-slate-800 text-center font-bold font-mono focus:border-emerald-600 focus:ring-1 focus:ring-emerald-600 transition-all" />
+                              </div>
+                              <div className="space-y-1">
+                                <label className="text-[10px] text-slate-500 font-bold block">السعر (TL)</label>
+                                <input type="number" step="0.01" min="0" placeholder="0.00" value={addPriceForOrder[order.id] || ''} onChange={(e) => setAddPriceForOrder(prev => ({ ...prev, [order.id]: e.target.value }))} className="w-full bg-white border border-slate-250 outline-none rounded-lg px-3 py-2 text-xs text-slate-800 text-center font-bold font-mono focus:border-emerald-600 focus:ring-1 focus:ring-emerald-600 transition-all" />
+                              </div>
+                            </div>
+                            <button type="button" onClick={() => handleAddArchivedOrderItem(order.id)} disabled={isUpdating || !selectedProdForOrder[order.id]} className="w-full bg-[#128C7E] hover:bg-[#128C7E]/90 disabled:bg-slate-200 disabled:text-slate-400 text-white font-bold py-2.5 rounded-xl text-xs flex items-center justify-center gap-1.5 cursor-pointer transition-all active:scale-95 shadow-sm">
+                              <Plus className="w-4 h-4" /> <span>إضافة المنتج</span>
+                            </button>
+                          </div>
                         ) : (
-                          `${item.quantity} صندوق × يحدد لاحقاً`
+                          /* Custom product form */
+                          <div className="bg-amber-50/50 border border-amber-200 rounded-xl p-3.5 space-y-3.5 shadow-2xs relative">
+                            <div className="flex items-center justify-between">
+                              <span className="text-xs font-extrabold text-amber-800">إضافة منتج مخصص (غير موجود بالمتجر)</span>
+                              <button type="button" onClick={() => { setShowCustomAddForm(prev => ({ ...prev, [order.id]: false })); setCustomProductName(prev => ({ ...prev, [order.id]: '' })); }} className="p-1 hover:bg-amber-100 rounded-lg transition-colors cursor-pointer text-amber-400 hover:text-amber-600">
+                                <X className="w-4 h-4" />
+                              </button>
+                            </div>
+                            <div className="space-y-1">
+                              <label className="text-[10px] text-amber-700 font-bold block">اسم المنتج</label>
+                              <input type="text" placeholder="أدخل اسم المنتج..." value={customProductName[order.id] || ''} onChange={(e) => setCustomProductName(prev => ({ ...prev, [order.id]: e.target.value }))} className="w-full bg-white border border-amber-250 outline-none rounded-lg px-3 py-2 text-xs text-slate-800 placeholder-slate-400 text-right font-bold focus:border-amber-500 focus:ring-1 focus:ring-amber-500 transition-all" />
+                            </div>
+                            <div className="grid grid-cols-2 gap-2">
+                              <div className="space-y-1">
+                                <label className="text-[10px] text-amber-700 font-bold block">الكمية</label>
+                                <input type="number" min="1" value={customProductQty[order.id] || 1} onChange={(e) => setCustomProductQty(prev => ({ ...prev, [order.id]: parseInt(e.target.value) || 1 }))} className="w-full bg-white border border-amber-250 outline-none rounded-lg px-3 py-2 text-xs text-slate-800 text-center font-bold font-mono focus:border-amber-500 focus:ring-1 focus:ring-amber-500 transition-all" />
+                              </div>
+                              <div className="space-y-1">
+                                <label className="text-[10px] text-amber-700 font-bold block">السعر (TL)</label>
+                                <input type="number" step="0.01" min="0" placeholder="0.00" value={customProductPrice[order.id] || ''} onChange={(e) => setCustomProductPrice(prev => ({ ...prev, [order.id]: e.target.value }))} className="w-full bg-white border border-amber-250 outline-none rounded-lg px-3 py-2 text-xs text-slate-800 text-center font-bold font-mono focus:border-amber-500 focus:ring-1 focus:ring-amber-500 transition-all" />
+                              </div>
+                            </div>
+                            <button type="button" onClick={() => handleAddCustomArchivedOrderItem(order.id)} disabled={isUpdating || !(customProductName[order.id] || '').trim()} className="w-full bg-amber-600 hover:bg-amber-700 disabled:bg-slate-200 disabled:text-slate-400 text-white font-bold py-2.5 rounded-xl text-xs flex items-center justify-center gap-1.5 cursor-pointer transition-all active:scale-95 shadow-sm">
+                              <Plus className="w-4 h-4" /> <span>إضافة المنتج المخصص</span>
+                            </button>
+                          </div>
                         )}
-                      </span>
-                    </div>
-                  ))}
-                  
-                  {/* إحصائية عدد الصناديق الإجمالي للفاتورة */}
-                  <div className="flex justify-between items-center text-xs font-extrabold text-[#128C7E] bg-emerald-50/30 border border-emerald-100/80 rounded-xl px-3.5 py-2 mt-2 shadow-2xs">
-                    <span>إجمالي عدد الصناديق المطلوبة:</span>
-                    <span className="font-mono text-sm bg-[#128C7E]/10 px-2 py-0.5 rounded-lg">{order.order_items.reduce((sum, item) => sum + item.quantity, 0)} صندوق</span>
-                  </div>
+                      </div>
+
+                      {/* Save/Cancel buttons */}
+                      <div className="flex items-center gap-2 mt-3 pt-3 border-t border-slate-200">
+                        <button
+                          onClick={() => handleSaveArchivedPrices(order.id)}
+                          disabled={isUpdating}
+                          className="flex-1 bg-[#128C7E] hover:bg-[#128C7E]/90 text-white font-bold py-2.5 rounded-xl text-xs flex items-center justify-center gap-1.5 cursor-pointer transition-all active:scale-95 shadow-sm disabled:opacity-50"
+                        >
+                          <Save className="w-4 h-4" />
+                          <span>حفظ التعديلات</span>
+                        </button>
+                        <button
+                          onClick={handleCancelEditing}
+                          className="flex-1 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold py-2.5 rounded-xl text-xs flex items-center justify-center gap-1.5 cursor-pointer transition-all active:scale-95 shadow-sm border border-slate-200"
+                        >
+                          <X className="w-4 h-4" />
+                          <span>إلغاء</span>
+                        </button>
+                      </div>
+                    </>
+                  ) : (
+                    /* === READ-ONLY MODE === */
+                    <>
+                      {order.order_items.map((item) => (
+                        <div key={item.id} className="flex justify-between items-center text-xs text-slate-655">
+                          <div className="flex items-center gap-2">
+                            {item.product_image || item.products?.image_url ? (
+                              <img 
+                                src={item.product_image || item.products?.image_url || undefined} 
+                                onClick={() => setActivePreviewImage(item.product_image || item.products?.image_url || null)}
+                                className="w-14 h-14 rounded-lg object-cover shrink-0 border border-slate-200 cursor-zoom-in hover:brightness-95 transition-all" 
+                                alt={item.product_name || item.products?.name || ''} 
+                              />
+                            ) : (
+                              <ShoppingBag className="w-14 h-14 p-2.5 bg-white text-slate-400 border border-slate-200 rounded-lg shrink-0" />
+                            )}
+                            <span>{item.product_name || item.products?.name || 'منتج غير متوفر'}</span>
+                          </div>
+                          <span className="font-semibold text-slate-800">
+                            {item.price_at_purchase !== null && item.price_at_purchase !== undefined && Number(item.price_at_purchase) > 0 ? (
+                              `${item.quantity} صندوق × ${Number(item.price_at_purchase).toFixed(2)} TL`
+                            ) : (
+                              `${item.quantity} صندوق × يحدد لاحقاً`
+                            )}
+                          </span>
+                        </div>
+                      ))}
+                      
+                      {/* إحصائية عدد الصناديق الإجمالي للفاتورة */}
+                      <div className="flex justify-between items-center text-xs font-extrabold text-[#128C7E] bg-emerald-50/30 border border-emerald-100/80 rounded-xl px-3.5 py-2 mt-2 shadow-2xs">
+                        <span>إجمالي عدد الصناديق المطلوبة:</span>
+                        <span className="font-mono text-sm bg-[#128C7E]/10 px-2 py-0.5 rounded-lg">{order.order_items.reduce((sum, item) => sum + item.quantity, 0)} صندوق</span>
+                      </div>
+                    </>
+                  )}
                 </div>
 
                 {/* Actions Buttons for Archived Orders */}
                 <div className="flex flex-wrap items-center gap-2 pt-3 border-t border-slate-200 print:hidden">
+                  {editingOrderId !== order.id && (
+                    <button
+                      onClick={() => {
+                        setEditingOrderId(order.id);
+                        setEditedPrices({});
+                        setEditedQuantities({});
+                      }}
+                      disabled={isUpdating || (editingOrderId !== null && editingOrderId !== order.id)}
+                      className="col-span-2 sm:col-auto bg-indigo-50 hover:bg-indigo-100 border border-indigo-250 text-indigo-700 font-bold px-3 py-2 sm:py-1.5 rounded-xl text-xs flex items-center justify-center gap-1 cursor-pointer transition-all active:scale-95 shadow-sm disabled:opacity-50"
+                      title="تعديل هذه الفاتورة"
+                    >
+                      <Edit3 className="w-3.5 h-3.5" />
+                      <span>تعديل الفاتورة</span>
+                    </button>
+                  )}
+
                   <button
                     onClick={() => handleDeleteOrder(order.id, order.customer_name)}
                     disabled={isUpdating}
