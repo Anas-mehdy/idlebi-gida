@@ -73,6 +73,7 @@ export default function AdminDashboard() {
   const [activePrintOrder, setActivePrintOrder] = useState<Order | null>(null);
   const [expandedOrders, setExpandedOrders] = useState<Record<string, boolean>>({});
   const [excludedAggregatedItems, setExcludedAggregatedItems] = useState<Record<string, boolean>>({});
+  const [aggregationExpanded, setAggregationExpanded] = useState(true);
 
   // States for adding custom products not in the store
   const [showCustomAddForm, setShowCustomAddForm] = useState<{[orderId: string]: boolean}>({});
@@ -1596,14 +1597,26 @@ export default function AdminDashboard() {
 
       {/* Layer 1: Global Daily Fulfillment Stats */}
       <div className="bg-white border border-slate-200 rounded-3xl p-6 space-y-5 shadow-sm">
-        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 pb-4 border-b border-slate-100">
+        <div className={`flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 ${aggregationExpanded ? 'pb-4 border-b border-slate-100' : ''}`}>
           <div className="flex items-center gap-3">
+            {/* Collapse/Expand Arrow Button */}
+            <button
+              onClick={() => setAggregationExpanded(!aggregationExpanded)}
+              className="p-1 rounded-lg text-slate-500 hover:bg-slate-200 active:scale-95 transition-all cursor-pointer flex items-center justify-center shrink-0 border border-slate-200"
+              title={aggregationExpanded ? "إغلاق التفاصيل" : "عرض التفاصيل"}
+            >
+              {aggregationExpanded ? (
+                <ChevronUp className="w-4 h-4" />
+              ) : (
+                <ChevronDown className="w-4 h-4" />
+              )}
+            </button>
             <div className="bg-blue-500/10 p-2.5 rounded-xl text-blue-600 border border-blue-500/20">
               <ClipboardList className="w-5 h-5" />
             </div>
             <div>
               <h2 className="text-md font-bold text-slate-800">تجميع الطلبيات الإجمالي لليوم</h2>
-              <p className="text-[11px] text-slate-505">إجمالي الكميات والسلع اللازم تجهيزها من المستودع لتلبية كافة الزبائن</p>
+              <p className="text-[11px] text-slate-500">إجمالي الكميات والسلع اللازم تجهيزها من المستودع لتلبية كافة الزبائن</p>
             </div>
           </div>
 
@@ -1650,57 +1663,59 @@ export default function AdminDashboard() {
           </div>
         </div>
 
-        {aggregatedItems.length > 0 ? (
-          <div className="space-y-4">
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-              {aggregatedItems.map((item, idx) => {
-                const isChecked = !excludedAggregatedItems[item.productName];
-                return (
-                  <div 
-                    key={idx}
-                    className="bg-slate-50 p-4 rounded-2xl border border-slate-200/60 flex items-center justify-between hover:border-slate-300 transition-colors"
-                  >
-                    <div className="flex items-center gap-3">
-                      <input
-                        type="checkbox"
-                        checked={isChecked}
-                        onChange={() => toggleAggregatedItem(item.productName)}
-                        className="w-4 h-4 rounded text-[#128C7E] focus:ring-[#128C7E] border-slate-350 cursor-pointer"
-                      />
-                      {item.imageUrl ? (
-                        <img 
-                          src={item.imageUrl} 
-                          onClick={() => setActivePreviewImage(item.imageUrl || null)}
-                          className="w-14 h-14 rounded-xl object-cover shrink-0 border border-slate-205 cursor-zoom-in hover:brightness-95 transition-all" 
-                          alt={item.productName} 
+        {aggregationExpanded && (
+          aggregatedItems.length > 0 ? (
+            <div className="space-y-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                {aggregatedItems.map((item, idx) => {
+                  const isChecked = !excludedAggregatedItems[item.productName];
+                  return (
+                    <div 
+                      key={idx}
+                      className="bg-slate-50 p-4 rounded-2xl border border-slate-200/60 flex items-center justify-between hover:border-slate-300 transition-colors"
+                    >
+                      <div className="flex items-center gap-3">
+                        <input
+                          type="checkbox"
+                          checked={isChecked}
+                          onChange={() => toggleAggregatedItem(item.productName)}
+                          className="w-4 h-4 rounded text-[#128C7E] focus:ring-[#128C7E] border-slate-350 cursor-pointer"
                         />
-                      ) : (
-                        <ShoppingBag className="w-14 h-14 p-2.5 bg-white text-slate-400 border border-slate-200 rounded-xl shrink-0" />
-                      )}
-                      <span className="text-sm font-semibold text-slate-700">{item.productName}</span>
+                        {item.imageUrl ? (
+                          <img 
+                            src={item.imageUrl} 
+                            onClick={() => setActivePreviewImage(item.imageUrl || null)}
+                            className="w-14 h-14 rounded-xl object-cover shrink-0 border border-slate-205 cursor-zoom-in hover:brightness-95 transition-all" 
+                            alt={item.productName} 
+                          />
+                        ) : (
+                          <ShoppingBag className="w-14 h-14 p-2.5 bg-white text-slate-400 border border-slate-200 rounded-xl shrink-0" />
+                        )}
+                        <span className="text-sm font-semibold text-slate-700">{item.productName}</span>
+                      </div>
+                      <span className="bg-white text-emerald-600 font-extrabold px-3 py-1.5 rounded-xl text-sm border border-slate-200 shrink-0">
+                        {item.totalQty} علبة / صندوق
+                      </span>
                     </div>
-                    <span className="bg-white text-emerald-600 font-extrabold px-3 py-1.5 rounded-xl text-sm border border-slate-200 shrink-0">
-                      {item.totalQty} علبة / صندوق
-                    </span>
-                  </div>
-                );
-              })}
+                  );
+                })}
+              </div>
+              
+              {/* إجمالي عدد الصناديق لتجميع الطلبيات الإجمالي */}
+              <div className="flex justify-between items-center text-xs font-extrabold text-[#128C7E] bg-emerald-50/30 border border-emerald-100/80 rounded-xl px-4 py-3 shadow-2xs">
+                <span>إجمالي عدد الصناديق للمنتجات المحددة:</span>
+                <span className="font-mono text-sm bg-[#128C7E]/10 px-2.5 py-0.5 rounded-lg text-emerald-700">
+                  {printedAggregatedItems.reduce((sum, item) => sum + item.totalQty, 0)} صندوق
+                </span>
+              </div>
             </div>
-            
-            {/* إجمالي عدد الصناديق لتجميع الطلبيات الإجمالي */}
-            <div className="flex justify-between items-center text-xs font-extrabold text-[#128C7E] bg-emerald-50/30 border border-emerald-100/80 rounded-xl px-4 py-3 shadow-2xs">
-              <span>إجمالي عدد الصناديق للمنتجات المحددة:</span>
-              <span className="font-mono text-sm bg-[#128C7E]/10 px-2.5 py-0.5 rounded-lg text-emerald-700">
-                {printedAggregatedItems.reduce((sum, item) => sum + item.totalQty, 0)} صندوق
-              </span>
+          ) : (
+            <div className="text-center py-10 space-y-2">
+              <CheckSquare className="w-10 h-10 text-slate-400 mx-auto" />
+              <h3 className="text-sm font-bold text-slate-700">كل السلع مجهزة وسُلمت للزبائن</h3>
+              <p className="text-xs text-slate-500">لا يوجد منتجات معلقة تحتاج للتجهيز من المستودع حالياً.</p>
             </div>
-          </div>
-        ) : (
-          <div className="text-center py-10 space-y-2">
-            <CheckSquare className="w-10 h-10 text-slate-400 mx-auto" />
-            <h3 className="text-sm font-bold text-slate-700">كل السلع مجهزة وسُلمت للزبائن</h3>
-            <p className="text-xs text-slate-500">لا يوجد منتجات معلقة تحتاج للتجهيز من المستودع حالياً.</p>
-          </div>
+          )
         )}
       </div>
 
