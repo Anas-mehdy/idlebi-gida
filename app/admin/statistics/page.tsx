@@ -5,7 +5,7 @@ import { supabase } from '@/lib/supabase';
 import { 
   TrendingUp, DollarSign, FileText, Users, ShoppingBag, Calendar, 
   Search, RefreshCw, X, AlertCircle, Loader2,
-  Trash2, Copy, Download, Printer, Plus, Edit3, Save
+  Trash2, Copy, Download, Printer, Plus, Edit3, Save, ChevronUp, ChevronDown
 } from 'lucide-react';
 import { jsPDF } from 'jspdf';
 import html2canvas from 'html2canvas-pro';
@@ -67,6 +67,11 @@ export default function AdminStatistics() {
   const [customProductPrice, setCustomProductPrice] = useState<{[orderId: string]: string}>({});
   const [lastSoldPrices, setLastSoldPrices] = useState<Record<string, number>>({});
   const [focusedItemId, setFocusedItemId] = useState<string | null>(null);
+  const [expandedOrders, setExpandedOrders] = useState<Record<string, boolean>>({});
+
+  const toggleOrderExpand = (orderId: string) => {
+    setExpandedOrders(prev => ({ ...prev, [orderId]: !prev[orderId] }));
+  };
 
   // Filters
   const [startDateFilter, setStartDateFilter] = useState('');
@@ -830,13 +835,33 @@ export default function AdminStatistics() {
                 className="bg-slate-50 border border-slate-200 rounded-2xl p-5 space-y-4 hover:border-slate-300 transition-all shadow-xs"
               >
                 {/* Order Header Info */}
-                <div className="flex items-center justify-between pb-3 border-b border-slate-200">
-                  <div>
-                    <h3 className="text-sm font-bold text-slate-800">{order.customer_name}</h3>
-                    <div className="flex items-center gap-2 text-[10px] text-slate-550 mt-1.5">
-                      <span>التاريخ: {formatDate(order.created_at)}</span>
-                      <span>•</span>
-                      <span>الوقت: {formatTime(order.created_at)}</span>
+                <div className={`flex items-center justify-between ${expandedOrders[order.id] || editingOrderId === order.id ? 'pb-3 border-b border-slate-200' : ''}`}>
+                  <div className="flex items-center gap-2.5">
+                    {/* Collapse/Expand Arrow Button */}
+                    <button
+                      onClick={() => toggleOrderExpand(order.id)}
+                      className="p-1 rounded-lg text-slate-500 hover:bg-slate-200 active:scale-95 transition-all cursor-pointer flex items-center justify-center shrink-0 border border-slate-200"
+                      title={expandedOrders[order.id] ? "إغلاق التفاصيل" : "عرض التفاصيل"}
+                    >
+                      {expandedOrders[order.id] || editingOrderId === order.id ? (
+                        <ChevronUp className="w-4 h-4" />
+                      ) : (
+                        <ChevronDown className="w-4 h-4" />
+                      )}
+                    </button>
+                    <div>
+                      <h3 className="text-sm font-bold text-slate-800">{order.customer_name}</h3>
+                      <div className="flex items-center gap-2 text-[10px] text-slate-550 mt-1.5">
+                        <span>التاريخ: {formatDate(order.created_at)}</span>
+                        <span>•</span>
+                        <span>الوقت: {formatTime(order.created_at)}</span>
+                        {!expandedOrders[order.id] && editingOrderId !== order.id && (
+                          <>
+                            <span>•</span>
+                            <span className="font-bold">{order.order_items.reduce((sum, item) => sum + item.quantity, 0)} صندوق</span>
+                          </>
+                        )}
+                      </div>
                     </div>
                   </div>
                   <span className="bg-white border border-slate-200 text-emerald-600 font-extrabold px-3 py-1.5 rounded-xl text-xs shadow-sm">
@@ -844,7 +869,8 @@ export default function AdminStatistics() {
                   </span>
                 </div>
 
-                {/* Item Details */}
+                {(expandedOrders[order.id] || editingOrderId === order.id) && (
+                <>
                 <div className="space-y-2">
                   {editingOrderId === order.id ? (
                     /* === EDIT MODE === */
@@ -1178,6 +1204,7 @@ export default function AdminStatistics() {
                     <span>إيصال 80 مم</span>
                   </button>
                 </div>
+                </>)}
               </div>
             ))}
           </div>
