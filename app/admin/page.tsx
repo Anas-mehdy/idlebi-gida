@@ -17,6 +17,7 @@ interface OrderItem {
   products?: {
     name: string;
     image_url?: string | null;
+    inventory_stock?: number | null;
   } | null;
 }
 
@@ -33,6 +34,7 @@ interface AggregatedItem {
   productName: string;
   totalQty: number;
   imageUrl?: string | null;
+  inventoryStock?: number | null;
 }
 
 interface Customer {
@@ -173,7 +175,8 @@ export default function AdminDashboard() {
             product_image,
             products (
               name,
-              image_url
+              image_url,
+              inventory_stock
             )
           )
         `)
@@ -189,7 +192,11 @@ export default function AdminDashboard() {
           ...item,
           product_name: item.product_name,
           product_image: item.product_image,
-          products: item.products ? { name: item.products.name, image_url: item.products.image_url } : null
+          products: item.products ? { 
+            name: item.products.name, 
+            image_url: item.products.image_url,
+            inventory_stock: item.products.inventory_stock 
+          } : null
         }))
       }));
 
@@ -248,19 +255,34 @@ export default function AdminDashboard() {
       setUsingMockData(false);
     } catch (err) {
       console.warn('Could not fetch active orders from database. Loading preview mode.', err);
+      
+      let localProducts = [];
+      const savedProducts = localStorage.getItem('demo_inventory_products');
+      if (savedProducts) {
+        try {
+          localProducts = JSON.parse(savedProducts);
+        } catch {
+          // ignore
+        }
+      }
+      if (localProducts.length === 0) {
+        localProducts = [
+          { id: 'p1', name: 'بسكويت شوكولاتة أولكر 12 قطعة', price: 45.00, image_url: 'https://images.unsplash.com/photo-1590080875515-8a3a8dc5735e?w=120&auto=format&fit=crop&q=60', inventory_stock: 50 },
+          { id: 'p2', name: 'شوكولاتة داماك بالفستق', price: 65.00, image_url: null, inventory_stock: null },
+          { id: 'p3', name: 'شاي تركي غوكسو 100 ظرف', price: 85.00, image_url: 'https://images.unsplash.com/photo-1576092768241-dec231879fc3?w=120&auto=format&fit=crop&q=60', inventory_stock: 120 },
+          { id: 'p4', name: 'كوكا كولا علب 330 مل', price: 25.00, image_url: 'https://images.unsplash.com/photo-1622483767028-3f66f32aef97?w=120&auto=format&fit=crop&q=60', inventory_stock: null },
+          { id: 'p5', name: 'صلصة طماطم تات 800 غ', price: 55.00, image_url: null, inventory_stock: null },
+          { id: 'p6', name: 'أرز تركي بالدو 1 كغ', price: 70.00, image_url: null, inventory_stock: null },
+          { id: 'p7', name: 'جبنة بيضاء بينار 500 غ', price: 110.00, image_url: null, inventory_stock: null },
+          { id: 'p8', name: 'لبن زبادي سوتاس 1.5 كغ', price: 75.00, image_url: null, inventory_stock: null }
+        ];
+        localStorage.setItem('demo_inventory_products', JSON.stringify(localProducts));
+      }
+      setAllProducts(localProducts);
+
       const mockOrders = getMockOrders();
       setOrders(mockOrders);
-      calculateStats(mockOrders);
-      setAllProducts([
-        { id: 'p1', name: 'بسكويت شوكولاتة أولكر 12 قطعة', price: 45.00, image_url: 'https://images.unsplash.com/photo-1590080875515-8a3a8dc5735e?w=120&auto=format&fit=crop&q=60' },
-        { id: 'p2', name: 'شوكولاتة داماك بالفستق', price: 65.00, image_url: null },
-        { id: 'p3', name: 'شاي تركي غوكسو 100 ظرف', price: 85.00, image_url: 'https://images.unsplash.com/photo-1576092768241-dec231879fc3?w=120&auto=format&fit=crop&q=60' },
-        { id: 'p4', name: 'كوكا كولا علب 330 مل', price: 25.00, image_url: 'https://images.unsplash.com/photo-1622483767028-3f66f32aef97?w=120&auto=format&fit=crop&q=60' },
-        { id: 'p5', name: 'صلصة طماطم تات 800 غ', price: 55.00, image_url: null },
-        { id: 'p6', name: 'أرز تركي بالدو 1 كغ', price: 70.00, image_url: null },
-        { id: 'p7', name: 'جبنة بيضاء بينار 500 غ', price: 110.00, image_url: null },
-        { id: 'p8', name: 'لبن زبادي سوتاس 1.5 كغ', price: 75.00, image_url: null }
-      ]);
+      calculateStats(mockOrders, localProducts);
 
       const localCustomers = JSON.parse(localStorage.getItem('idlebi_customers') || '[]');
       if (localCustomers.length === 0) {
@@ -294,7 +316,7 @@ export default function AdminDashboard() {
     fetchOrders();
   }, []);
 
-  const calculateStats = (activeOrders: Order[]) => {
+  const calculateStats = (activeOrders: Order[], currentProducts?: any[]) => {
     // Only calculate stats for active/pending orders (excluding postponed ones)
     const pendingOrders = activeOrders.filter(o => o.status === 'pending');
 
@@ -304,7 +326,12 @@ export default function AdminDashboard() {
 
     // 2. Aggregate quantities needed for fulfillment (Layer 1)
     const productAggregation: { 
-      [productIdOrName: string]: { productName: string, qty: number, imageUrl?: string | null } 
+      [productIdOrName: string]: { 
+        productName: string, 
+        qty: number, 
+        imageUrl?: string | null,
+        inventoryStock?: number | null 
+      } 
     } = {};
     
     pendingOrders.forEach((order) => {
@@ -313,8 +340,21 @@ export default function AdminDashboard() {
         const imgUrl = item.product_image || item.products?.image_url || null;
         const groupKey = item.product_id || productName;
 
+        let stock = item.products && item.products.inventory_stock !== undefined ? item.products.inventory_stock : null;
+        if (stock === null && item.product_id) {
+          const matchedProd = (currentProducts || allProducts).find(p => p.id === item.product_id);
+          if (matchedProd && matchedProd.inventory_stock !== undefined) {
+            stock = matchedProd.inventory_stock;
+          }
+        }
+
         if (!productAggregation[groupKey]) {
-          productAggregation[groupKey] = { productName, qty: 0, imageUrl: imgUrl };
+          productAggregation[groupKey] = { 
+            productName, 
+            qty: 0, 
+            imageUrl: imgUrl,
+            inventoryStock: stock 
+          };
         }
         productAggregation[groupKey].qty += item.quantity;
       });
@@ -324,6 +364,7 @@ export default function AdminDashboard() {
       productName: productAggregation[key].productName,
       totalQty: productAggregation[key].qty,
       imageUrl: productAggregation[key].imageUrl,
+      inventoryStock: productAggregation[key].inventoryStock,
     }));
 
     setAggregatedItems(aggregatedList);
@@ -1691,7 +1732,17 @@ export default function AdminDashboard() {
                         ) : (
                           <ShoppingBag className="w-14 h-14 p-2.5 bg-white text-slate-400 border border-slate-200 rounded-xl shrink-0" />
                         )}
-                        <span className="text-sm font-semibold text-slate-700">{item.productName}</span>
+                        <div className="flex flex-col">
+                          <span className="text-sm font-semibold text-slate-700">{item.productName}</span>
+                          {item.inventoryStock !== null && item.inventoryStock !== undefined && (
+                            <span className="text-[10px] font-bold mt-0.5 text-slate-450">
+                              باقي في المخزون:{' '}
+                              <span className={item.inventoryStock <= 0 ? 'text-rose-600 font-black' : 'text-[#128C7E] font-black'}>
+                                {item.inventoryStock} صندوق
+                              </span>
+                            </span>
+                          )}
+                        </div>
                       </div>
                       <span className="bg-white text-emerald-600 font-extrabold px-3 py-1.5 rounded-xl text-sm border border-slate-200 shrink-0">
                         {item.totalQty} علبة / صندوق
