@@ -85,6 +85,8 @@ export default function AdminDashboard() {
   const [editedQuantities, setEditedQuantities] = useState<{[itemId: string]: number}>({});
   const [editingCustomerId, setEditingCustomerId] = useState<string | null>(null);
   const [tempCustomerName, setTempCustomerName] = useState<string>('');
+  const [customerSearchQuery, setCustomerSearchQuery] = useState<string>('');
+  const [customerDropdownOpen, setCustomerDropdownOpen] = useState<string | null>(null);
   const [approvedCustomers, setApprovedCustomers] = useState<Customer[]>([]);
   const [lastSoldPrices, setLastSoldPrices] = useState<Record<string, number>>({});
   const [focusedItemId, setFocusedItemId] = useState<string | null>(null);
@@ -1098,26 +1100,73 @@ export default function AdminDashboard() {
                       </button>
                       <div className="space-y-1">
                         {editingCustomerId === order.id ? (
-                          <div className="flex items-center gap-1.5" onClick={(e) => e.stopPropagation()}>
-                            <select
-                              value={tempCustomerName}
-                              onChange={(e) => setTempCustomerName(e.target.value)}
-                              className="bg-white border border-slate-300 outline-none rounded-xl px-2.5 py-1 text-[11px] text-slate-800 focus:border-[#128C7E] focus:ring-1 focus:ring-[#128C7E] font-bold max-w-[200px]"
-                              autoFocus
-                            >
-                              <option value="" disabled>اختر زبوناً...</option>
-                              {!approvedCustomers.some(c => c.name === order.customer_name) && (
-                                <option value={order.customer_name}>{order.customer_name} (غير مسجل)</option>
+                          <div className="flex items-center gap-1.5 relative" onClick={(e) => e.stopPropagation()}>
+                            <div className="relative">
+                              <input
+                                type="text"
+                                value={tempCustomerName}
+                                onChange={(e) => {
+                                  setTempCustomerName(e.target.value);
+                                  setCustomerSearchQuery(e.target.value);
+                                  setCustomerDropdownOpen(order.id);
+                                }}
+                                onFocus={() => {
+                                  setCustomerSearchQuery(tempCustomerName);
+                                  setCustomerDropdownOpen(order.id);
+                                }}
+                                placeholder="ابحث أو اكتب اسم زبون..."
+                                className="bg-white border border-slate-350 outline-none rounded-xl px-2.5 py-1 text-[11px] text-slate-800 focus:border-[#128C7E] focus:ring-1 focus:ring-[#128C7E] font-bold w-[180px] text-right"
+                                autoFocus
+                              />
+                              
+                              {customerDropdownOpen === order.id && (
+                                <div className="absolute right-0 top-full mt-1 bg-white border border-slate-200 rounded-xl shadow-lg w-[240px] max-h-48 overflow-y-auto z-50 p-1 text-right divide-y divide-slate-100">
+                                  {customerSearchQuery.trim() && !approvedCustomers.some(c => c.name === customerSearchQuery.trim()) && (
+                                    <button
+                                      type="button"
+                                      onClick={() => {
+                                        setTempCustomerName(customerSearchQuery.trim());
+                                        setCustomerDropdownOpen(null);
+                                      }}
+                                      className="w-full text-right px-3 py-1.5 rounded-lg text-[10px] text-[#128C7E] font-bold hover:bg-slate-50 transition-colors"
+                                    >
+                                      استخدام "{customerSearchQuery.trim()}" (زبون جديد)
+                                    </button>
+                                  )}
+                                  
+                                  {approvedCustomers
+                                    .filter(c => c.name.toLowerCase().includes(customerSearchQuery.toLowerCase()))
+                                    .map((cust) => (
+                                      <button
+                                        key={cust.id}
+                                        type="button"
+                                        onClick={() => {
+                                          setTempCustomerName(cust.name);
+                                          setCustomerDropdownOpen(null);
+                                        }}
+                                        className={`w-full text-right px-3 py-1.5 rounded-lg text-[11px] transition-colors hover:bg-slate-50 ${
+                                          tempCustomerName === cust.name ? 'bg-emerald-50 text-[#128C7E] font-bold' : 'text-slate-700'
+                                        }`}
+                                      >
+                                        {cust.name}
+                                      </button>
+                                    ))
+                                  }
+
+                                  {approvedCustomers.filter(c => c.name.toLowerCase().includes(customerSearchQuery.toLowerCase())).length === 0 && !customerSearchQuery.trim() && (
+                                    <div className="p-2 text-center text-slate-400 text-[10px]">
+                                      اكتب اسماً للبحث...
+                                    </div>
+                                  )}
+                                </div>
                               )}
-                              {approvedCustomers.map((cust) => (
-                                <option key={cust.id} value={cust.name}>
-                                  {cust.name}
-                                </option>
-                              ))}
-                            </select>
+                            </div>
                             <button
                               type="button"
-                              onClick={() => handleSaveCustomerName(order.id)}
+                              onClick={() => {
+                                handleSaveCustomerName(order.id);
+                                setCustomerDropdownOpen(null);
+                              }}
                               className="p-1.5 text-emerald-600 hover:bg-emerald-50 border border-emerald-100 rounded-lg transition-colors cursor-pointer"
                               title="حفظ الاسم"
                             >
@@ -1125,7 +1174,10 @@ export default function AdminDashboard() {
                             </button>
                             <button
                               type="button"
-                              onClick={() => setEditingCustomerId(null)}
+                              onClick={() => {
+                                setEditingCustomerId(null);
+                                setCustomerDropdownOpen(null);
+                              }}
                               className="p-1.5 text-slate-450 hover:bg-slate-100 border border-slate-200 rounded-lg transition-colors cursor-pointer"
                               title="إلغاء"
                             >
@@ -1146,6 +1198,7 @@ export default function AdminDashboard() {
                                 e.stopPropagation();
                                 setEditingCustomerId(order.id);
                                 setTempCustomerName(order.customer_name);
+                                setCustomerSearchQuery(order.customer_name);
                               }}
                               className="p-1 text-slate-400 hover:text-[#128C7E] hover:bg-slate-100 border border-slate-200 rounded-lg transition-colors cursor-pointer opacity-0 group-hover:opacity-100 focus:opacity-100 shrink-0"
                               title="تعديل اسم الزبون"
@@ -1807,26 +1860,73 @@ export default function AdminDashboard() {
                       </button>
                       <div className="space-y-1">
                         {editingCustomerId === order.id ? (
-                          <div className="flex items-center gap-1.5" onClick={(e) => e.stopPropagation()}>
-                            <select
-                              value={tempCustomerName}
-                              onChange={(e) => setTempCustomerName(e.target.value)}
-                              className="bg-white border border-slate-300 outline-none rounded-xl px-2.5 py-1 text-[11px] text-slate-800 focus:border-[#128C7E] focus:ring-1 focus:ring-[#128C7E] font-bold max-w-[200px]"
-                              autoFocus
-                            >
-                              <option value="" disabled>اختر زبوناً...</option>
-                              {!approvedCustomers.some(c => c.name === order.customer_name) && (
-                                <option value={order.customer_name}>{order.customer_name} (غير مسجل)</option>
+                          <div className="flex items-center gap-1.5 relative" onClick={(e) => e.stopPropagation()}>
+                            <div className="relative">
+                              <input
+                                type="text"
+                                value={tempCustomerName}
+                                onChange={(e) => {
+                                  setTempCustomerName(e.target.value);
+                                  setCustomerSearchQuery(e.target.value);
+                                  setCustomerDropdownOpen(order.id);
+                                }}
+                                onFocus={() => {
+                                  setCustomerSearchQuery(tempCustomerName);
+                                  setCustomerDropdownOpen(order.id);
+                                }}
+                                placeholder="ابحث أو اكتب اسم زبون..."
+                                className="bg-white border border-slate-350 outline-none rounded-xl px-2.5 py-1 text-[11px] text-slate-800 focus:border-[#128C7E] focus:ring-1 focus:ring-[#128C7E] font-bold w-[180px] text-right"
+                                autoFocus
+                              />
+                              
+                              {customerDropdownOpen === order.id && (
+                                <div className="absolute right-0 top-full mt-1 bg-white border border-slate-200 rounded-xl shadow-lg w-[240px] max-h-48 overflow-y-auto z-50 p-1 text-right divide-y divide-slate-100">
+                                  {customerSearchQuery.trim() && !approvedCustomers.some(c => c.name === customerSearchQuery.trim()) && (
+                                    <button
+                                      type="button"
+                                      onClick={() => {
+                                        setTempCustomerName(customerSearchQuery.trim());
+                                        setCustomerDropdownOpen(null);
+                                      }}
+                                      className="w-full text-right px-3 py-1.5 rounded-lg text-[10px] text-[#128C7E] font-bold hover:bg-slate-50 transition-colors"
+                                    >
+                                      استخدام "{customerSearchQuery.trim()}" (زبون جديد)
+                                    </button>
+                                  )}
+                                  
+                                  {approvedCustomers
+                                    .filter(c => c.name.toLowerCase().includes(customerSearchQuery.toLowerCase()))
+                                    .map((cust) => (
+                                      <button
+                                        key={cust.id}
+                                        type="button"
+                                        onClick={() => {
+                                          setTempCustomerName(cust.name);
+                                          setCustomerDropdownOpen(null);
+                                        }}
+                                        className={`w-full text-right px-3 py-1.5 rounded-lg text-[11px] transition-colors hover:bg-slate-50 ${
+                                          tempCustomerName === cust.name ? 'bg-emerald-50 text-[#128C7E] font-bold' : 'text-slate-700'
+                                        }`}
+                                      >
+                                        {cust.name}
+                                      </button>
+                                    ))
+                                  }
+
+                                  {approvedCustomers.filter(c => c.name.toLowerCase().includes(customerSearchQuery.toLowerCase())).length === 0 && !customerSearchQuery.trim() && (
+                                    <div className="p-2 text-center text-slate-400 text-[10px]">
+                                      اكتب اسماً للبحث...
+                                    </div>
+                                  )}
+                                </div>
                               )}
-                              {approvedCustomers.map((cust) => (
-                                <option key={cust.id} value={cust.name}>
-                                  {cust.name}
-                                </option>
-                              ))}
-                            </select>
+                            </div>
                             <button
                               type="button"
-                              onClick={() => handleSaveCustomerName(order.id)}
+                              onClick={() => {
+                                handleSaveCustomerName(order.id);
+                                setCustomerDropdownOpen(null);
+                              }}
                               className="p-1.5 text-emerald-600 hover:bg-emerald-50 border border-emerald-100 rounded-lg transition-colors cursor-pointer"
                               title="حفظ الاسم"
                             >
@@ -1834,7 +1934,10 @@ export default function AdminDashboard() {
                             </button>
                             <button
                               type="button"
-                              onClick={() => setEditingCustomerId(null)}
+                              onClick={() => {
+                                setEditingCustomerId(null);
+                                setCustomerDropdownOpen(null);
+                              }}
                               className="p-1.5 text-slate-450 hover:bg-slate-100 border border-slate-200 rounded-lg transition-colors cursor-pointer"
                               title="إلغاء"
                             >
@@ -1855,6 +1958,7 @@ export default function AdminDashboard() {
                                 e.stopPropagation();
                                 setEditingCustomerId(order.id);
                                 setTempCustomerName(order.customer_name);
+                                setCustomerSearchQuery(order.customer_name);
                               }}
                               className="p-1 text-slate-400 hover:text-[#128C7E] hover:bg-slate-100 border border-slate-200 rounded-lg transition-colors cursor-pointer opacity-0 group-hover:opacity-100 focus:opacity-100 shrink-0"
                               title="تعديل اسم الزبون"
