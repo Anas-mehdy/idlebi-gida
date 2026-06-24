@@ -126,16 +126,27 @@ export default function CatalogPage() {
 
       {/* Main Header - Clean B2B Brand */}
       <header className="sticky top-0 bg-[#075E54] text-white px-4 py-3.5 shadow-md z-40 shrink-0">
-        <div className="max-w-md mx-auto flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <div className="bg-[#128C7E] p-2.5 rounded-full text-white shadow-inner flex items-center justify-center">
-              <Store className="w-6 h-6" />
+        <div className="max-w-md mx-auto flex items-center justify-between gap-2">
+          <div className="flex items-center gap-3 min-w-0">
+            <div className="bg-[#128C7E] p-2.5 rounded-full text-white shadow-inner flex items-center justify-center shrink-0 font-medium">
+              <Store className="w-5.5 h-5.5" />
             </div>
-            <div>
-              <h1 className="text-xl font-bold tracking-tight">idelbi gida</h1>
-              <p className="text-xs text-teal-100 font-medium">تجارة المواد الغذائية بالجملة • idelbi gıda</p>
+            <div className="min-w-0">
+              <h1 className="text-lg font-bold tracking-tight truncate leading-tight">idelbi gida</h1>
+              <p className="text-[10px] text-teal-100 font-medium truncate mt-0.5">تجارة المواد الغذائية بالجملة • idelbi gıda</p>
             </div>
           </div>
+
+          <a
+            href="https://wa.me/905350215375?text=%D9%85%D8%B1%D8%AD%D8%A8%D8%A7%D9%8B%D8%8C%20%D8%A3%D8%B1%D9%8A%D8%AF%20%D9%85%D8%AA%D8%AC%D8%B1%D8%A7%D9%8B%20%D9%85%D8%B4%D8%A7%D8%A8%D9%87%D8%A7%D9%8B%20%D9%84%D9%85%D8%AA%D8%AC%D8%B1%D9%83%D9%85"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="bg-[#128C7E]/40 hover:bg-[#128C7E]/70 border border-[#128C7E]/40 rounded-xl px-2.5 py-1.5 text-[9px] leading-snug text-teal-50 font-bold transition-all text-right shrink-0 hover:scale-102 hover:shadow-xs active:scale-98"
+            dir="rtl"
+          >
+            <div>هل تريد متجراً مشابهاً؟</div>
+            <div>تواصل معنا - <span className="underline text-emerald-300">اضغط هنا</span></div>
+          </a>
         </div>
       </header>
 
