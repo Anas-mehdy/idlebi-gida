@@ -122,89 +122,56 @@ CREATE POLICY "Allow admin all customers" ON customers FOR ALL TO authenticated 
 ALTER TABLE products ADD COLUMN IF NOT EXISTS inventory_stock INTEGER DEFAULT NULL;
 
 -- Migration: Create trigger to automatically decrement/increment inventory stock when order items are changed
---            Uses SECURITY DEFINER to bypass RLS (so anon checkout can update products.inventory_stock)
---            search_path pinned to 'public' to prevent search_path hijacking
 CREATE OR REPLACE FUNCTION update_inventory_on_order_item_change()
-RETURNS TRIGGER
-LANGUAGE plpgsql
-SECURITY DEFINER
-SET search_path = public
-AS $$
+RETURNS TRIGGER AS $$
 BEGIN
-    -- Handle INSERT: decrement stock for the new product
+    -- Handle INSERT
     IF (TG_OP = 'INSERT') THEN
         IF NEW.product_id IS NOT NULL THEN
-            UPDATE public.products
+            UPDATE products 
             SET inventory_stock = inventory_stock - NEW.quantity
             WHERE id = NEW.product_id AND inventory_stock IS NOT NULL;
         END IF;
-        RETURN NEW;
-
-    -- Handle UPDATE: adjust stock by the difference
+        
+    -- Handle UPDATE
     ELSIF (TG_OP = 'UPDATE') THEN
-        -- Case 1: product_id changed (rare, but handled)
-        IF OLD.product_id IS DISTINCT FROM NEW.product_id THEN
-            -- Restore stock to old product
-            IF OLD.product_id IS NOT NULL THEN
-                UPDATE public.products
-                SET inventory_stock = inventory_stock + OLD.quantity
-                WHERE id = OLD.product_id AND inventory_stock IS NOT NULL;
-            END IF;
-            -- Subtract stock from new product
+        IF OLD.product_id IS NOT NULL AND OLD.product_id <> COALESCE(NEW.product_id, '00000000-0000-0000-0000-000000000000'::uuid) THEN
+            UPDATE products 
+            SET inventory_stock = inventory_stock + OLD.quantity
+            WHERE id = OLD.product_id AND inventory_stock IS NOT NULL;
+            
             IF NEW.product_id IS NOT NULL THEN
-                UPDATE public.products
+                UPDATE products 
                 SET inventory_stock = inventory_stock - NEW.quantity
                 WHERE id = NEW.product_id AND inventory_stock IS NOT NULL;
             END IF;
         ELSE
-            -- Case 2: same product, quantity changed
-            IF NEW.product_id IS NOT NULL AND OLD.quantity IS DISTINCT FROM NEW.quantity THEN
-                UPDATE public.products
+            IF NEW.product_id IS NOT NULL THEN
+                UPDATE products 
                 SET inventory_stock = inventory_stock + (OLD.quantity - NEW.quantity)
                 WHERE id = NEW.product_id AND inventory_stock IS NOT NULL;
             END IF;
         END IF;
-        RETURN NEW;
-
-    -- Handle DELETE: restore stock for the removed product
+        
+    -- Handle DELETE
     ELSIF (TG_OP = 'DELETE') THEN
         IF OLD.product_id IS NOT NULL THEN
-            UPDATE public.products
+            UPDATE products 
             SET inventory_stock = inventory_stock + OLD.quantity
             WHERE id = OLD.product_id AND inventory_stock IS NOT NULL;
         END IF;
-        RETURN OLD;
     END IF;
-
-    -- Fallback (should never reach here)
-    RETURN NULL;
+    
+    RETURN NEW;
 END;
-$$;
+$$ LANGUAGE plpgsql;
 
--- Revoke direct EXECUTE from public roles for defense-in-depth
-REVOKE ALL ON FUNCTION update_inventory_on_order_item_change() FROM PUBLIC;
-REVOKE ALL ON FUNCTION update_inventory_on_order_item_change() FROM anon;
-REVOKE ALL ON FUNCTION update_inventory_on_order_item_change() FROM authenticated;
-
-DROP TRIGGER IF EXISTS trg_update_inventory_on_order_item_change ON public.order_items;
+DROP TRIGGER IF EXISTS trg_update_inventory_on_order_item_change ON order_items;
 
 CREATE TRIGGER trg_update_inventory_on_order_item_change
-AFTER INSERT OR UPDATE OR DELETE ON public.order_items
+AFTER INSERT OR UPDATE OR DELETE ON order_items
 FOR EACH ROW
 EXECUTE FUNCTION update_inventory_on_order_item_change();
-
--- Migration: Add Special Offer columns to products table
-ALTER TABLE products ADD COLUMN IF NOT EXISTS has_offer BOOLEAN DEFAULT FALSE NOT NULL;
-ALTER TABLE products ADD COLUMN IF NOT EXISTS offer_title TEXT DEFAULT NULL;
-ALTER TABLE products ADD COLUMN IF NOT EXISTS offer_type TEXT DEFAULT 'unlimited' CHECK (offer_type IN ('unlimited', 'date_limited', 'stock_limited'));
-ALTER TABLE products ADD COLUMN IF NOT EXISTS offer_end_date TIMESTAMP WITH TIME ZONE DEFAULT NULL;
-ALTER TABLE products ADD COLUMN IF NOT EXISTS offer_max_quantity INTEGER DEFAULT NULL;
-ALTER TABLE products ADD COLUMN IF NOT EXISTS offer_used_quantity INTEGER DEFAULT 0 NOT NULL;
-
--- Migration: Add applied_offer column to order_items table
-ALTER TABLE order_items ADD COLUMN IF NOT EXISTS applied_offer TEXT DEFAULT NULL;
-
-
 
 
 

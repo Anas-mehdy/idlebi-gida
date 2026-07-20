@@ -5,7 +5,7 @@ import Image from 'next/image';
 import Link from 'next/link';
 import { supabase } from '@/lib/supabase';
 import { useCart } from '@/context/CartContext';
-import { Search, ShoppingBag, Plus, Minus, Store, MessageCircle, AlertCircle, ShoppingCart, X, Package, Maximize2 } from 'lucide-react';
+import { Search, ShoppingBag, Plus, Minus, Store, MessageCircle, AlertCircle, ShoppingCart, X, Package, Maximize2, Gift, Tag } from 'lucide-react';
 
 interface Category {
   id: string;
@@ -20,7 +20,34 @@ interface Product {
   category_id: string;
   image_url: string | null;
   is_hidden?: boolean;
+  has_offer?: boolean;
+  offer_title?: string | null;
+  offer_type?: 'unlimited' | 'date_limited' | 'stock_limited';
+  offer_end_date?: string | null;
+  offer_max_quantity?: number | null;
+  offer_used_quantity?: number;
 }
+
+const isOfferActive = (product: Product): boolean => {
+  if (!product.has_offer || !product.offer_title || !product.offer_title.trim()) {
+    return false;
+  }
+  
+  if (product.offer_type === 'date_limited') {
+    if (!product.offer_end_date) return false;
+    const endDate = new Date(product.offer_end_date).getTime();
+    if (isNaN(endDate) || Date.now() > endDate) return false;
+  }
+
+  if (product.offer_type === 'stock_limited') {
+    if (product.offer_max_quantity === null || product.offer_max_quantity === undefined) return false;
+    const used = product.offer_used_quantity || 0;
+    if (used >= product.offer_max_quantity) return false;
+  }
+
+  return true;
+};
+
 
 // Fallback mock data if Supabase is not connected
 const MOCK_CATEGORIES: Category[] = [
@@ -250,14 +277,25 @@ export default function CatalogPage() {
                     <div className="grid grid-cols-2 gap-3.5">
                       {catProducts.map((product) => {
                         const qty = getProductQuantity(product.id);
+                        const offerActive = isOfferActive(product);
                         return (
                           <div
                             key={product.id}
-                            className="bg-white p-3 rounded-3xl border border-slate-200/60 flex flex-col justify-between hover:shadow-xs transition-all duration-200 relative overflow-hidden"
+                            className={`bg-white p-3 rounded-3xl border flex flex-col justify-between hover:shadow-xs transition-all duration-200 relative overflow-hidden ${
+                              offerActive ? 'border-amber-300 ring-1 ring-amber-300/50' : 'border-slate-200/60'
+                            }`}
                           >
                             {/* In-Stock Indicator dot */}
                             <span className="absolute top-3.5 right-3.5 w-2 h-2 rounded-full bg-emerald-500 z-10 border border-white" title="متوفر" />
-                            
+
+                            {/* Offer Badge Ribbon if active */}
+                            {offerActive && (
+                              <div className="absolute top-3 left-3 bg-amber-500 text-white text-[9px] font-black px-2 py-0.5 rounded-full z-10 shadow-xs flex items-center gap-1">
+                                <Gift className="w-2.5 h-2.5" />
+                                <span>عرض خاص</span>
+                              </div>
+                            )}
+
                             {/* Product Image Wrapper */}
                             <div 
                               onClick={() => product.image_url && setActivePreviewImage(product.image_url)}
@@ -287,12 +325,30 @@ export default function CatalogPage() {
 
                             {/* Info Area */}
                             <div className="flex-1 flex flex-col justify-between">
-                              <h3 className="text-xs font-bold text-slate-800 line-clamp-2 text-right mb-2.5 min-h-[32px] leading-tight">
-                                {product.name}
-                              </h3>
+                              <div>
+                                <h3 className="text-xs font-bold text-slate-800 line-clamp-2 text-right mb-1 min-h-[32px] leading-tight">
+                                  {product.name}
+                                </h3>
+
+                                {/* Offer Text Callout */}
+                                {offerActive && (
+                                  <div className="bg-amber-50 border border-amber-200/80 rounded-xl p-1.5 mb-2 text-[9.5px] font-bold text-amber-900 text-right leading-tight flex items-start gap-1">
+                                    <Tag className="w-3 h-3 text-amber-600 shrink-0 mt-0.5" />
+                                    <div className="flex-1">
+                                      <span>{product.offer_title}</span>
+                                      {product.offer_type === 'stock_limited' && typeof product.offer_max_quantity === 'number' && (
+                                        <span className="block text-[8.5px] text-amber-700 font-extrabold mt-0.5">
+                                          🔥 متبقي {Math.max(0, product.offer_max_quantity - (product.offer_used_quantity || 0))} صندوق للعرض
+                                        </span>
+                                      )}
+
+                                    </div>
+                                  </div>
+                                )}
+                              </div>
                               
                               {/* Price and Add Control */}
-                              <div className="flex items-center justify-between mt-auto pt-2.5 border-t border-slate-100/60">
+                              <div className="flex items-center justify-between mt-auto pt-2 border-t border-slate-100/60">
                                 {/* Price Block */}
                                 <div className="space-y-0.5">
                                   {product.price !== null && product.price !== undefined && Number(product.price) > 0 && (
@@ -326,7 +382,13 @@ export default function CatalogPage() {
                                     {qty}
                                   </span>
                                   <button
-                                    onClick={() => addToCart(product)}
+                                    onClick={() => addToCart({
+                                      id: product.id,
+                                      name: product.name,
+                                      price: product.price,
+                                      image_url: product.image_url,
+                                      applied_offer: offerActive ? product.offer_title : null
+                                    })}
                                     className="bg-[#25D366] hover:bg-[#20ba59] text-white p-1 rounded-full transition-all active:scale-90 shrink-0 select-none shadow-3xs"
                                   >
                                     <Plus className="w-3 h-3 stroke-[2.5]" />
@@ -337,6 +399,7 @@ export default function CatalogPage() {
                           </div>
                         );
                       })}
+
                     </div>
                   </div>
                 ))}

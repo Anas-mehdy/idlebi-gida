@@ -8,11 +8,12 @@ export interface CartItem {
   price: number | null;
   image_url: string | null;
   quantity: number;
+  applied_offer?: string | null;
 }
 
 interface CartContextType {
   cart: CartItem[];
-  addToCart: (product: { id: string; name: string; price: number | null; image_url: string | null }) => void;
+  addToCart: (product: { id: string; name: string; price: number | null; image_url: string | null; applied_offer?: string | null }) => void;
   removeFromCart: (productId: string) => void;
   updateQuantity: (productId: string, quantity: number) => void;
   clearCart: () => void;
@@ -49,17 +50,18 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
     }
   }, [cart, isLoaded]);
 
-  const addToCart = (product: { id: string; name: string; price: number | null; image_url: string | null }) => {
+  const addToCart = (product: { id: string; name: string; price: number | null; image_url: string | null; applied_offer?: string | null }) => {
     setCart((prevCart) => {
       const existingItem = prevCart.find((item) => item.id === product.id);
       if (existingItem) {
         return prevCart.map((item) =>
-          item.id === product.id ? { ...item, quantity: item.quantity + 1 } : item
+          item.id === product.id ? { ...item, quantity: item.quantity + 1, applied_offer: product.applied_offer || item.applied_offer } : item
         );
       }
       return [...prevCart, { ...product, quantity: 1 }];
     });
   };
+
 
   const removeFromCart = (productId: string) => {
     setCart((prevCart) => {

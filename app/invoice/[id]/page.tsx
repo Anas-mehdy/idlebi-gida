@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect, use } from 'react';
 import { supabase } from '@/lib/supabase';
-import { ShoppingBag, Loader2, Calendar, User, Clock, CheckCircle2, Printer, ChevronRight, Store } from 'lucide-react';
+import { ShoppingBag, Loader2, Calendar, User, Clock, CheckCircle2, Printer, ChevronRight, Store, Gift, Tag } from 'lucide-react';
 import Link from 'next/link';
 
 interface OrderItem {
@@ -13,11 +13,13 @@ interface OrderItem {
   price_at_purchase: number;
   product_name?: string | null;
   product_image?: string | null;
+  applied_offer?: string | null;
   products?: {
     name: string;
     image_url?: string | null;
   } | null;
 }
+
 
 interface Order {
   id: string;
@@ -223,7 +225,14 @@ export default function PublicInvoicePage({ params }: { params: Promise<{ id: st
                           `${item.quantity} صندوق × يحدد لاحقاً`
                         )}
                       </p>
+                      {item.applied_offer && (
+                        <div className="mt-1 inline-flex items-center gap-1 bg-amber-50 border border-amber-200/80 text-amber-900 font-bold px-2 py-0.5 rounded-lg text-[9.5px]">
+                          <Gift className="w-3 h-3 text-amber-600 shrink-0" />
+                          <span>عرض خاص: {item.applied_offer}</span>
+                        </div>
+                      )}
                     </div>
+
                   </div>
                   {/* Total Price for item */}
                   <span className="text-sm font-black text-slate-800 whitespace-nowrap">

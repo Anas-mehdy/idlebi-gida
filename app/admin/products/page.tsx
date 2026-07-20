@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect, useRef } from 'react';
 import { supabase } from '@/lib/supabase';
-import { Plus, Trash2, ShoppingBag, Loader2, Image as ImageIcon, Upload, AlertCircle, RefreshCw, GripVertical, Eye, EyeOff, X, Pencil, Search } from 'lucide-react';
+import { Plus, Trash2, ShoppingBag, Loader2, Image as ImageIcon, Upload, AlertCircle, RefreshCw, GripVertical, Eye, EyeOff, X, Pencil, Search, Tag, Gift, Clock, PackageCheck, AlertTriangle } from 'lucide-react';
 
 interface Category {
   id: string;
@@ -10,7 +10,7 @@ interface Category {
   sort_order?: number;
 }
 
-interface Product {
+export interface Product {
   id: string;
   name: string;
   price: number | null;
@@ -18,10 +18,37 @@ interface Product {
   image_url: string | null;
   sort_order?: number;
   is_hidden?: boolean;
+  has_offer?: boolean;
+  offer_title?: string | null;
+  offer_type?: 'unlimited' | 'date_limited' | 'stock_limited';
+  offer_end_date?: string | null;
+  offer_max_quantity?: number | null;
+  offer_used_quantity?: number;
   categories?: {
     name: string;
   } | null;
 }
+
+export const isOfferActive = (product: Product): boolean => {
+  if (!product.has_offer || !product.offer_title || !product.offer_title.trim()) {
+    return false;
+  }
+  
+  if (product.offer_type === 'date_limited') {
+    if (!product.offer_end_date) return false;
+    const endDate = new Date(product.offer_end_date).getTime();
+    if (isNaN(endDate) || Date.now() > endDate) return false;
+  }
+
+  if (product.offer_type === 'stock_limited') {
+    if (product.offer_max_quantity === null || product.offer_max_quantity === undefined) return false;
+    const used = product.offer_used_quantity || 0;
+    if (used >= product.offer_max_quantity) return false;
+  }
+
+  return true;
+};
+
 
 const MOCK_CATEGORIES: Category[] = [
   { id: '1', name: 'بسكويت وحلويات', sort_order: 0 },
@@ -122,6 +149,13 @@ export default function AdminProducts() {
   const [imageFile, setImageFile] = useState<File | null>(null);
   const [imagePreview, setImagePreview] = useState<string | null>(null);
 
+  // Form fields - Special Offer
+  const [hasOffer, setHasOffer] = useState(false);
+  const [offerTitle, setOfferTitle] = useState('');
+  const [offerType, setOfferType] = useState<'unlimited' | 'date_limited' | 'stock_limited'>('unlimited');
+  const [offerEndDate, setOfferEndDate] = useState('');
+  const [offerMaxQuantity, setOfferMaxQuantity] = useState('');
+
   // Edit product states
   const [editingProduct, setEditingProduct] = useState<Product | null>(null);
   const [editName, setEditName] = useState('');
@@ -131,6 +165,15 @@ export default function AdminProducts() {
   const [editImagePreview, setEditImagePreview] = useState<string | null>(null);
   const [editImageAction, setEditImageAction] = useState<'keep' | 'new' | 'remove'>('keep');
   const [editErrorMsg, setEditErrorMsg] = useState('');
+
+  // Edit product states - Special Offer
+  const [editHasOffer, setEditHasOffer] = useState(false);
+  const [editOfferTitle, setEditOfferTitle] = useState('');
+  const [editOfferType, setEditOfferType] = useState<'unlimited' | 'date_limited' | 'stock_limited'>('unlimited');
+  const [editOfferEndDate, setEditOfferEndDate] = useState('');
+  const [editOfferMaxQuantity, setEditOfferMaxQuantity] = useState('');
+  const [editOfferUsedQuantity, setEditOfferUsedQuantity] = useState(0);
+
 
   // Status
   const [loading, setLoading] = useState(true);
@@ -437,6 +480,12 @@ export default function AdminProducts() {
     setEditImagePreview(null);
     setEditImageAction('keep');
     setEditErrorMsg('');
+    setEditHasOffer(false);
+    setEditOfferTitle('');
+    setEditOfferType('unlimited');
+    setEditOfferEndDate('');
+    setEditOfferMaxQuantity('');
+    setEditOfferUsedQuantity(0);
   };
 
   const handleStartEdit = (product: Product) => {
@@ -448,6 +497,30 @@ export default function AdminProducts() {
     setEditImagePreview(null);
     setEditImageAction(product.image_url ? 'keep' : 'new');
     setEditErrorMsg('');
+
+    // Set special offer edit state
+    setEditHasOffer(product.has_offer || false);
+    setEditOfferTitle(product.offer_title || '');
+    setEditOfferType(product.offer_type || 'unlimited');
+    
+    let formattedEndDate = '';
+    if (product.offer_end_date) {
+      try {
+        const d = new Date(product.offer_end_date);
+        // Format to YYYY-MM-DDTHH:mm for datetime-local input
+        const year = d.getFullYear();
+        const month = String(d.getMonth() + 1).padStart(2, '0');
+        const day = String(d.getDate()).padStart(2, '0');
+        const hours = String(d.getHours()).padStart(2, '0');
+        const minutes = String(d.getMinutes()).padStart(2, '0');
+        formattedEndDate = `${year}-${month}-${day}T${hours}:${minutes}`;
+      } catch (e) {
+        console.warn('Could not format offer_end_date', e);
+      }
+    }
+    setEditOfferEndDate(formattedEndDate);
+    setEditOfferMaxQuantity(product.offer_max_quantity !== null && product.offer_max_quantity !== undefined ? product.offer_max_quantity.toString() : '');
+    setEditOfferUsedQuantity(product.offer_used_quantity || 0);
   };
 
   const handleSaveEdit = async (e: React.FormEvent) => {
@@ -525,13 +598,23 @@ export default function AdminProducts() {
         }
 
         const parsedPrice = editPrice.trim() ? parseFloat(editPrice) : null;
+        const offerPayload = {
+          has_offer: editHasOffer,
+          offer_title: editHasOffer && editOfferTitle.trim() ? editOfferTitle.trim() : null,
+          offer_type: editHasOffer ? editOfferType : 'unlimited',
+          offer_end_date: editHasOffer && editOfferType === 'date_limited' && editOfferEndDate ? new Date(editOfferEndDate).toISOString() : null,
+          offer_max_quantity: editHasOffer && editOfferType === 'stock_limited' && editOfferMaxQuantity ? parseInt(editOfferMaxQuantity, 10) : null,
+          offer_used_quantity: editHasOffer && editOfferType === 'stock_limited' ? editOfferUsedQuantity : 0
+        };
+
         const { data: updatedProd, error: updateError } = await supabase
           .from('products')
           .update({
             name: editName.trim(),
             price: parsedPrice,
             category_id: editCategoryId,
-            image_url: finalImageUrl
+            image_url: finalImageUrl,
+            ...offerPayload
           })
           .eq('id', editingProduct.id)
           .select('*, categories(name)')
@@ -555,6 +638,12 @@ export default function AdminProducts() {
           price: editPrice.trim() ? parseFloat(editPrice) : null,
           category_id: editCategoryId,
           image_url: editImageAction === 'remove' ? null : (editImageAction === 'new' ? editImagePreview : editingProduct.image_url),
+          has_offer: editHasOffer,
+          offer_title: editHasOffer && editOfferTitle.trim() ? editOfferTitle.trim() : null,
+          offer_type: editHasOffer ? editOfferType : 'unlimited',
+          offer_end_date: editHasOffer && editOfferType === 'date_limited' && editOfferEndDate ? new Date(editOfferEndDate).toISOString() : null,
+          offer_max_quantity: editHasOffer && editOfferType === 'stock_limited' && editOfferMaxQuantity ? parseInt(editOfferMaxQuantity, 10) : null,
+          offer_used_quantity: editHasOffer && editOfferType === 'stock_limited' ? editOfferUsedQuantity : 0,
           categories: matchingCat ? { name: matchingCat.name } : null
         };
 
@@ -628,13 +717,23 @@ export default function AdminProducts() {
 
         // 2. Insert product row in DB
         const parsedPrice = price.trim() ? parseFloat(price) : null;
+        const offerPayload = {
+          has_offer: hasOffer,
+          offer_title: hasOffer && offerTitle.trim() ? offerTitle.trim() : null,
+          offer_type: hasOffer ? offerType : 'unlimited',
+          offer_end_date: hasOffer && offerType === 'date_limited' && offerEndDate ? new Date(offerEndDate).toISOString() : null,
+          offer_max_quantity: hasOffer && offerType === 'stock_limited' && offerMaxQuantity ? parseInt(offerMaxQuantity, 10) : null,
+          offer_used_quantity: 0
+        };
+
         const { data: newProd, error: insertError } = await supabase
           .from('products')
           .insert({
             name: name.trim(),
             price: parsedPrice,
             category_id: categoryId,
-            image_url: finalImageUrl
+            image_url: finalImageUrl,
+            ...offerPayload
           })
           .select('*, categories(name)')
           .single();
@@ -655,7 +754,13 @@ export default function AdminProducts() {
           name: name.trim(),
           price: price.trim() ? parseFloat(price) : null,
           category_id: categoryId,
-          image_url: imagePreview, // Use preview base64 as temporary image
+          image_url: imagePreview,
+          has_offer: hasOffer,
+          offer_title: hasOffer && offerTitle.trim() ? offerTitle.trim() : null,
+          offer_type: hasOffer ? offerType : 'unlimited',
+          offer_end_date: hasOffer && offerType === 'date_limited' && offerEndDate ? new Date(offerEndDate).toISOString() : null,
+          offer_max_quantity: hasOffer && offerType === 'stock_limited' && offerMaxQuantity ? parseInt(offerMaxQuantity, 10) : null,
+          offer_used_quantity: 0,
           categories: matchingCat ? { name: matchingCat.name } : null
         };
         setProducts((prev) => [mockNewProd, ...prev]);
@@ -667,6 +772,11 @@ export default function AdminProducts() {
       setCategoryId('');
       setImageFile(null);
       setImagePreview(null);
+      setHasOffer(false);
+      setOfferTitle('');
+      setOfferType('unlimited');
+      setOfferEndDate('');
+      setOfferMaxQuantity('');
       if (fileInputRef.current) fileInputRef.current.value = '';
     } catch (err: any) {
       console.error(err);
@@ -675,6 +785,7 @@ export default function AdminProducts() {
       setSubmitting(false);
     }
   };
+
 
   const handleDeleteProduct = async (id: string, name: string, imageUrl: string | null) => {
     const confirmDelete = window.confirm(`هل أنت متأكد من حذف المنتج "${name}"؟`);
@@ -870,7 +981,115 @@ export default function AdminProducts() {
               </div>
             </div>
 
+            {/* Special Offer Card */}
+            <div className="bg-amber-50/60 border border-amber-200/80 rounded-2xl p-3.5 space-y-3">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2 text-amber-900 font-bold text-xs">
+                  <Gift className="w-4 h-4 text-amber-600" />
+                  <span>إضافة عرض خاص للمنتج</span>
+                </div>
+                <label className="relative inline-flex items-center cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={hasOffer}
+                    onChange={(e) => setHasOffer(e.target.checked)}
+                    className="sr-only peer"
+                    disabled={submitting}
+                  />
+                  <div className="w-9 h-5 bg-slate-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:right-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-amber-500"></div>
+                </label>
+              </div>
+
+              {hasOffer && (
+                <div className="space-y-3 pt-1 border-t border-amber-200/60 text-right">
+                  {/* Offer Title Input */}
+                  <div className="space-y-1">
+                    <label className="block text-[11px] font-bold text-slate-700">تفاصيل العرض المخصص</label>
+                    <input
+                      type="text"
+                      required={hasOffer}
+                      value={offerTitle}
+                      onChange={(e) => setOfferTitle(e.target.value)}
+                      placeholder="مثال: اشتر 10 صناديق واحصل على 1 مجاناً"
+                      className="w-full bg-white border border-amber-300/80 outline-none rounded-xl px-3 py-2 text-xs text-slate-800 placeholder-slate-400 focus:border-amber-500 focus:ring-1 focus:ring-amber-500 transition-all text-right"
+                      disabled={submitting}
+                    />
+                  </div>
+
+                  {/* Validity Option Radio Buttons */}
+                  <div className="space-y-1.5">
+                    <label className="block text-[11px] font-bold text-slate-700">صلاحية العرض (اختر خياراً):</label>
+                    <div className="space-y-1.5 text-xs">
+                      <label className="flex items-center gap-2 bg-white p-2 rounded-xl border border-amber-200 cursor-pointer hover:bg-amber-50/40">
+                        <input
+                          type="radio"
+                          name="addOfferType"
+                          value="unlimited"
+                          checked={offerType === 'unlimited'}
+                          onChange={() => setOfferType('unlimited')}
+                          className="accent-amber-600"
+                        />
+                        <span className="font-semibold text-slate-800">1- بدون تاريخ انتهاء</span>
+                        <span className="text-[10px] text-slate-400 mr-auto">(يوقفه الأدمن يدوياً)</span>
+                      </label>
+
+                      <label className="flex items-center gap-2 bg-white p-2 rounded-xl border border-amber-200 cursor-pointer hover:bg-amber-50/40">
+                        <input
+                          type="radio"
+                          name="addOfferType"
+                          value="date_limited"
+                          checked={offerType === 'date_limited'}
+                          onChange={() => setOfferType('date_limited')}
+                          className="accent-amber-600"
+                        />
+                        <span className="font-semibold text-slate-800">2- تاريخ انتهاء محدد</span>
+                      </label>
+
+                      {offerType === 'date_limited' && (
+                        <div className="pr-6 pt-1">
+                          <input
+                            type="datetime-local"
+                            required={offerType === 'date_limited'}
+                            value={offerEndDate}
+                            onChange={(e) => setOfferEndDate(e.target.value)}
+                            className="w-full bg-white border border-amber-300 rounded-xl px-3 py-1.5 text-xs text-slate-800 outline-none focus:border-amber-500"
+                          />
+                        </div>
+                      )}
+
+                      <label className="flex items-center gap-2 bg-white p-2 rounded-xl border border-amber-200 cursor-pointer hover:bg-amber-50/40">
+                        <input
+                          type="radio"
+                          name="addOfferType"
+                          value="stock_limited"
+                          checked={offerType === 'stock_limited'}
+                          onChange={() => setOfferType('stock_limited')}
+                          className="accent-amber-600"
+                        />
+                        <span className="font-semibold text-slate-800">3- عدد صناديق محدد</span>
+                      </label>
+
+                      {offerType === 'stock_limited' && (
+                        <div className="pr-6 pt-1">
+                          <input
+                            type="number"
+                            min="1"
+                            required={offerType === 'stock_limited'}
+                            value={offerMaxQuantity}
+                            onChange={(e) => setOfferMaxQuantity(e.target.value)}
+                            placeholder="عدد الصناديق المتاحة (مثال: 50)"
+                            className="w-full bg-white border border-amber-300 rounded-xl px-3 py-1.5 text-xs text-slate-800 outline-none focus:border-amber-500 text-right"
+                          />
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              )}
+            </div>
+
             {errorMsg && (
+
               <div className="bg-rose-500/10 border border-rose-500/20 text-rose-800 p-3 rounded-xl text-xs font-semibold leading-relaxed">
                 {errorMsg}
               </div>
@@ -981,22 +1200,47 @@ export default function AdminProducts() {
                               product.name.charAt(0)
                             )}
                           </div>
-                          <button
-                            type="button"
-                            onClick={() => {
-                              setSelectedProductForHistory(product);
-                              fetchSalesHistory(product.id, product.name);
-                            }}
-                            className="text-sm font-bold text-slate-800 line-clamp-1 flex items-center gap-1.5 hover:text-[#128C7E] hover:underline transition-all cursor-pointer border-none bg-transparent text-right outline-none p-0"
-                            title="اضغط لعرض سجل مبيعات هذا المنتج بالتفصيل للزبائن"
-                          >
-                            <span>{product.name}</span>
-                            {product.is_hidden && (
-                              <span className="bg-amber-50 text-amber-700 text-[10px] font-black px-1.5 py-0.5 rounded-md border border-amber-250 shrink-0">
-                                مخفي
-                              </span>
+                          <div className="flex flex-col gap-1 min-w-0">
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setSelectedProductForHistory(product);
+                                fetchSalesHistory(product.id, product.name);
+                              }}
+                              className="text-sm font-bold text-slate-800 line-clamp-1 flex items-center gap-1.5 hover:text-[#128C7E] hover:underline transition-all cursor-pointer border-none bg-transparent text-right outline-none p-0"
+                              title="اضغط لعرض سجل مبيعات هذا المنتج بالتفصيل للزبائن"
+                            >
+                              <span>{product.name}</span>
+                              {product.is_hidden && (
+                                <span className="bg-amber-50 text-amber-700 text-[10px] font-black px-1.5 py-0.5 rounded-md border border-amber-250 shrink-0">
+                                  مخفي
+                                </span>
+                              )}
+                            </button>
+                            
+                            {product.has_offer && product.offer_title && (
+                              <div className="flex items-center gap-1 text-[10px] flex-wrap">
+                                {isOfferActive(product) ? (
+                                  <span className="bg-amber-100/90 text-amber-900 border border-amber-300 font-bold px-2 py-0.5 rounded-md flex items-center gap-1">
+                                    <Gift className="w-3 h-3 text-amber-600 shrink-0" />
+                                    <span>{product.offer_title}</span>
+                                    {product.offer_type === 'stock_limited' && typeof product.offer_max_quantity === 'number' && (
+                                      <span className="bg-amber-200/80 px-1.5 py-0.2 rounded text-[9px] font-extrabold mr-1">
+                                        متبقي: {Math.max(0, product.offer_max_quantity - (product.offer_used_quantity || 0))} صندوق
+                                      </span>
+                                    )}
+
+                                  </span>
+                                ) : (
+                                  <span className="bg-slate-100 text-slate-500 border border-slate-200 font-semibold px-2 py-0.5 rounded-md flex items-center gap-1">
+                                    <AlertTriangle className="w-3 h-3 text-slate-400 shrink-0" />
+                                    <span>عُرض منتهي: {product.offer_title}</span>
+                                  </span>
+                                )}
+                              </div>
                             )}
-                          </button>
+                          </div>
+
                         </div>
                       </td>
                       <td className="py-3 text-sm text-slate-600">
@@ -1251,7 +1495,125 @@ export default function AdminProducts() {
                 )}
               </div>
 
+              {/* Special Offer Card in Edit Modal */}
+              <div className="bg-amber-50/60 border border-amber-200/80 rounded-2xl p-3.5 space-y-3">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2 text-amber-900 font-bold text-xs">
+                    <Gift className="w-4 h-4 text-amber-600" />
+                    <span>عرض خاص للمنتج</span>
+                  </div>
+                  <label className="relative inline-flex items-center cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={editHasOffer}
+                      onChange={(e) => setEditHasOffer(e.target.checked)}
+                      className="sr-only peer"
+                      disabled={submitting}
+                    />
+                    <div className="w-9 h-5 bg-slate-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:right-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-amber-500"></div>
+                  </label>
+                </div>
+
+                {editHasOffer && (
+                  <div className="space-y-3 pt-1 border-t border-amber-200/60 text-right">
+                    {/* Offer Title Input */}
+                    <div className="space-y-1">
+                      <label className="block text-[11px] font-bold text-slate-700">تفاصيل العرض المخصص</label>
+                      <input
+                        type="text"
+                        required={editHasOffer}
+                        value={editOfferTitle}
+                        onChange={(e) => setEditOfferTitle(e.target.value)}
+                        placeholder="مثال: اشتر 10 صناديق واحصل على 1 مجاناً"
+                        className="w-full bg-white border border-amber-300/80 outline-none rounded-xl px-3 py-2 text-xs text-slate-800 placeholder-slate-400 focus:border-amber-500 focus:ring-1 focus:ring-amber-500 transition-all text-right"
+                        disabled={submitting}
+                      />
+                    </div>
+
+                    {/* Validity Option Radio Buttons */}
+                    <div className="space-y-1.5">
+                      <label className="block text-[11px] font-bold text-slate-700">صلاحية العرض (اختر خياراً):</label>
+                      <div className="space-y-1.5 text-xs">
+                        <label className="flex items-center gap-2 bg-white p-2 rounded-xl border border-amber-200 cursor-pointer hover:bg-amber-50/40">
+                          <input
+                            type="radio"
+                            name="editOfferType"
+                            value="unlimited"
+                            checked={editOfferType === 'unlimited'}
+                            onChange={() => setEditOfferType('unlimited')}
+                            className="accent-amber-600"
+                          />
+                          <span className="font-semibold text-slate-800">1- بدون تاريخ انتهاء</span>
+                          <span className="text-[10px] text-slate-400 mr-auto">(يوقفه الأدمن يدوياً)</span>
+                        </label>
+
+                        <label className="flex items-center gap-2 bg-white p-2 rounded-xl border border-amber-200 cursor-pointer hover:bg-amber-50/40">
+                          <input
+                            type="radio"
+                            name="editOfferType"
+                            value="date_limited"
+                            checked={editOfferType === 'date_limited'}
+                            onChange={() => setEditOfferType('date_limited')}
+                            className="accent-amber-600"
+                          />
+                          <span className="font-semibold text-slate-800">2- تاريخ انتهاء محدد</span>
+                        </label>
+
+                        {editOfferType === 'date_limited' && (
+                          <div className="pr-6 pt-1">
+                            <input
+                              type="datetime-local"
+                              required={editOfferType === 'date_limited'}
+                              value={editOfferEndDate}
+                              onChange={(e) => setEditOfferEndDate(e.target.value)}
+                              className="w-full bg-white border border-amber-300 rounded-xl px-3 py-1.5 text-xs text-slate-800 outline-none focus:border-amber-500"
+                            />
+                          </div>
+                        )}
+
+                        <label className="flex items-center gap-2 bg-white p-2 rounded-xl border border-amber-200 cursor-pointer hover:bg-amber-50/40">
+                          <input
+                            type="radio"
+                            name="editOfferType"
+                            value="stock_limited"
+                            checked={editOfferType === 'stock_limited'}
+                            onChange={() => setEditOfferType('stock_limited')}
+                            className="accent-amber-600"
+                          />
+                          <span className="font-semibold text-slate-800">3- عدد صناديق محدد</span>
+                        </label>
+
+                        {editOfferType === 'stock_limited' && (
+                          <div className="pr-6 pt-1 space-y-2">
+                            <input
+                              type="number"
+                              min="1"
+                              required={editOfferType === 'stock_limited'}
+                              value={editOfferMaxQuantity}
+                              onChange={(e) => setEditOfferMaxQuantity(e.target.value)}
+                              placeholder="عدد الصناديق المتاحة (مثال: 50)"
+                              className="w-full bg-white border border-amber-300 rounded-xl px-3 py-1.5 text-xs text-slate-800 outline-none focus:border-amber-500 text-right"
+                            />
+                            <div className="flex items-center justify-between bg-amber-100/50 p-2 rounded-xl text-[11px] text-amber-900">
+                              <span>المباع من العرض حتى الآن: <strong>{editOfferUsedQuantity}</strong></span>
+                              <button
+                                type="button"
+                                onClick={() => setEditOfferUsedQuantity(0)}
+                                className="text-[10px] text-amber-800 hover:text-amber-950 underline bg-transparent border-none cursor-pointer"
+                              >
+                                إعادة تصفير العداد
+                              </button>
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                )}
+              </div>
+
               {editErrorMsg && (
+
                 <div className="bg-rose-500/10 border border-rose-500/20 text-rose-800 p-3 rounded-xl text-xs font-semibold leading-relaxed">
                   {editErrorMsg}
                 </div>

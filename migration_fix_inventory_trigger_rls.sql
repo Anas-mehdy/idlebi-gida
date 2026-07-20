@@ -1,10 +1,19 @@
--- 1. Add inventory_stock column to products table (NULL means not tracked in inventory)
--- Allows negative values as requested by the user. No CHECK constraint is added.
-ALTER TABLE products ADD COLUMN IF NOT EXISTS inventory_stock INTEGER DEFAULT NULL;
+-- ============================================================
+-- Migration: Fix inventory trigger RLS bypass
+-- Date: 2026-07-04
+-- Issue: When an anonymous (anon) user places an order via the
+--        catalog checkout, the trigger function runs with the
+--        anon role's permissions. The RLS policy on `products`
+--        only allows `authenticated` users to UPDATE, so the
+--        trigger's UPDATE on inventory_stock is silently blocked.
+--
+-- Fix: Recreate the function with SECURITY DEFINER so it
+--      executes as the function owner (postgres), bypassing RLS.
+--      Also pin search_path to 'public' to prevent search_path
+--      hijacking, and use fully-qualified table names.
+-- ============================================================
 
--- 2. Create trigger to automatically decrement/increment inventory stock when order items are changed
---    Uses SECURITY DEFINER to bypass RLS (so anon checkout can update products.inventory_stock)
---    search_path pinned to 'public' to prevent search_path hijacking
+-- 1. Replace the function with SECURITY DEFINER + hardened search_path
 CREATE OR REPLACE FUNCTION update_inventory_on_order_item_change()
 RETURNS TRIGGER
 LANGUAGE plpgsql
@@ -62,12 +71,13 @@ BEGIN
 END;
 $$;
 
--- Revoke direct EXECUTE from public roles for defense-in-depth
+-- 2. Revoke direct EXECUTE from public roles for defense-in-depth.
+--    The trigger will still fire because it's owned by postgres.
 REVOKE ALL ON FUNCTION update_inventory_on_order_item_change() FROM PUBLIC;
 REVOKE ALL ON FUNCTION update_inventory_on_order_item_change() FROM anon;
 REVOKE ALL ON FUNCTION update_inventory_on_order_item_change() FROM authenticated;
 
--- 3. Drop existing trigger if it exists and create the new one
+-- 3. Drop and recreate the trigger to ensure it's cleanly bound
 DROP TRIGGER IF EXISTS trg_update_inventory_on_order_item_change ON public.order_items;
 
 CREATE TRIGGER trg_update_inventory_on_order_item_change
