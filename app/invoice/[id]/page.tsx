@@ -4,6 +4,7 @@ import React, { useState, useEffect, use } from 'react';
 import { supabase } from '@/lib/supabase';
 import { ShoppingBag, Loader2, Calendar, User, Clock, CheckCircle2, Printer, ChevronRight, Store, Gift, Tag } from 'lucide-react';
 import Link from 'next/link';
+import { isOfferActive, getOfferBonusQuantity, getOrderBoxSummary } from '@/lib/offerHelpers';
 
 interface OrderItem {
   id: string;
@@ -17,8 +18,15 @@ interface OrderItem {
   products?: {
     name: string;
     image_url?: string | null;
+    has_offer?: boolean;
+    offer_title?: string | null;
+    offer_type?: 'unlimited' | 'date_limited' | 'stock_limited';
+    offer_end_date?: string | null;
+    offer_max_quantity?: number | null;
+    offer_used_quantity?: number;
   } | null;
 }
+
 
 
 interface Order {
@@ -56,7 +64,13 @@ export default function PublicInvoicePage({ params }: { params: Promise<{ id: st
             product_image,
             products (
               name,
-              image_url
+              image_url,
+              has_offer,
+              offer_title,
+              offer_type,
+              offer_end_date,
+              offer_max_quantity,
+              offer_used_quantity
             )
           )
         `)
@@ -71,13 +85,18 @@ export default function PublicInvoicePage({ params }: { params: Promise<{ id: st
 
       const typedOrder: Order = {
         ...data,
-        order_items: (data.order_items || []).map((item: any) => ({
-          ...item,
-          product_name: item.product_name,
-          product_image: item.product_image,
-          products: item.products ? { name: item.products.name, image_url: item.products.image_url } : null
-        }))
+        order_items: (data.order_items || []).map((item: any) => {
+          const effectiveOffer = item.applied_offer || (item.products && isOfferActive(item.products) ? item.products.offer_title : null);
+          return {
+            ...item,
+            applied_offer: effectiveOffer,
+            product_name: item.product_name,
+            product_image: item.product_image,
+            products: item.products ? { ...item.products } : null
+          };
+        })
       };
+
 
       setOrder(typedOrder);
     } catch (err: any) {
@@ -225,12 +244,18 @@ export default function PublicInvoicePage({ params }: { params: Promise<{ id: st
                           `${item.quantity} صندوق × يحدد لاحقاً`
                         )}
                       </p>
-                      {item.applied_offer && (
-                        <div className="mt-1 inline-flex items-center gap-1 bg-amber-50 border border-amber-200/80 text-amber-900 font-bold px-2 py-0.5 rounded-lg text-[9.5px]">
-                          <Gift className="w-3 h-3 text-amber-600 shrink-0" />
-                          <span>عرض خاص: {item.applied_offer}</span>
-                        </div>
-                      )}
+                      {(() => {
+                        const offer = item.applied_offer || (item.products && isOfferActive(item.products) ? item.products.offer_title : null);
+                        if (!offer) return null;
+                        const bonusQty = getOfferBonusQuantity(offer, item.quantity);
+                        return (
+                          <div className="mt-1 inline-flex items-center gap-1 bg-amber-50 border border-amber-200/80 text-amber-900 font-bold px-2 py-0.5 rounded-lg text-[9.5px]">
+                            <Gift className="w-3 h-3 text-amber-600 shrink-0" />
+                            <span>عرض خاص: {offer}</span>
+                            {bonusQty > 0 && <span className="text-amber-950 font-extrabold mr-1">(+ {bonusQty} صندوق مجاناً)</span>}
+                          </div>
+                        );
+                      })()}
                     </div>
 
                   </div>
@@ -249,12 +274,22 @@ export default function PublicInvoicePage({ params }: { params: Promise<{ id: st
         </div>
 
         {/* إحصائية الصناديق للفاتورة */}
-        <div className="bg-slate-50 rounded-2xl p-4 border border-slate-200/60 flex items-center justify-between text-xs font-bold text-slate-700">
-          <span>إجمالي عدد الصناديق المطلوبة:</span>
-          <span className="font-mono text-sm bg-slate-200/60 px-2.5 py-0.5 rounded-lg text-slate-800">
-            {order.order_items.reduce((sum, item) => sum + item.quantity, 0)} صندوق
-          </span>
-        </div>
+        {(() => {
+          const summary = getOrderBoxSummary(order.order_items);
+          return (
+            <div className="bg-slate-50 rounded-2xl p-4 border border-slate-200/60 flex items-center justify-between text-xs font-bold text-slate-700">
+              <span>إجمالي عدد الصناديق المطلوبة:</span>
+              <span className="font-mono text-sm bg-slate-200/60 px-2.5 py-0.5 rounded-lg text-slate-800">
+                {summary.bonusBoxes > 0 ? (
+                  `${summary.totalBoxes} صندوق (${summary.paidBoxes} أصلية + ${summary.bonusBoxes} مجاناً بالعروض)`
+                ) : (
+                  `${summary.paidBoxes} صندوق`
+                )}
+              </span>
+            </div>
+          );
+        })()}
+
 
         {/* Grand Total Card */}
         <div className="bg-emerald-50/50 rounded-2xl p-4 border border-emerald-100 flex items-center justify-between">

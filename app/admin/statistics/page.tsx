@@ -5,10 +5,11 @@ import { supabase } from '@/lib/supabase';
 import { 
   TrendingUp, DollarSign, FileText, Users, ShoppingBag, Calendar, 
   Search, RefreshCw, X, AlertCircle, Loader2,
-  Trash2, Copy, Download, Printer, Plus, Edit3, Save, ChevronUp, ChevronDown
+  Trash2, Copy, Download, Printer, Plus, Edit3, Save, ChevronUp, ChevronDown, Gift, Tag
 } from 'lucide-react';
 import { jsPDF } from 'jspdf';
 import html2canvas from 'html2canvas-pro';
+import { isOfferActive, getOfferBonusQuantity, getOrderBoxSummary } from '@/lib/offerHelpers';
 
 interface OrderItem {
   id: string;
@@ -18,11 +19,19 @@ interface OrderItem {
   price_at_purchase: number;
   product_name?: string | null;
   product_image?: string | null;
+  applied_offer?: string | null;
   products?: {
     name: string;
     image_url?: string | null;
+    has_offer?: boolean;
+    offer_title?: string | null;
+    offer_type?: 'unlimited' | 'date_limited' | 'stock_limited';
+    offer_end_date?: string | null;
+    offer_max_quantity?: number | null;
+    offer_used_quantity?: number;
   } | null;
 }
+
 
 interface Order {
   id: string;
@@ -152,7 +161,13 @@ export default function AdminStatistics() {
             product_image,
             products (
               name,
-              image_url
+              image_url,
+              has_offer,
+              offer_title,
+              offer_type,
+              offer_end_date,
+              offer_max_quantity,
+              offer_used_quantity
             )
           )
         `)
@@ -163,13 +178,18 @@ export default function AdminStatistics() {
 
       const typedOrders: Order[] = (data || []).map((order: any) => ({
         ...order,
-        order_items: (order.order_items || []).map((item: any) => ({
-          ...item,
-          product_name: item.product_name,
-          product_image: item.product_image,
-          products: item.products ? { name: item.products.name, image_url: item.products.image_url } : null
-        }))
+        order_items: (order.order_items || []).map((item: any) => {
+          const effectiveOffer = item.applied_offer || (item.products && isOfferActive(item.products) ? item.products.offer_title : null);
+          return {
+            ...item,
+            applied_offer: effectiveOffer,
+            product_name: item.product_name,
+            product_image: item.product_image,
+            products: item.products ? { ...item.products } : null
+          };
+        })
       }));
+
 
       setOrders(typedOrders);
       usingMockData && setUsingMockData(false);
@@ -1118,7 +1138,21 @@ export default function AdminStatistics() {
                             ) : (
                               <ShoppingBag className="w-14 h-14 p-2.5 bg-white text-slate-400 border border-slate-200 rounded-lg shrink-0" />
                             )}
-                            <span>{item.product_name || item.products?.name || 'منتج غير متوفر'}</span>
+                            <div className="flex flex-col text-right">
+                              <span className="font-bold text-slate-800 text-right">{item.product_name || item.products?.name || 'منتج غير متوفر'}</span>
+                              {(() => {
+                                const offer = item.applied_offer || (item.products && isOfferActive(item.products) ? item.products.offer_title : null);
+                                if (!offer) return null;
+                                const bonusQty = getOfferBonusQuantity(offer, item.quantity);
+                                return (
+                                  <span className="inline-flex items-center gap-1 text-[10px] font-bold text-amber-800 bg-amber-50 border border-amber-200/80 px-1.5 py-0.5 rounded-md mt-0.5 w-fit">
+                                    <Gift className="w-3 h-3 text-amber-600 shrink-0" />
+                                    <span>{offer}</span>
+                                    {bonusQty > 0 && <span className="text-amber-950 font-extrabold mr-0.5">(+ {bonusQty} صندوق مجاناً)</span>}
+                                  </span>
+                                );
+                              })()}
+                            </div>
                           </div>
                           <span className="font-semibold text-slate-800">
                             {item.price_at_purchase !== null && item.price_at_purchase !== undefined && Number(item.price_at_purchase) > 0 ? (
@@ -1131,10 +1165,22 @@ export default function AdminStatistics() {
                       ))}
                       
                       {/* إحصائية عدد الصناديق الإجمالي للفاتورة */}
-                      <div className="flex justify-between items-center text-xs font-extrabold text-[#128C7E] bg-emerald-50/30 border border-emerald-100/80 rounded-xl px-3.5 py-2 mt-2 shadow-2xs">
-                        <span>إجمالي عدد الصناديق المطلوبة:</span>
-                        <span className="font-mono text-sm bg-[#128C7E]/10 px-2 py-0.5 rounded-lg">{order.order_items.reduce((sum, item) => sum + item.quantity, 0)} صندوق</span>
-                      </div>
+                      {(() => {
+                        const summary = getOrderBoxSummary(order.order_items);
+                        return (
+                          <div className="flex justify-between items-center text-xs font-extrabold text-[#128C7E] bg-emerald-50/30 border border-emerald-100/80 rounded-xl px-3.5 py-2 mt-2 shadow-2xs">
+                            <span>إجمالي عدد الصناديق المطلوبة:</span>
+                            <span className="font-mono text-sm bg-[#128C7E]/10 px-2 py-0.5 rounded-lg">
+                              {summary.bonusBoxes > 0 ? (
+                                `${summary.totalBoxes} صندوق (${summary.paidBoxes} أصلية + ${summary.bonusBoxes} مجاناً بالعروض)`
+                              ) : (
+                                `${summary.paidBoxes} صندوق`
+                              )}
+                            </span>
+                          </div>
+                        );
+                      })()}
+
                     </>
                   )}
                 </div>

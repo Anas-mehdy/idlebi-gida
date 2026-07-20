@@ -2,9 +2,10 @@
 
 import React, { useState, useEffect } from 'react';
 import { supabase } from '@/lib/supabase';
-import { ShoppingBag, Users, CheckSquare, ClipboardList, TrendingUp, DollarSign, Clock, AlertCircle, Trash2, Save, Copy, X, CalendarClock, Printer, Plus, Search, Download, ChevronDown, ChevronUp, Edit2 } from 'lucide-react';
+import { ShoppingBag, Users, CheckSquare, ClipboardList, TrendingUp, DollarSign, Clock, AlertCircle, Trash2, Save, Copy, X, CalendarClock, Printer, Plus, Search, Download, ChevronDown, ChevronUp, Edit2, Gift, Tag } from 'lucide-react';
 import html2canvas from 'html2canvas-pro';
 import { jsPDF } from 'jspdf';
+import { isOfferActive, getOfferBonusQuantity, getOrderBoxSummary } from '@/lib/offerHelpers';
 
 interface OrderItem {
   id: string;
@@ -14,12 +15,20 @@ interface OrderItem {
   price_at_purchase: number;
   product_name?: string | null;
   product_image?: string | null;
+  applied_offer?: string | null;
   products?: {
     name: string;
     image_url?: string | null;
     inventory_stock?: number | null;
+    has_offer?: boolean;
+    offer_title?: string | null;
+    offer_type?: 'unlimited' | 'date_limited' | 'stock_limited';
+    offer_end_date?: string | null;
+    offer_max_quantity?: number | null;
+    offer_used_quantity?: number;
   } | null;
 }
+
 
 interface Order {
   id: string;
@@ -91,7 +100,16 @@ export default function AdminDashboard() {
   const [lastSoldPrices, setLastSoldPrices] = useState<Record<string, number>>({});
   const [focusedItemId, setFocusedItemId] = useState<string | null>(null);
 
+  const allProductsMap = React.useMemo(() => {
+    const map: Record<string, any> = {};
+    (allProducts || []).forEach(p => {
+      map[p.id] = p;
+    });
+    return map;
+  }, [allProducts]);
+
   const toggleOrderExpand = (orderId: string) => {
+
     setExpandedOrders(prev => ({
       ...prev,
       [orderId]: !prev[orderId]
@@ -178,7 +196,13 @@ export default function AdminDashboard() {
             products (
               name,
               image_url,
-              inventory_stock
+              inventory_stock,
+              has_offer,
+              offer_title,
+              offer_type,
+              offer_end_date,
+              offer_max_quantity,
+              offer_used_quantity
             )
           )
         `)
@@ -190,17 +214,28 @@ export default function AdminDashboard() {
       // Make sure order_items and products nested object satisfies our type structure
       const typedOrders: Order[] = (data || []).map((order: any) => ({
         ...order,
-        order_items: (order.order_items || []).map((item: any) => ({
-          ...item,
-          product_name: item.product_name,
-          product_image: item.product_image,
-          products: item.products ? { 
-            name: item.products.name, 
-            image_url: item.products.image_url,
-            inventory_stock: item.products.inventory_stock 
-          } : null
-        }))
+        order_items: (order.order_items || []).map((item: any) => {
+          const effectiveOffer = item.applied_offer || (item.products && isOfferActive(item.products) ? item.products.offer_title : null);
+          return {
+            ...item,
+            applied_offer: effectiveOffer,
+            product_name: item.product_name,
+            product_image: item.product_image,
+            products: item.products ? { 
+              name: item.products.name, 
+              image_url: item.products.image_url,
+              inventory_stock: item.products.inventory_stock,
+              has_offer: item.products.has_offer,
+              offer_title: item.products.offer_title,
+              offer_type: item.products.offer_type,
+              offer_end_date: item.products.offer_end_date,
+              offer_max_quantity: item.products.offer_max_quantity,
+              offer_used_quantity: item.products.offer_used_quantity
+            } : null
+          };
+        })
       }));
+
 
       // Fetch all products for adding products dropdown
       const { data: prodData, error: prodError } = await supabase
@@ -643,13 +678,16 @@ export default function AdminDashboard() {
 
       let insertedId = 'temp-' + Date.now();
 
+      const activeOffer = isOfferActive(selectedProduct) ? selectedProduct.offer_title : null;
+
       if (isUrlConfigured) {
         if (existingItem) {
           const { error: updateError } = await supabase
             .from('order_items')
             .update({ 
               quantity: existingItem.quantity + qty,
-              price_at_purchase: price
+              price_at_purchase: price,
+              applied_offer: existingItem.applied_offer || activeOffer
             })
             .eq('id', existingItem.id);
 
@@ -663,7 +701,8 @@ export default function AdminDashboard() {
               quantity: qty,
               price_at_purchase: price,
               product_name: selectedProduct.name,
-              product_image: selectedProduct.image_url
+              product_image: selectedProduct.image_url,
+              applied_offer: activeOffer
             })
             .select();
 
@@ -691,7 +730,8 @@ export default function AdminDashboard() {
                 return {
                   ...item,
                   quantity: item.quantity + qty,
-                  price_at_purchase: price
+                  price_at_purchase: price,
+                  applied_offer: item.applied_offer || activeOffer
                 };
               }
               return item;
@@ -705,10 +745,8 @@ export default function AdminDashboard() {
               price_at_purchase: price,
               product_name: selectedProduct.name,
               product_image: selectedProduct.image_url,
-              products: {
-                name: selectedProduct.name,
-                image_url: selectedProduct.image_url
-              }
+              applied_offer: activeOffer,
+              products: { ...selectedProduct }
             });
           }
           return {
@@ -716,6 +754,7 @@ export default function AdminDashboard() {
             total_price: newTotalPrice,
             order_items: newItems
           };
+
         }
         return o;
       });
@@ -1273,7 +1312,22 @@ export default function AdminDashboard() {
                           ) : (
                             <ShoppingBag className="w-12 h-12 sm:w-14 sm:h-14 p-2 sm:p-2.5 bg-white text-slate-400 border border-slate-200 rounded-lg shrink-0" />
                           )}
-                          <span className="font-bold text-slate-800 text-right">{item.product_name || item.products?.name || 'منتج غير متوفر'}</span>
+                          <div className="flex flex-col text-right">
+                            <span className="font-bold text-slate-800 text-right">{item.product_name || item.products?.name || 'منتج غير متوفر'}</span>
+                            {(() => {
+                              const offer = item.applied_offer || (item.product_id && allProductsMap[item.product_id] && isOfferActive(allProductsMap[item.product_id]) ? allProductsMap[item.product_id].offer_title : null);
+                              if (!offer) return null;
+                              const currentQty = editedQuantities[item.id] !== undefined ? editedQuantities[item.id] : item.quantity;
+                              const bonusQty = getOfferBonusQuantity(offer, currentQty);
+                              return (
+                                <span className="inline-flex items-center gap-1 text-[10px] font-bold text-amber-800 bg-amber-50 border border-amber-200/80 px-1.5 py-0.5 rounded-md mt-0.5 w-fit">
+                                  <Gift className="w-3 h-3 text-amber-600 shrink-0" />
+                                  <span>{offer}</span>
+                                  {bonusQty > 0 && <span className="text-amber-950 font-extrabold mr-0.5">(+ {bonusQty} صندوق مجاناً)</span>}
+                                </span>
+                              );
+                            })()}
+                          </div>
                         </div>
                         {/* Mobile Delete Button */}
                         <button
@@ -1389,10 +1443,28 @@ export default function AdminDashboard() {
                   ))}
                   
                   {/* إحصائية عدد الصناديق الإجمالي للفاتورة */}
-                  <div className="flex justify-between items-center text-xs font-extrabold text-[#128C7E] bg-emerald-50/30 border border-emerald-100/80 rounded-xl px-3.5 py-2 mt-2 shadow-2xs">
-                    <span>إجمالي عدد الصناديق المطلوبة:</span>
-                    <span className="font-mono text-sm bg-[#128C7E]/10 px-2 py-0.5 rounded-lg">{order.order_items.reduce((sum, item) => sum + item.quantity, 0)} صندوق</span>
-                  </div>
+                  {(() => {
+                    const summary = getOrderBoxSummary(
+                      order.order_items.map(item => ({
+                        ...item,
+                        quantity: editedQuantities[item.id] !== undefined ? editedQuantities[item.id] : item.quantity
+                      })),
+                      allProductsMap
+                    );
+                    return (
+                      <div className="flex justify-between items-center text-xs font-extrabold text-[#128C7E] bg-emerald-50/30 border border-emerald-100/80 rounded-xl px-3.5 py-2 mt-2 shadow-2xs">
+                        <span>إجمالي عدد الصناديق المطلوبة:</span>
+                        <span className="font-mono text-sm bg-[#128C7E]/10 px-2 py-0.5 rounded-lg">
+                          {summary.bonusBoxes > 0 ? (
+                            `${summary.totalBoxes} صندوق (${summary.paidBoxes} أصلية + ${summary.bonusBoxes} مجاناً بالعروض)`
+                          ) : (
+                            `${summary.paidBoxes} صندوق`
+                          )}
+                        </span>
+                      </div>
+                    );
+                  })()}
+
 
                   {/* زر ونموذج إضافة منتج للفاتورة */}
                   <div className="mt-3 pt-2 border-t border-dashed border-slate-200">
@@ -2033,7 +2105,22 @@ export default function AdminDashboard() {
                           ) : (
                             <ShoppingBag className="w-12 h-12 sm:w-14 sm:h-14 p-2 sm:p-2.5 bg-white text-slate-400 border border-slate-200 rounded-lg shrink-0" />
                           )}
-                          <span className="font-bold text-slate-800 text-right">{item.product_name || item.products?.name || 'منتج غير متوفر'}</span>
+                          <div className="flex flex-col text-right">
+                            <span className="font-bold text-slate-800 text-right">{item.product_name || item.products?.name || 'منتج غير متوفر'}</span>
+                            {(() => {
+                              const offer = item.applied_offer || (item.product_id && allProductsMap[item.product_id] && isOfferActive(allProductsMap[item.product_id]) ? allProductsMap[item.product_id].offer_title : null);
+                              if (!offer) return null;
+                              const currentQty = editedQuantities[item.id] !== undefined ? editedQuantities[item.id] : item.quantity;
+                              const bonusQty = getOfferBonusQuantity(offer, currentQty);
+                              return (
+                                <span className="inline-flex items-center gap-1 text-[10px] font-bold text-amber-800 bg-amber-50 border border-amber-200/80 px-1.5 py-0.5 rounded-md mt-0.5 w-fit">
+                                  <Gift className="w-3 h-3 text-amber-600 shrink-0" />
+                                  <span>{offer}</span>
+                                  {bonusQty > 0 && <span className="text-amber-950 font-extrabold mr-0.5">(+ {bonusQty} صندوق مجاناً)</span>}
+                                </span>
+                              );
+                            })()}
+                          </div>
                         </div>
                         {/* Mobile Delete Button */}
                         <button
@@ -2149,10 +2236,28 @@ export default function AdminDashboard() {
                   ))}
                   
                   {/* إحصائية عدد الصناديق الإجمالي للفاتورة */}
-                  <div className="flex justify-between items-center text-xs font-extrabold text-[#128C7E] bg-emerald-50/30 border border-emerald-100/80 rounded-xl px-3.5 py-2 mt-2 shadow-2xs">
-                    <span>إجمالي عدد الصناديق المطلوبة:</span>
-                    <span className="font-mono text-sm bg-[#128C7E]/10 px-2 py-0.5 rounded-lg">{order.order_items.reduce((sum, item) => sum + item.quantity, 0)} صندوق</span>
-                  </div>
+                  {(() => {
+                    const summary = getOrderBoxSummary(
+                      order.order_items.map(item => ({
+                        ...item,
+                        quantity: editedQuantities[item.id] !== undefined ? editedQuantities[item.id] : item.quantity
+                      })),
+                      allProductsMap
+                    );
+                    return (
+                      <div className="flex justify-between items-center text-xs font-extrabold text-[#128C7E] bg-emerald-50/30 border border-emerald-100/80 rounded-xl px-3.5 py-2 mt-2 shadow-2xs">
+                        <span>إجمالي عدد الصناديق المطلوبة:</span>
+                        <span className="font-mono text-sm bg-[#128C7E]/10 px-2 py-0.5 rounded-lg">
+                          {summary.bonusBoxes > 0 ? (
+                            `${summary.totalBoxes} صندوق (${summary.paidBoxes} أصلية + ${summary.bonusBoxes} مجاناً بالعروض)`
+                          ) : (
+                            `${summary.paidBoxes} صندوق`
+                          )}
+                        </span>
+                      </div>
+                    );
+                  })()}
+
 
                   {/* زر ونموذج إضافة منتج للفاتورة */}
                   <div className="mt-3 pt-2 border-t border-dashed border-slate-200">
@@ -2574,10 +2679,20 @@ export default function AdminDashboard() {
                 const price = Number(item.price_at_purchase || 0);
                 const qty = item.quantity;
                 const total = price * qty;
+                const offer = item.applied_offer || (item.product_id && allProductsMap[item.product_id] && isOfferActive(allProductsMap[item.product_id]) ? allProductsMap[item.product_id].offer_title : null);
+                const bonusQty = offer ? getOfferBonusQuantity(offer, qty) : 0;
                 return (
                   <tr key={item.id} className="border-b border-slate-300">
                     <td className="border border-slate-355 px-3 py-2.5 text-center font-bold font-mono">{idx + 1}</td>
-                    <td className="border border-slate-355 px-3 py-2.5 font-bold text-slate-800">{item.product_name || item.products?.name || 'منتج غير معروف'}</td>
+                    <td className="border border-slate-355 px-3 py-2.5 font-bold text-slate-800">
+                      <div>{item.product_name || item.products?.name || 'منتج غير معروف'}</div>
+                      {offer && (
+                        <div className="text-[11px] text-amber-900 font-extrabold mt-1 bg-amber-50 border border-amber-200/80 rounded-md px-2 py-0.5 inline-flex items-center gap-1">
+                          <span>🎁 عرض خاص: {offer}</span>
+                          {bonusQty > 0 && <span className="text-amber-950 font-black">(+ {bonusQty} صندوق مجاناً)</span>}
+                        </div>
+                      )}
+                    </td>
                     <td className="border border-slate-355 px-3 py-2.5 text-center font-black font-mono">{qty} صندوق</td>
                     <td className="border border-slate-355 px-3 py-2.5 text-center font-extrabold font-mono">{price.toFixed(2)} TL</td>
                     <td className="border border-slate-355 px-3 py-2.5 text-center font-black font-mono">{total.toFixed(2)} TL</td>
@@ -2592,9 +2707,17 @@ export default function AdminDashboard() {
             <div className="text-xs text-slate-550 font-bold">
               <span>إجمالي الصناديق: </span>
               <span className="font-extrabold text-slate-800 text-sm font-mono mr-1">
-                {activePrintOrder.order_items.reduce((sum, item) => sum + item.quantity, 0)} صندوق
+                {(() => {
+                  const summary = getOrderBoxSummary(activePrintOrder.order_items, allProductsMap);
+                  return summary.bonusBoxes > 0 ? (
+                    `${summary.totalBoxes} صندوق (${summary.paidBoxes} أصلية + ${summary.bonusBoxes} مجاناً بالعروض)`
+                  ) : (
+                    `${summary.paidBoxes} صندوق`
+                  );
+                })()}
               </span>
             </div>
+
             <div className="text-right">
               <span className="text-slate-700 font-black text-md">المجموع الكلي النهائي:</span>
               <span className="text-xl font-black text-[#128C7E] font-mono mr-2 bg-emerald-50 border border-emerald-200 px-3 py-1 rounded-lg">
@@ -2745,10 +2868,17 @@ export default function AdminDashboard() {
                 const price = Number(item.price_at_purchase || 0);
                 const qty = item.quantity;
                 const total = price * qty;
+                const offer = item.applied_offer || (item.product_id && allProductsMap[item.product_id] && isOfferActive(allProductsMap[item.product_id]) ? allProductsMap[item.product_id].offer_title : null);
+                const bonusQty = offer ? getOfferBonusQuantity(offer, qty) : 0;
                 return (
                   <tr key={item.id} className="border-b border-dashed border-black/30">
                     <td className="py-2 pr-0.5">
                       <div className="font-bold text-[13px]">{item.product_name || item.products?.name || 'مادة'}</div>
+                      {offer && (
+                        <div className="text-[11px] text-black font-extrabold mt-0.5">
+                          * عرض: {offer} {bonusQty > 0 ? `(+${bonusQty} مجانا)` : ''}
+                        </div>
+                      )}
                       <div className="text-[11px] text-black/70 font-mono mt-0.5">{price.toFixed(2)} TL</div>
                     </td>
                     <td className="py-2 text-center font-bold font-mono text-[13px]">{qty}</td>
@@ -2763,8 +2893,18 @@ export default function AdminDashboard() {
           <div className="border-t-2 border-black pt-2.5 space-y-2 text-[13px] font-bold">
             <div className="flex justify-between">
               <span>إجمالي الصناديق:</span>
-              <span className="font-mono">{activePrintOrder.order_items.reduce((sum, item) => sum + item.quantity, 0)} صندوق</span>
+              <span className="font-mono">
+                {(() => {
+                  const summary = getOrderBoxSummary(activePrintOrder.order_items, allProductsMap);
+                  return summary.bonusBoxes > 0 ? (
+                    `${summary.totalBoxes} صندوق (${summary.paidBoxes}+${summary.bonusBoxes}مجانا)`
+                  ) : (
+                    `${summary.paidBoxes} صندوق`
+                  );
+                })()}
+              </span>
             </div>
+
             <div className="flex justify-between text-sm border-t border-dashed border-black pt-2 font-black">
               <span>المجموع الكلي:</span>
               <span className="font-mono text-lg">{Number(activePrintOrder.total_price).toFixed(2)} TL</span>
