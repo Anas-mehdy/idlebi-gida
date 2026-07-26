@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect, useRef } from 'react';
 import { supabase } from '@/lib/supabase';
-import { Plus, Trash2, ShoppingBag, Loader2, Image as ImageIcon, Upload, AlertCircle, RefreshCw, GripVertical, Eye, EyeOff, X, Pencil, Search, Tag, Gift, Clock, PackageCheck, AlertTriangle } from 'lucide-react';
+import { Plus, Trash2, ShoppingBag, Loader2, Image as ImageIcon, Upload, AlertCircle, RefreshCw, GripVertical, Eye, EyeOff, X, Pencil, Search, Tag, Gift, Clock, PackageCheck, AlertTriangle, FileText } from 'lucide-react';
 
 interface Category {
   id: string;
@@ -24,6 +24,7 @@ export interface Product {
   offer_end_date?: string | null;
   offer_max_quantity?: number | null;
   offer_used_quantity?: number;
+  note?: string | null;
   categories?: {
     name: string;
   } | null;
@@ -156,6 +157,10 @@ export default function AdminProducts() {
   const [offerEndDate, setOfferEndDate] = useState('');
   const [offerMaxQuantity, setOfferMaxQuantity] = useState('');
 
+  // Form fields - Product Note
+  const [hasNote, setHasNote] = useState(false);
+  const [note, setNote] = useState('');
+
   // Edit product states
   const [editingProduct, setEditingProduct] = useState<Product | null>(null);
   const [editName, setEditName] = useState('');
@@ -173,6 +178,10 @@ export default function AdminProducts() {
   const [editOfferEndDate, setEditOfferEndDate] = useState('');
   const [editOfferMaxQuantity, setEditOfferMaxQuantity] = useState('');
   const [editOfferUsedQuantity, setEditOfferUsedQuantity] = useState(0);
+
+  // Edit product states - Product Note
+  const [editHasNote, setEditHasNote] = useState(false);
+  const [editNote, setEditNote] = useState('');
 
 
   // Status
@@ -521,6 +530,11 @@ export default function AdminProducts() {
     setEditOfferEndDate(formattedEndDate);
     setEditOfferMaxQuantity(product.offer_max_quantity !== null && product.offer_max_quantity !== undefined ? product.offer_max_quantity.toString() : '');
     setEditOfferUsedQuantity(product.offer_used_quantity || 0);
+
+    // Set product note edit state
+    const hasActiveNote = !product.has_offer && !!product.note && !!product.note.trim();
+    setEditHasNote(hasActiveNote);
+    setEditNote(product.note || '');
   };
 
   const handleSaveEdit = async (e: React.FormEvent) => {
@@ -598,13 +612,15 @@ export default function AdminProducts() {
         }
 
         const parsedPrice = editPrice.trim() ? parseFloat(editPrice) : null;
+        const noteValue = !editHasOffer && editHasNote && editNote.trim() ? editNote.trim() : null;
         const offerPayload = {
           has_offer: editHasOffer,
           offer_title: editHasOffer && editOfferTitle.trim() ? editOfferTitle.trim() : null,
           offer_type: editHasOffer ? editOfferType : 'unlimited',
           offer_end_date: editHasOffer && editOfferType === 'date_limited' && editOfferEndDate ? new Date(editOfferEndDate).toISOString() : null,
           offer_max_quantity: editHasOffer && editOfferType === 'stock_limited' && editOfferMaxQuantity ? parseInt(editOfferMaxQuantity, 10) : null,
-          offer_used_quantity: editHasOffer && editOfferType === 'stock_limited' ? editOfferUsedQuantity : 0
+          offer_used_quantity: editHasOffer && editOfferType === 'stock_limited' ? editOfferUsedQuantity : 0,
+          note: noteValue
         };
 
         const { data: updatedProd, error: updateError } = await supabase
@@ -632,6 +648,7 @@ export default function AdminProducts() {
         );
       } else {
         const matchingCat = categories.find(c => c.id === editCategoryId);
+        const noteValue = !editHasOffer && editHasNote && editNote.trim() ? editNote.trim() : null;
         const mockUpdatedProd: Product = {
           ...editingProduct,
           name: editName.trim(),
@@ -644,6 +661,7 @@ export default function AdminProducts() {
           offer_end_date: editHasOffer && editOfferType === 'date_limited' && editOfferEndDate ? new Date(editOfferEndDate).toISOString() : null,
           offer_max_quantity: editHasOffer && editOfferType === 'stock_limited' && editOfferMaxQuantity ? parseInt(editOfferMaxQuantity, 10) : null,
           offer_used_quantity: editHasOffer && editOfferType === 'stock_limited' ? editOfferUsedQuantity : 0,
+          note: noteValue,
           categories: matchingCat ? { name: matchingCat.name } : null
         };
 
@@ -717,13 +735,15 @@ export default function AdminProducts() {
 
         // 2. Insert product row in DB
         const parsedPrice = price.trim() ? parseFloat(price) : null;
+        const noteValue = !hasOffer && hasNote && note.trim() ? note.trim() : null;
         const offerPayload = {
           has_offer: hasOffer,
           offer_title: hasOffer && offerTitle.trim() ? offerTitle.trim() : null,
           offer_type: hasOffer ? offerType : 'unlimited',
           offer_end_date: hasOffer && offerType === 'date_limited' && offerEndDate ? new Date(offerEndDate).toISOString() : null,
           offer_max_quantity: hasOffer && offerType === 'stock_limited' && offerMaxQuantity ? parseInt(offerMaxQuantity, 10) : null,
-          offer_used_quantity: 0
+          offer_used_quantity: 0,
+          note: noteValue
         };
 
         const { data: newProd, error: insertError } = await supabase
@@ -749,6 +769,7 @@ export default function AdminProducts() {
       } else {
         // Mock add
         const matchingCat = categories.find(c => c.id === categoryId);
+        const noteValue = !hasOffer && hasNote && note.trim() ? note.trim() : null;
         const mockNewProd: Product = {
           id: Math.random().toString(),
           name: name.trim(),
@@ -761,6 +782,7 @@ export default function AdminProducts() {
           offer_end_date: hasOffer && offerType === 'date_limited' && offerEndDate ? new Date(offerEndDate).toISOString() : null,
           offer_max_quantity: hasOffer && offerType === 'stock_limited' && offerMaxQuantity ? parseInt(offerMaxQuantity, 10) : null,
           offer_used_quantity: 0,
+          note: noteValue,
           categories: matchingCat ? { name: matchingCat.name } : null
         };
         setProducts((prev) => [mockNewProd, ...prev]);
@@ -777,6 +799,8 @@ export default function AdminProducts() {
       setOfferType('unlimited');
       setOfferEndDate('');
       setOfferMaxQuantity('');
+      setHasNote(false);
+      setNote('');
       if (fileInputRef.current) fileInputRef.current.value = '';
     } catch (err: any) {
       console.error(err);
@@ -992,7 +1016,14 @@ export default function AdminProducts() {
                   <input
                     type="checkbox"
                     checked={hasOffer}
-                    onChange={(e) => setHasOffer(e.target.checked)}
+                    onChange={(e) => {
+                      const checked = e.target.checked;
+                      setHasOffer(checked);
+                      if (checked) {
+                        setHasNote(false);
+                        setNote('');
+                      }
+                    }}
                     className="sr-only peer"
                     disabled={submitting}
                   />
@@ -1084,6 +1115,53 @@ export default function AdminProducts() {
                       )}
                     </div>
                   </div>
+                </div>
+              )}
+            </div>
+
+            {/* Product Note Card */}
+            <div className="bg-sky-50/60 border border-sky-200/80 rounded-2xl p-3.5 space-y-3">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2 text-sky-900 font-bold text-xs">
+                  <FileText className="w-4 h-4 text-sky-600" />
+                  <span>إضافة ملاحظة للمنتج</span>
+                </div>
+                <label className="relative inline-flex items-center cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={hasNote}
+                    onChange={(e) => {
+                      const checked = e.target.checked;
+                      setHasNote(checked);
+                      if (checked) {
+                        setHasOffer(false);
+                        setOfferTitle('');
+                      }
+                    }}
+                    className="sr-only peer"
+                    disabled={submitting}
+                  />
+                  <div className="w-9 h-5 bg-slate-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:right-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-sky-500"></div>
+                </label>
+              </div>
+
+              {hasNote && (
+                <div className="space-y-2 pt-1 border-t border-sky-200/60 text-right">
+                  <div className="space-y-1">
+                    <label className="block text-[11px] font-bold text-slate-700">نص الملاحظة</label>
+                    <input
+                      type="text"
+                      required={hasNote}
+                      value={note}
+                      onChange={(e) => setNote(e.target.value)}
+                      placeholder="مثال: علبة زجاجية / يحتوي على مكسرات..."
+                      className="w-full bg-white border border-sky-300/80 outline-none rounded-xl px-3 py-2 text-xs text-slate-800 placeholder-slate-400 focus:border-sky-500 focus:ring-1 focus:ring-sky-500 transition-all text-right"
+                      disabled={submitting}
+                    />
+                  </div>
+                  <p className="text-[10px] text-sky-700 font-medium">
+                    ℹ️ تظهر هذه الملاحظة تحت المنتج مباشرة بدون أي كلمات إضافية (مثل "عرض" أو "ملاحظة").
+                  </p>
                 </div>
               )}
             </div>
@@ -1237,6 +1315,15 @@ export default function AdminProducts() {
                                     <span>عُرض منتهي: {product.offer_title}</span>
                                   </span>
                                 )}
+                              </div>
+                            )}
+
+                            {product.note && !product.has_offer && (
+                              <div className="flex items-center gap-1 text-[10px] flex-wrap">
+                                <span className="bg-sky-50 text-sky-800 border border-sky-200 font-medium px-2 py-0.5 rounded-md flex items-center gap-1">
+                                  <FileText className="w-3 h-3 text-sky-600 shrink-0" />
+                                  <span>{product.note}</span>
+                                </span>
                               </div>
                             )}
                           </div>
@@ -1506,7 +1593,14 @@ export default function AdminProducts() {
                     <input
                       type="checkbox"
                       checked={editHasOffer}
-                      onChange={(e) => setEditHasOffer(e.target.checked)}
+                      onChange={(e) => {
+                        const checked = e.target.checked;
+                        setEditHasOffer(checked);
+                        if (checked) {
+                          setEditHasNote(false);
+                          setEditNote('');
+                        }
+                      }}
                       className="sr-only peer"
                       disabled={submitting}
                     />
@@ -1608,6 +1702,53 @@ export default function AdminProducts() {
                         )}
                       </div>
                     </div>
+                  </div>
+                )}
+              </div>
+
+              {/* Product Note Card in Edit Modal */}
+              <div className="bg-sky-50/60 border border-sky-200/80 rounded-2xl p-3.5 space-y-3">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2 text-sky-900 font-bold text-xs">
+                    <FileText className="w-4 h-4 text-sky-600" />
+                    <span>إضافة ملاحظة للمنتج</span>
+                  </div>
+                  <label className="relative inline-flex items-center cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={editHasNote}
+                      onChange={(e) => {
+                        const checked = e.target.checked;
+                        setEditHasNote(checked);
+                        if (checked) {
+                          setEditHasOffer(false);
+                          setEditOfferTitle('');
+                        }
+                      }}
+                      className="sr-only peer"
+                      disabled={submitting}
+                    />
+                    <div className="w-9 h-5 bg-slate-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:right-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-sky-500"></div>
+                  </label>
+                </div>
+
+                {editHasNote && (
+                  <div className="space-y-2 pt-1 border-t border-sky-200/60 text-right">
+                    <div className="space-y-1">
+                      <label className="block text-[11px] font-bold text-slate-700">نص الملاحظة</label>
+                      <input
+                        type="text"
+                        required={editHasNote}
+                        value={editNote}
+                        onChange={(e) => setEditNote(e.target.value)}
+                        placeholder="مثال: علبة زجاجية / يحتوي على مكسرات..."
+                        className="w-full bg-white border border-sky-300/80 outline-none rounded-xl px-3 py-2 text-xs text-slate-800 placeholder-slate-400 focus:border-sky-500 focus:ring-1 focus:ring-sky-500 transition-all text-right"
+                        disabled={submitting}
+                      />
+                    </div>
+                    <p className="text-[10px] text-sky-700 font-medium">
+                      ℹ️ تظهر هذه الملاحظة تحت المنتج مباشرة بدون أي كلمات إضافية (مثل "عرض" أو "ملاحظة").
+                    </p>
                   </div>
                 )}
               </div>

@@ -26,6 +26,7 @@ interface Product {
   offer_end_date?: string | null;
   offer_max_quantity?: number | null;
   offer_used_quantity?: number;
+  note?: string | null;
 }
 
 const isOfferActive = (product: Product): boolean => {
@@ -348,6 +349,13 @@ export default function CatalogPage() {
                                       )}
 
                                     </div>
+                                  </div>
+                                )}
+
+                                {/* Product Note Callout */}
+                                {!offerActive && product.note && product.note.trim() && (
+                                  <div className="bg-slate-50 border border-slate-200/80 rounded-xl p-1.5 mb-2 text-[9.5px] font-medium text-slate-700 text-right leading-tight">
+                                    <span>{product.note.trim()}</span>
                                   </div>
                                 )}
                               </div>
