@@ -1,14 +1,15 @@
 'use client';
 
 import React, { useState, useEffect, use } from 'react';
-import { ShieldCheck, Lock, Store, AlertCircle, Loader2, ArrowLeft, CheckCircle2 } from 'lucide-react';
-import Link from 'next/link';
+import { ShieldCheck, Lock, AlertCircle, Loader2, FileWarning, UserX, Ban } from 'lucide-react';
 
 export default function AccessTokenPage({ params }: { params: Promise<{ token: string }> }) {
   const { token } = use(params);
 
   const [loading, setLoading] = useState(true);
   const [errorMsg, setErrorMsg] = useState('');
+  const [errorTitle, setErrorTitle] = useState('رابط الدخول غير صالح');
+  const [httpStatus, setHttpStatus] = useState<number | null>(null);
   const [customerName, setCustomerName] = useState('');
   const [hasPin, setHasPin] = useState(false);
   const [pin, setPin] = useState('');
@@ -26,17 +27,49 @@ export default function AccessTokenPage({ params }: { params: Promise<{ token: s
           body: JSON.stringify({ token })
         });
 
-        const data = await res.json();
+        setHttpStatus(res.status);
 
-        if (!res.ok) {
-          throw new Error(data.error || 'رابط الدخول غير صالح أو تم إلغاؤه.');
+        // Safe response parsing: read text first to prevent JSON parse crashes
+        const responseText = await res.text();
+        let data: any = null;
+        try {
+          data = responseText ? JSON.parse(responseText) : null;
+        } catch (parseErr) {
+          console.error('Failed to parse JSON response from verify-link API:', parseErr, responseText);
+        }
+
+        if (!data) {
+          setErrorTitle('خطأ في الاستجابة');
+          setErrorMsg('تلقى المتصفح رداً غير متوقع أو فارغاً من المخدم.');
+          return;
+        }
+
+        if (!res.ok || !data.success) {
+          if (res.status === 404) {
+            setErrorTitle('رابط غير موجود');
+            setErrorMsg(data.error || 'رابط الدخول الخاص غير موجود، يرجى التأكد من الرمز المستعمل.');
+          } else if (res.status === 410) {
+            setErrorTitle('رابط ملغى أو منتهي');
+            setErrorMsg(data.error || 'رابط الدخول هذا تم إبطاله أو انتهت صلاحيته.');
+          } else if (res.status === 403) {
+            setErrorTitle('حساب موقوف');
+            setErrorMsg(data.error || 'حساب هذا الزبون موقوف حالياً من قبل الإدارة.');
+          } else if (res.status === 500) {
+            setErrorTitle('خطأ تقني في المخدم');
+            setErrorMsg(data.error || 'حدث خطأ تقني داخلي أثناء فحص الرابط.');
+          } else {
+            setErrorTitle('تعذر الدخول');
+            setErrorMsg(data.error || 'حدث خطأ أثناء فحص صلاحية رابط الدخول.');
+          }
+          return;
         }
 
         setCustomerName(data.customerName || 'زبون معتمد');
         setHasPin(data.hasPin);
       } catch (err: any) {
-        console.error('Error verifying link:', err);
-        setErrorMsg(err.message || 'حدث خطأ في التحقق من رابط الدخول.');
+        console.error('Network or client error verifying link:', err);
+        setErrorTitle('خطأ في الاتصال');
+        setErrorMsg(err.message || 'تعذر الاتصال بالمخدم للتحقق من الرابط.');
       } finally {
         setLoading(false);
       }
@@ -53,7 +86,6 @@ export default function AccessTokenPage({ params }: { params: Promise<{ token: s
     setErrorMsg('');
 
     try {
-      // Basic device info
       const ua = navigator.userAgent;
       let browser = 'غير معروف';
       let os = 'غير معروف';
@@ -80,16 +112,26 @@ export default function AccessTokenPage({ params }: { params: Promise<{ token: s
         })
       });
 
-      const data = await res.json();
+      const responseText = await res.text();
+      let data: any = null;
+      try {
+        data = responseText ? JSON.parse(responseText) : null;
+      } catch (parseErr) {
+        console.error('Failed to parse JSON response from verify-pin API:', parseErr, responseText);
+      }
 
-      if (!res.ok) {
-        throw new Error(data.error || 'فشل التحقق من رمز PIN');
+      if (!data) {
+        throw new Error('تلقى المتصفح رداً غير متوقع أثناء تأكيد الـ PIN.');
+      }
+
+      if (!res.ok || !data.success) {
+        throw new Error(data.error || 'رمز PIN غير صحيح أو فشل الاعتماد.');
       }
 
       // Redirect to status page pending approval
       window.location.href = '/access/status?reason=pending';
     } catch (err: any) {
-      console.error(err);
+      console.error('Error submitting PIN:', err);
       setErrorMsg(err.message || 'حدث خطأ أثناء التأكيد.');
     } finally {
       setSubmitting(false);
@@ -98,7 +140,7 @@ export default function AccessTokenPage({ params }: { params: Promise<{ token: s
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-slate-50 flex flex-col items-center justify-center p-4 font-sans text-right">
+      <div className="min-h-screen bg-slate-50 flex flex-col items-center justify-center p-4 font-sans text-right dir-rtl">
         <div className="bg-white p-8 rounded-3xl border border-slate-200 shadow-lg text-center space-y-4 max-w-sm w-full">
           <Loader2 className="w-10 h-10 text-emerald-600 animate-spin mx-auto" />
           <h2 className="text-sm font-bold text-slate-800">جاري التحقق من رابط الدخول...</h2>
@@ -111,15 +153,21 @@ export default function AccessTokenPage({ params }: { params: Promise<{ token: s
     return (
       <div className="min-h-screen bg-slate-50 flex flex-col items-center justify-center p-4 font-sans text-right dir-rtl">
         <div className="bg-white p-8 rounded-3xl border border-slate-200 shadow-xl text-center space-y-5 max-w-md w-full">
-          <div className="w-14 h-14 bg-rose-50 border border-rose-100 rounded-2xl text-rose-600 flex items-center justify-center mx-auto shadow-sm">
-            <AlertCircle className="w-7 h-7" />
+          <div className={`w-14 h-14 rounded-2xl flex items-center justify-center mx-auto shadow-sm border ${
+            httpStatus === 410 ? 'bg-amber-50 border-amber-200 text-amber-600' :
+            httpStatus === 403 ? 'bg-orange-50 border-orange-200 text-orange-600' :
+            'bg-rose-50 border-rose-200 text-rose-600'
+          }`}>
+            {httpStatus === 410 ? <FileWarning className="w-7 h-7" /> :
+             httpStatus === 403 ? <UserX className="w-7 h-7" /> :
+             <AlertCircle className="w-7 h-7" />}
           </div>
           <div className="space-y-2">
-            <h1 className="text-lg font-bold text-slate-800">رابط الدخول غير صالح</h1>
+            <h1 className="text-lg font-bold text-slate-800">{errorTitle}</h1>
             <p className="text-xs text-slate-500 leading-relaxed">{errorMsg}</p>
           </div>
           <div className="pt-2 border-t border-slate-100">
-            <p className="text-xs text-slate-400">يرجى التواصل مع إدارة المتجر للحصول على رابط دخول جديد.</p>
+            <p className="text-xs text-slate-400">يرجى التواصل مع إدارة المتجر للحصول على مساعدة.</p>
           </div>
         </div>
       </div>
@@ -129,7 +177,7 @@ export default function AccessTokenPage({ params }: { params: Promise<{ token: s
   return (
     <div className="min-h-screen bg-slate-50 flex flex-col items-center justify-center p-4 font-sans dir-rtl">
       <div className="w-full max-w-md bg-white rounded-3xl p-6 sm:p-8 border border-slate-200 shadow-xl space-y-6">
-        {/* Header Header */}
+        {/* Header */}
         <div className="text-center space-y-2">
           <div className="w-14 h-14 bg-emerald-50 border border-emerald-200/60 rounded-2xl text-emerald-600 flex items-center justify-center mx-auto shadow-sm">
             <ShieldCheck className="w-7 h-7" />

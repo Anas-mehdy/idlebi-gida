@@ -4,39 +4,67 @@ import { hashToken } from '@/lib/auth/crypto';
 
 export async function POST(request: NextRequest) {
   try {
-    const { token } = await request.json();
+    const body = await request.json().catch(() => null);
 
-    if (!token || typeof token !== 'string') {
-      return NextResponse.json({ error: 'رمز الدخول غير صحيح' }, { status: 400 });
+    if (!body || !body.token || typeof body.token !== 'string') {
+      return NextResponse.json(
+        { success: false, error: 'رمز رابط الدخول مفقود أو غير صحيح' },
+        { status: 400 }
+      );
     }
 
-    const tokenHash = hashToken(token.trim());
+    const token = body.token.trim();
+    if (!token) {
+      return NextResponse.json(
+        { success: false, error: 'رمز رابط الدخول فارغ' },
+        { status: 400 }
+      );
+    }
 
-    // Find active access link
+    const tokenHash = hashToken(token);
+
+    // 1. Fetch access link record by token_hash
     const { data: linkData, error: linkError } = await supabaseAdmin
       .from('customer_access_links')
       .select('id, customer_id, status, customers(id, name, status, pin_hash)')
       .eq('token_hash', tokenHash)
-      .eq('status', 'active')
-      .single();
+      .maybeSingle();
 
-    if (linkError || !linkData) {
+    if (linkError) {
+      console.error('Database error in verify-link lookup:', linkError);
       return NextResponse.json(
-        { error: 'رابط الدخول هذا غير صالح أو تم إلغاؤه من قبل الإدارة.' },
+        { success: false, error: 'حدث خطأ تقني في قاعدة البيانات أثناء البحث عن الرابط' },
+        { status: 500 }
+      );
+    }
+
+    // 2. Link not found (404)
+    if (!linkData) {
+      return NextResponse.json(
+        { success: false, error: 'رابط الدخول الخاص غير موجود، يرجى التأكد من الرمز الصحيح.' },
         { status: 404 }
+      );
+    }
+
+    // 3. Link revoked or expired (410)
+    if (linkData.status === 'revoked' || linkData.status === 'expired') {
+      return NextResponse.json(
+        { success: false, error: 'رابط الدخول هذا ملغى أو منتهي الصلاحية، يرجى التواصل مع الإدارة للحصول على رابط جديد.' },
+        { status: 410 }
       );
     }
 
     const customer = linkData.customers as any;
 
+    // 4. Customer account suspended (403)
     if (!customer || customer.status === 'suspended') {
       return NextResponse.json(
-        { error: 'حساب هذا الزبون موقوف حالياً، يرجى التواصل مع الإدارة.' },
+        { success: false, error: 'حساب هذا الزبون موقوف حالياً، يرجى التواصل مع الإدارة.' },
         { status: 403 }
       );
     }
 
-    // Update last_used_at timestamp on the access link
+    // 5. Update last_used_at timestamp on the access link
     await supabaseAdmin
       .from('customer_access_links')
       .update({ last_used_at: new Date().toISOString() })
@@ -47,9 +75,13 @@ export async function POST(request: NextRequest) {
       customerId: customer.id,
       customerName: customer.name,
       hasPin: Boolean(customer.pin_hash)
-    });
+    }, { status: 200 });
+
   } catch (err: any) {
-    console.error('Error in verify-link:', err);
-    return NextResponse.json({ error: 'حدث خطأ غير متوقع' }, { status: 500 });
+    console.error('Unhandled exception in verify-link API handler:', err);
+    return NextResponse.json(
+      { success: false, error: 'حدث خطأ تقني غير متوقع في السيرفر' },
+      { status: 500 }
+    );
   }
 }

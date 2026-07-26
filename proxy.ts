@@ -29,9 +29,9 @@ export default function proxy(request: NextRequest) {
     const adminSession = request.cookies.get('admin_session');
 
     if (!adminSession || adminSession.value !== 'authenticated') {
-      if (pathname.startsWith('/api/admin')) {
+      if (pathname.startsWith('/api/')) {
         return NextResponse.json(
-          { error: 'Unauthorized admin access' },
+          { success: false, error: 'Unauthorized admin access' },
           { status: 401 }
         );
       }
@@ -41,9 +41,11 @@ export default function proxy(request: NextRequest) {
     return NextResponse.next();
   }
 
-  // 4. Customer Access & Status Public Routes (/access/*, /access/status, etc.)
+  // 4. Customer Access & Onboarding Public Routes (/access/*, /api/access/*, /waiting-approval, /access-denied)
+  // Explicitly allow onboarding API endpoints and public access pages without session checks or redirects.
   if (
     pathname.startsWith('/access') ||
+    pathname.startsWith('/api/access') ||
     pathname === '/waiting-approval' ||
     pathname === '/access-denied'
   ) {
@@ -60,9 +62,9 @@ export default function proxy(request: NextRequest) {
 
     // If no customer device session cookie exists at all
     if (!approvedSession && !pendingSession) {
-      if (pathname.startsWith('/api/store')) {
+      if (pathname.startsWith('/api/')) {
         return NextResponse.json(
-          { error: 'Unauthorized store access: Device approval required' },
+          { success: false, error: 'Unauthorized store access: Device approval required' },
           { status: 401 }
         );
       }
@@ -73,9 +75,9 @@ export default function proxy(request: NextRequest) {
 
     // If only pending session exists and visitor is trying to access store routes or APIs
     if (!approvedSession && pendingSession) {
-      if (pathname.startsWith('/api/store')) {
+      if (pathname.startsWith('/api/')) {
         return NextResponse.json(
-          { error: 'Forbidden: Device pending approval' },
+          { success: false, error: 'Forbidden: Device pending approval' },
           { status: 403 }
         );
       }
