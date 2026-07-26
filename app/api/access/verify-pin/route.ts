@@ -17,7 +17,6 @@ export async function POST(request: NextRequest) {
       .from('customer_access_links')
       .select('id, customer_id, customers(id, name, status, pin_hash, max_devices)')
       .eq('token_hash', tokenHash)
-      .eq('status', 'active')
       .single();
 
     if (linkError || !linkData) {
@@ -53,7 +52,105 @@ export async function POST(request: NextRequest) {
       user_agent: request.headers.get('user-agent') || 'unknown'
     });
 
-    // 3. Count current approved devices
+    // 3. Check if browser already has an active approved customer_device_session
+    const approvedCookie = request.cookies.get('customer_device_session');
+    if (approvedCookie?.value) {
+      const sessionHash = hashToken(approvedCookie.value);
+      const { data: activeSession } = await supabaseAdmin
+        .from('customer_sessions')
+        .select('id, expires_at, customer_id, customer_devices!inner(id, status)')
+        .eq('session_token_hash', sessionHash)
+        .maybeSingle();
+
+      if (activeSession && activeSession.customer_id === customer.id) {
+        const dev = activeSession.customer_devices as any;
+        if (dev?.status === 'approved' && new Date(activeSession.expires_at).getTime() > Date.now()) {
+          console.log('[VerifyPin] Active approved session found. Bypassing duplicate device creation.');
+          return NextResponse.json({
+            success: true,
+            status: 'approved',
+            alreadyApproved: true,
+            redirectTo: '/'
+          });
+        }
+      }
+    }
+
+    const userAgent = request.headers.get('user-agent') || '';
+    const ip = request.headers.get('x-forwarded-for') || '127.0.0.1';
+    const now = new Date().toISOString();
+
+    // 4. Check if pending cookie exists matching an existing device
+    const pendingCookie = request.cookies.get('customer_pending_session');
+    if (pendingCookie?.value) {
+      const pendingHash = hashToken(pendingCookie.value);
+      const { data: existingDevice } = await supabaseAdmin
+        .from('customer_devices')
+        .select('id, status, customer_id')
+        .eq('device_token_hash', pendingHash)
+        .maybeSingle();
+
+      if (existingDevice && existingDevice.customer_id === customer.id) {
+        console.log('[VerifyPin] Reusing existing pending device record:', existingDevice.id);
+        await supabaseAdmin
+          .from('customer_devices')
+          .update({ last_seen_at: now, last_ip: ip })
+          .eq('id', existingDevice.id);
+
+        return NextResponse.json({
+          success: true,
+          status: existingDevice.status,
+          customerName: customer.name,
+          message: existingDevice.status === 'approved' ? 'الجهاز معتمد بالفعل' : 'طلب الجهاز معلق وبانتظار موافقة الأدمن.'
+        });
+      }
+    }
+
+    // 5. Check if matching device already exists by customer_id and user_agent (to prevent duplicate rows)
+    const { data: matchingDevice } = await supabaseAdmin
+      .from('customer_devices')
+      .select('id, status')
+      .eq('customer_id', customer.id)
+      .eq('user_agent', userAgent)
+      .order('last_seen_at', { ascending: false })
+      .limit(1)
+      .maybeSingle();
+
+    if (matchingDevice && (matchingDevice.status === 'pending' || matchingDevice.status === 'approved')) {
+      console.log('[VerifyPin] Reusing device record matching user agent:', matchingDevice.id);
+      const deviceToken = generateRandomToken(32);
+      const deviceTokenHash = hashToken(deviceToken);
+
+      await supabaseAdmin
+        .from('customer_devices')
+        .update({
+          device_token_hash: deviceTokenHash,
+          last_seen_at: now,
+          last_ip: ip
+        })
+        .eq('id', matchingDevice.id);
+
+      const response = NextResponse.json({
+        success: true,
+        status: matchingDevice.status,
+        customerName: customer.name,
+        message: matchingDevice.status === 'approved' 
+          ? 'الجهاز معتمد بالفعل' 
+          : 'تم تسجيل الطلب بنجاح وهو بانتظار موافقة الأدمن.'
+      });
+
+      response.cookies.set('customer_pending_session', deviceToken, {
+        httpOnly: true,
+        secure: process.env.NODE_ENV === 'production',
+        sameSite: 'lax',
+        path: '/',
+        maxAge: 7 * 24 * 60 * 60 // 7 days
+      });
+
+      return response;
+    }
+
+    // 6. Count current approved devices
     const { count: approvedCount } = await supabaseAdmin
       .from('customer_devices')
       .select('id', { count: 'exact', head: true })
@@ -63,14 +160,11 @@ export async function POST(request: NextRequest) {
     const maxDevices = customer.max_devices || 2;
     const isOverLimit = (approvedCount || 0) >= maxDevices;
 
-    // 4. Create new device request
+    // 7. Create new device request if no match exists
     const deviceToken = generateRandomToken(32);
     const deviceTokenHash = hashToken(deviceToken);
 
-    const userAgent = request.headers.get('user-agent') || '';
-    const ip = request.headers.get('x-forwarded-for') || '127.0.0.1';
-
-    const { data: deviceData, error: deviceError } = await supabaseAdmin
+    const { data: newDeviceData, error: deviceError } = await supabaseAdmin
       .from('customer_devices')
       .insert({
         customer_id: customer.id,
@@ -90,7 +184,8 @@ export async function POST(request: NextRequest) {
       throw deviceError;
     }
 
-    // 5. Create Pending Device Cookie (Limited access)
+    console.log('[VerifyPin] Created new device request:', newDeviceData.id);
+
     const response = NextResponse.json({
       success: true,
       status: 'pending',

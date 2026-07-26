@@ -77,7 +77,9 @@ export async function GET(request: NextRequest) {
       if (currentStatus === 'approved') {
         const sessionToken = generateRandomToken(32);
         const sessionTokenHash = hashToken(sessionToken);
-        const expiresAt = new Date(Date.now() + 365 * 24 * 60 * 60 * 1000).toISOString();
+        const DURATION_180_DAYS_MS = 180 * 24 * 60 * 60 * 1000;
+        const DURATION_180_DAYS_SEC = 180 * 24 * 60 * 60;
+        const expiresAt = new Date(Date.now() + DURATION_180_DAYS_MS).toISOString();
 
         // Create new customer session in DB
         const { error: sessionInsertErr } = await supabaseAdmin
@@ -102,13 +104,13 @@ export async function GET(request: NextRequest) {
           redirectTo: '/'
         });
 
-        // Set approved customer_device_session cookie
+        // Set persistent approved customer_device_session cookie (180 days)
         response.cookies.set('customer_device_session', sessionToken, {
           httpOnly: true,
           secure: process.env.NODE_ENV === 'production',
           sameSite: 'lax',
           path: '/',
-          maxAge: 365 * 24 * 60 * 60 // 1 year
+          maxAge: DURATION_180_DAYS_SEC
         });
 
         // Clear pending cookie

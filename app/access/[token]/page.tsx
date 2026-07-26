@@ -64,6 +64,11 @@ export default function AccessTokenPage({ params }: { params: Promise<{ token: s
           return;
         }
 
+        if (data.alreadyApproved === true) {
+          window.location.href = data.redirectTo || '/';
+          return;
+        }
+
         setCustomerName(data.customerName || 'زبون معتمد');
         setHasPin(data.hasPin);
       } catch (err: any) {

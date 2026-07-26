@@ -64,7 +64,33 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // 5. Update last_used_at timestamp on the access link
+    // 5. Check if browser already has an active approved customer_device_session for this customer
+    const approvedCookie = request.cookies.get('customer_device_session');
+    if (approvedCookie?.value) {
+      const sessionHash = hashToken(approvedCookie.value);
+      const { data: sessionData } = await supabaseAdmin
+        .from('customer_sessions')
+        .select('id, expires_at, customer_id, customer_devices!inner(status)')
+        .eq('session_token_hash', sessionHash)
+        .maybeSingle();
+
+      if (sessionData && sessionData.customer_id === customer.id) {
+        const device = sessionData.customer_devices as any;
+        const expiresAt = new Date(sessionData.expires_at).getTime();
+        if (device?.status === 'approved' && expiresAt > Date.now()) {
+          console.log('[VerifyLink] Active approved customer_device_session found. Bypassing PIN for customer:', customer.id);
+          return NextResponse.json({
+            success: true,
+            alreadyApproved: true,
+            redirectTo: '/',
+            customerId: customer.id,
+            customerName: customer.name
+          }, { status: 200 });
+        }
+      }
+    }
+
+    // 6. Update last_used_at timestamp on the access link
     await supabaseAdmin
       .from('customer_access_links')
       .update({ last_used_at: new Date().toISOString() })
@@ -72,6 +98,7 @@ export async function POST(request: NextRequest) {
 
     return NextResponse.json({
       success: true,
+      alreadyApproved: false,
       customerId: customer.id,
       customerName: customer.name,
       hasPin: Boolean(customer.pin_hash)

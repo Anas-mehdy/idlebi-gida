@@ -82,7 +82,7 @@ export async function POST(request: NextRequest) {
       const sessionToken = generateRandomToken(32);
       const sessionTokenHash = hashToken(sessionToken);
 
-      const expiresAt = new Date(Date.now() + 365 * 24 * 60 * 60 * 1000).toISOString(); // 1 year session
+      const expiresAt = new Date(Date.now() + 180 * 24 * 60 * 60 * 1000).toISOString(); // 180 days session
 
       await supabaseAdmin.from('customer_sessions').insert({
         customer_id: device.customer_id,
