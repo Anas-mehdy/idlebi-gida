@@ -79,42 +79,47 @@ export default function CatalogPage() {
   const [usingMockData, setUsingMockData] = useState(false);
   const [activePreviewImage, setActivePreviewImage] = useState<string | null>(null);
 
+  const [showPrices, setShowPrices] = useState(true);
+
   useEffect(() => {
     async function fetchData() {
       try {
         setLoading(true);
         
-        // Check if environment variables are set and look like placeholders
-        const isUrlConfigured = process.env.NEXT_PUBLIC_SUPABASE_URL && !process.env.NEXT_PUBLIC_SUPABASE_URL.includes('placeholder');
-        const isKeyConfigured = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY && !process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY.includes('placeholder');
+        // Call secure Store Products API
+        const res = await fetch('/api/store/products');
+        
+        if (res.status === 401 || res.status === 403) {
+          const data = await res.json();
+          if (data.redirectUrl) {
+            window.location.href = data.redirectUrl;
+            return;
+          }
+        }
 
-        if (!isUrlConfigured || !isKeyConfigured) {
+        if (res.ok) {
+          const data = await res.json();
+          setCategories(data.categories || []);
+          setProducts(data.products || []);
+          setShowPrices(data.showPrices ?? true);
+          setUsingMockData(false);
+          return;
+        }
+
+        // Direct Supabase fallback if API server route fallback needed
+        const isUrlConfigured = process.env.NEXT_PUBLIC_SUPABASE_URL && !process.env.NEXT_PUBLIC_SUPABASE_URL.includes('placeholder');
+        if (!isUrlConfigured) {
           throw new Error('Supabase environment variables not configured');
         }
 
-        // Fetch categories
-        const { data: catData, error: catError } = await supabase
-          .from('categories')
-          .select('*')
-          .order('sort_order', { ascending: true })
-          .order('name', { ascending: true });
-
-        if (catError) throw catError;
-
-        // Fetch products
-        const { data: prodData, error: prodError } = await supabase
-          .from('products')
-          .select('*')
-          .order('sort_order', { ascending: true })
-          .order('name', { ascending: true });
-
-        if (prodError) throw prodError;
+        const { data: catData } = await supabase.from('categories').select('*').order('sort_order', { ascending: true });
+        const { data: prodData } = await supabase.from('products').select('*').order('name', { ascending: true });
 
         setCategories(catData || []);
         setProducts(prodData || []);
         setUsingMockData(false);
       } catch (err) {
-        console.warn('Database connection failed. Loading highly optimized offline demonstration catalog.', err);
+        console.warn('Loading demonstration catalog fallback.', err);
         setCategories(MOCK_CATEGORIES);
         setProducts(MOCK_PRODUCTS);
         setUsingMockData(true);
@@ -351,7 +356,7 @@ export default function CatalogPage() {
                               <div className="flex items-center justify-between mt-auto pt-2 border-t border-slate-100/60">
                                 {/* Price Block */}
                                 <div className="space-y-0.5">
-                                  {product.price !== null && product.price !== undefined && Number(product.price) > 0 && (
+                                  {product.price !== null && product.price !== undefined && Number(product.price) > 0 ? (
                                     <>
                                       <span className="text-[11px] font-black text-emerald-600 block leading-none">
                                         {Number(product.price).toFixed(2)} TL
@@ -360,6 +365,10 @@ export default function CatalogPage() {
                                         للحزمة
                                       </span>
                                     </>
+                                  ) : (
+                                    <span className="text-[10px] font-extrabold text-amber-700 block leading-tight">
+                                      تواصل لمعرفة السعر
+                                    </span>
                                   )}
                                 </div>
                                 

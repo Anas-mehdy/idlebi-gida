@@ -83,12 +83,28 @@ export default function PublicInvoicePage({ params }: { params: Promise<{ id: st
         throw new Error('الفاتورة المطلوبة غير موجودة.');
       }
 
+      // Check customer's show_prices setting
+      let customerShowPrices = true;
+      if (data.customer_name) {
+        const { data: custData } = await supabase
+          .from('customers')
+          .select('show_prices')
+          .eq('name', data.customer_name)
+          .maybeSingle();
+
+        if (custData && custData.show_prices === false) {
+          customerShowPrices = false;
+        }
+      }
+
       const typedOrder: Order = {
         ...data,
+        total_price: customerShowPrices ? data.total_price : 0,
         order_items: (data.order_items || []).map((item: any) => {
           const effectiveOffer = item.applied_offer || (item.products && isOfferActive(item.products) ? item.products.offer_title : null);
           return {
             ...item,
+            price_at_purchase: customerShowPrices ? item.price_at_purchase : 0,
             applied_offer: effectiveOffer,
             product_name: item.product_name,
             product_image: item.product_image,
@@ -96,7 +112,6 @@ export default function PublicInvoicePage({ params }: { params: Promise<{ id: st
           };
         })
       };
-
 
       setOrder(typedOrder);
     } catch (err: any) {

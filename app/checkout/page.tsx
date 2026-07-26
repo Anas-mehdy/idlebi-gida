@@ -49,68 +49,26 @@ export default function CheckoutPage() {
     setIsSubmitting(true);
 
     try {
-      let orderId = '';
-      const isUrlConfigured = process.env.NEXT_PUBLIC_SUPABASE_URL && !process.env.NEXT_PUBLIC_SUPABASE_URL.includes('placeholder');
+      // Call secure API checkout
+      const res = await fetch('/api/store/checkout', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          cart,
+          customerName: customerName.trim()
+        })
+      });
 
-      if (isUrlConfigured) {
-        // 1. Save order to orders table
-        const { data: orderData, error: orderError } = await supabase
-          .from('orders')
-          .insert({
-            customer_name: customerName.trim(),
-            total_price: totalPrice,
-            status: 'pending'
-          })
-          .select('id')
-          .single();
-
-        if (orderError) throw orderError;
-        orderId = orderData.id;
-
-        // 2. Save items to order_items table
-        const orderItemsToInsert = cart.map((item) => ({
-          order_id: orderId,
-          product_id: item.id.startsWith('p') ? null : item.id, // Set null if using mock ids (p1, p2)
-          quantity: item.quantity,
-          price_at_purchase: item.price,
-          product_name: item.name,
-          product_image: item.image_url,
-          applied_offer: item.applied_offer || null
-        }));
-
-        const { error: itemsError } = await supabase
-          .from('order_items')
-          .insert(orderItemsToInsert);
-
-        if (itemsError) throw itemsError;
-
-        // 3. Update offer_used_quantity for stock_limited offers
-        for (const item of cart) {
-          if (item.id && !item.id.startsWith('p')) {
-            try {
-              const { data: pData } = await supabase
-                .from('products')
-                .select('offer_type, offer_used_quantity')
-                .eq('id', item.id)
-                .single();
-
-              if (pData && pData.offer_type === 'stock_limited') {
-                const currentUsed = pData.offer_used_quantity || 0;
-                await supabase
-                  .from('products')
-                  .update({ offer_used_quantity: currentUsed + item.quantity })
-                  .eq('id', item.id);
-              }
-            } catch (pErr) {
-              console.warn('Could not update offer_used_quantity for product:', item.id, pErr);
-            }
-          }
+      if (res.ok) {
+        const data = await res.json();
+        if (data.whatsappUrl) {
+          clearCart();
+          window.location.href = data.whatsappUrl;
+          return;
         }
-      } else {
-        console.log('Database not connected. Bypassing database save in demo mode.');
       }
 
-      // 4. Build WhatsApp text structure with offer badges if present
+      // Fallback if API route is not available (demo mode)
       let messageLines = ['طلب جديد: idelbi gida'];
       cart.forEach((item, index) => {
         let line = `${index + 1}. ${item.name} (x${item.quantity})`;
@@ -123,38 +81,21 @@ export default function CheckoutPage() {
         }
       });
       messageLines.push('-----------------------');
-      messageLines.push(`الحساب: ${totalPrice.toFixed(2)} TL`);
+      if (totalPrice > 0) {
+        messageLines.push(`الحساب: ${totalPrice.toFixed(2)} TL`);
+      } else {
+        messageLines.push('ملاحظة: سيتم تأكيد الأسعار معكم عبر واتساب.');
+      }
       messageLines.push(`الزبون: ${customerName.trim()}`);
-
 
       const encodedText = encodeURIComponent(messageLines.join('\n'));
       const whatsappUrl = `https://wa.me/${whatsappNumber}?text=${encodedText}`;
 
-      // Clear the local shopping cart
       clearCart();
-
-      // Redirect user to WhatsApp
       window.location.href = whatsappUrl;
     } catch (err: any) {
-      console.error('Checkout process encountered an error, falling back silently and instantly to WhatsApp:', err);
-      
-      // Fallback redirection to WhatsApp silently and instantly even if DB fails
-      let messageLines = ['طلب جديد: idelbi gida'];
-      cart.forEach((item, index) => {
-        messageLines.push(`${index + 1}. ${item.name} (x${item.quantity})`);
-        if (item.price !== null && item.price !== undefined && Number(item.price) > 0) {
-          messageLines.push(`${(item.price * item.quantity).toFixed(2)} TL`);
-        }
-      });
-      messageLines.push('-----------------------');
-      messageLines.push(`الحساب: ${totalPrice.toFixed(2)} TL`);
-      messageLines.push(`الزبون: ${customerName.trim()}`);
-
-      const encodedText = encodeURIComponent(messageLines.join('\n'));
-      const whatsappUrl = `https://wa.me/${whatsappNumber}?text=${encodedText}`;
-      
-      clearCart();
-      window.location.href = whatsappUrl;
+      console.error('Checkout error:', err);
+      setErrorMsg('حدث خطأ أثناء إتمام الطلب، يرجى المحاولة لاحقاً.');
     } finally {
       setIsSubmitting(false);
     }
