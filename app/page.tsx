@@ -82,6 +82,32 @@ export default function CatalogPage() {
 
   const [showPrices, setShowPrices] = useState(true);
 
+  // Helper functions and effect to handle browser/hardware back button when modal is open
+  const openImagePreview = (url: string) => {
+    setActivePreviewImage(url);
+    window.history.pushState({ modal: 'image-preview' }, '');
+  };
+
+  const closeImagePreview = () => {
+    setActivePreviewImage(null);
+    if (typeof window !== 'undefined' && window.history.state?.modal === 'image-preview') {
+      window.history.back();
+    }
+  };
+
+  useEffect(() => {
+    const handlePopState = () => {
+      if (activePreviewImage) {
+        setActivePreviewImage(null);
+      }
+    };
+
+    window.addEventListener('popstate', handlePopState);
+    return () => {
+      window.removeEventListener('popstate', handlePopState);
+    };
+  }, [activePreviewImage]);
+
   useEffect(() => {
     async function fetchData() {
       try {
@@ -304,7 +330,7 @@ export default function CatalogPage() {
 
                             {/* Product Image Wrapper */}
                             <div 
-                              onClick={() => product.image_url && setActivePreviewImage(product.image_url)}
+                              onClick={() => product.image_url && openImagePreview(product.image_url)}
                               className={`w-full aspect-square bg-slate-50/50 rounded-2xl overflow-hidden flex items-center justify-center border border-slate-100 mb-2.5 relative shrink-0 group ${
                                 product.image_url ? 'cursor-zoom-in' : 'select-none'
                               }`}
@@ -470,14 +496,14 @@ export default function CatalogPage() {
       {/* Full-Screen Image Preview Modal */}
       {activePreviewImage && (
         <div 
-          onClick={() => setActivePreviewImage(null)}
+          onClick={closeImagePreview}
           className="fixed inset-0 bg-black/90 backdrop-blur-md z-50 flex items-center justify-center p-4 cursor-zoom-out transition-opacity duration-300"
         >
           {/* Close Button */}
           <button 
             onClick={(e) => {
               e.stopPropagation();
-              setActivePreviewImage(null);
+              closeImagePreview();
             }}
             className="absolute top-6 left-6 bg-white/10 hover:bg-white/20 active:scale-95 text-white p-2.5 rounded-full border border-white/20 transition-all cursor-pointer shadow-lg z-50 flex items-center justify-center"
             title="إغلاق الصورة"

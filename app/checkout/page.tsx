@@ -16,6 +16,32 @@ export default function CheckoutPage() {
   const [errorMsg, setErrorMsg] = useState('');
   const [activePreviewImage, setActivePreviewImage] = useState<string | null>(null);
 
+  // Helper functions and effect to handle browser/hardware back button when modal is open
+  const openImagePreview = (url: string) => {
+    setActivePreviewImage(url);
+    window.history.pushState({ modal: 'image-preview' }, '');
+  };
+
+  const closeImagePreview = () => {
+    setActivePreviewImage(null);
+    if (typeof window !== 'undefined' && window.history.state?.modal === 'image-preview') {
+      window.history.back();
+    }
+  };
+
+  useEffect(() => {
+    const handlePopState = () => {
+      if (activePreviewImage) {
+        setActivePreviewImage(null);
+      }
+    };
+
+    window.addEventListener('popstate', handlePopState);
+    return () => {
+      window.removeEventListener('popstate', handlePopState);
+    };
+  }, [activePreviewImage]);
+
   // Fetch active WhatsApp number from settings
   useEffect(() => {
     async function fetchSettings() {
@@ -135,7 +161,7 @@ export default function CheckoutPage() {
                   <div className="flex items-center gap-3 min-w-0 flex-1">
                     {/* Image Thumbnail */}
                     <div
-                      onClick={() => item.image_url && setActivePreviewImage(item.image_url)}
+                      onClick={() => item.image_url && openImagePreview(item.image_url)}
                       className={`w-12 h-12 rounded-xl bg-slate-50 border border-slate-100 flex items-center justify-center shrink-0 overflow-hidden relative group ${
                         item.image_url ? 'cursor-zoom-in hover:brightness-95 transition-all' : 'select-none'
                       }`}
@@ -244,14 +270,14 @@ export default function CheckoutPage() {
       {/* Full-Screen Image Preview Modal */}
       {activePreviewImage && (
         <div 
-          onClick={() => setActivePreviewImage(null)}
+          onClick={closeImagePreview}
           className="fixed inset-0 bg-black/90 backdrop-blur-md z-50 flex items-center justify-center p-4 cursor-zoom-out transition-opacity duration-300"
         >
           {/* Close Button */}
           <button 
             onClick={(e) => {
               e.stopPropagation();
-              setActivePreviewImage(null);
+              closeImagePreview();
             }}
             className="absolute top-6 left-6 bg-white/10 hover:bg-white/20 active:scale-95 text-white p-2.5 rounded-full border border-white/20 transition-all cursor-pointer shadow-lg z-50 flex items-center justify-center"
             title="إغلاق الصورة"
