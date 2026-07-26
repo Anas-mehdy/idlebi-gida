@@ -17,15 +17,25 @@ function StatusContent() {
   const checkStatusNow = async () => {
     setChecking(true);
     try {
-      const res = await fetch('/api/store/products');
-      if (res.ok) {
+      const res = await fetch('/api/access/status');
+      const text = await res.text();
+      let data: any = null;
+      try {
+        data = text ? JSON.parse(text) : null;
+      } catch (e) {
+        console.error('Error parsing device status JSON:', e);
+      }
+
+      if (data && data.approved === true) {
         setAutoApproved(true);
         setTimeout(() => {
-          window.location.href = '/';
-        }, 1500);
+          window.location.href = data.redirectTo || '/';
+        }, 1000);
+      } else if (data && data.redirectUrl && data.status !== 'pending') {
+        window.location.href = data.redirectUrl;
       }
     } catch (err) {
-      console.log('Device not approved yet.');
+      console.log('Device check failed or pending.', err);
     } finally {
       setChecking(false);
     }
