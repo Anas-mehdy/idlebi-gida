@@ -207,7 +207,7 @@ export default function InventoryPage() {
     }
   };
 
-  // Quick increase/decrease quantity by offset (e.g. +1, -1)
+  // Quick increase/decrease quantity by offset (e.g. +1, -1) using atomic database RPC
   const handleQuickAdjust = async (productId: string, offset: number) => {
     setActionLoadingId(productId);
     setErrorMsg('');
@@ -218,22 +218,29 @@ export default function InventoryPage() {
       return;
     }
 
-    const currentStock = targetProduct.inventory_stock;
-    const newStock = currentStock + offset; // Allows negative values
-
     try {
-      if (isUrlConfigured && !usingMockData) {
-        const { error } = await supabase
-          .from('products')
-          .update({ inventory_stock: newStock })
-          .eq('id', productId);
+      let finalStock = targetProduct.inventory_stock + offset;
 
-        if (error) throw error;
+      if (isUrlConfigured && !usingMockData) {
+        // Call atomic RPC inside database
+        const { data: rpcData, error: rpcError } = await supabase
+          .rpc('adjust_inventory_stock', { product_id: productId, delta: offset });
+
+        if (rpcError) {
+          console.error('RPC adjust_inventory_stock failed:', rpcError);
+          setErrorMsg('تعذر تعديل المخزون. يرجى التأكد من تطبيق migration_adjust_inventory_rpc.sql.');
+          setActionLoadingId(null);
+          return;
+        }
+
+        if (typeof rpcData === 'number') {
+          finalStock = rpcData;
+        }
       }
 
       const updatedProducts = products.map(p => {
         if (p.id === productId) {
-          return { ...p, inventory_stock: newStock };
+          return { ...p, inventory_stock: finalStock };
         }
         return p;
       });

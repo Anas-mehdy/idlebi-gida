@@ -41,6 +41,7 @@ export default function CheckoutPage() {
 
   const handleCheckout = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (isSubmitting) return;
     if (!customerName.trim()) {
       setErrorMsg('يرجى إدخال اسم الزبون لتأكيد الطلب.');
       return;
@@ -59,43 +60,20 @@ export default function CheckoutPage() {
         })
       });
 
-      if (res.ok) {
-        const data = await res.json();
-        if (data.whatsappUrl) {
-          clearCart();
-          window.location.href = data.whatsappUrl;
-          return;
-        }
+      const data = await res.json().catch(() => null);
+
+      if (res.ok && data?.success && data?.whatsappUrl) {
+        clearCart();
+        window.location.href = data.whatsappUrl;
+        return;
       }
 
-      // Fallback if API route is not available (demo mode)
-      let messageLines = ['طلب جديد: idelbi gida'];
-      cart.forEach((item, index) => {
-        let line = `${index + 1}. ${item.name} (x${item.quantity})`;
-        if (item.applied_offer) {
-          line += ` [🎁 عرض: ${item.applied_offer}]`;
-        }
-        messageLines.push(line);
-        if (item.price !== null && item.price !== undefined && Number(item.price) > 0) {
-          messageLines.push(`${(item.price * item.quantity).toFixed(2)} TL`);
-        }
-      });
-      messageLines.push('-----------------------');
-      if (totalPrice > 0) {
-        messageLines.push(`الحساب: ${totalPrice.toFixed(2)} TL`);
-      } else {
-        messageLines.push('ملاحظة: سيتم تأكيد الأسعار معكم عبر واتساب.');
-      }
-      messageLines.push(`الزبون: ${customerName.trim()}`);
-
-      const encodedText = encodeURIComponent(messageLines.join('\n'));
-      const whatsappUrl = `https://wa.me/${whatsappNumber}?text=${encodedText}`;
-
-      clearCart();
-      window.location.href = whatsappUrl;
+      // API returned error or non-ok response: show error message without clearing cart or opening WhatsApp
+      const serverError = data?.error || 'تعذر تسجيل الطلب حالياً. يرجى المحاولة مرة أخرى.';
+      setErrorMsg(serverError);
     } catch (err: any) {
       console.error('Checkout error:', err);
-      setErrorMsg('حدث خطأ أثناء إتمام الطلب، يرجى المحاولة لاحقاً.');
+      setErrorMsg('تعذر تسجيل الطلب حالياً. يرجى المحاولة مرة أخرى.');
     } finally {
       setIsSubmitting(false);
     }

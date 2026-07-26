@@ -2,6 +2,9 @@ import { NextRequest, NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabaseAdmin';
 import { verifyCustomerSession } from '@/lib/auth/customerSession';
 
+const UUID_REGEX = /^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$/;
+
+
 export async function POST(request: NextRequest) {
   try {
     const auth = await verifyCustomerSession(request);
@@ -33,22 +36,45 @@ export async function POST(request: NextRequest) {
       console.warn('Could not fetch whatsapp number setting:', err);
     }
 
-    // 2. Fetch actual product prices from database for accurate internal order records
+    // 2. Extract valid UUID product IDs from cart and bulk fetch from DB
+    const validProductIds = cart
+      .map((item: any) => item.id)
+      .filter((id: any) => typeof id === 'string' && UUID_REGEX.test(id));
+
+    const productMap = new Map<string, any>();
+    if (validProductIds.length > 0) {
+      const { data: prodList, error: prodErr } = await supabaseAdmin
+        .from('products')
+        .select('id, price, offer_type, offer_used_quantity')
+        .in('id', validProductIds);
+
+      if (prodErr) {
+        console.error('Error fetching products during checkout:', prodErr);
+        throw prodErr;
+      }
+
+      if (prodList) {
+        prodList.forEach((prod) => productMap.set(prod.id, prod));
+      }
+    }
+
+    // 3. Process cart items and map product_id accurately
     let calculatedTotalPrice = 0;
     const itemRecords: any[] = [];
 
     for (const item of cart) {
+      const isCustomItem = item.isCustom || !item.id;
+      const isValidUuid = typeof item.id === 'string' && UUID_REGEX.test(item.id);
+
+      let actualProductId: string | null = null;
       let actualPrice = item.price || 0;
 
-      if (item.id && !item.id.startsWith('p')) {
-        const { data: prodData } = await supabaseAdmin
-          .from('products')
-          .select('price, offer_type, offer_used_quantity')
-          .eq('id', item.id)
-          .single();
-
+      if (isValidUuid) {
+        const prodData = productMap.get(item.id);
         if (prodData) {
-          actualPrice = prodData.price || 0;
+          actualProductId = prodData.id;
+          actualPrice = prodData.price !== null && prodData.price !== undefined ? prodData.price : (item.price || 0);
+
           // Update offer used quantity if applicable
           if (prodData.offer_type === 'stock_limited') {
             const currentUsed = prodData.offer_used_quantity || 0;
@@ -57,22 +83,36 @@ export async function POST(request: NextRequest) {
               .update({ offer_used_quantity: currentUsed + item.quantity })
               .eq('id', item.id);
           }
+        } else {
+          // Product has a UUID format but does not exist in DB
+          return NextResponse.json(
+            { error: `المنتج "${item.name}" غير موجود في الكتالوج أو تم إزالته. يرجى تعديل السلة.` },
+            { status: 400 }
+          );
         }
+      } else if (isCustomItem) {
+        actualProductId = null;
+      } else {
+        // Invalid ID format (e.g., demo mock id 'p1') not in database
+        return NextResponse.json(
+          { error: `عنصر السلة "${item.name}" غير صالح. يرجى إزالته وإعادته للسلة.` },
+          { status: 400 }
+        );
       }
 
       calculatedTotalPrice += actualPrice * item.quantity;
 
       itemRecords.push({
-        product_id: item.id && !item.id.startsWith('p') ? item.id : null,
+        product_id: actualProductId,
         quantity: item.quantity,
         price_at_purchase: actualPrice,
         product_name: item.name,
-        product_image: item.image_url,
+        product_image: item.image_url || null,
         applied_offer: item.applied_offer || null
       });
     }
 
-    // 3. Save order to database
+    // 4. Save order to database
     const { data: orderData, error: orderError } = await supabaseAdmin
       .from('orders')
       .insert({
@@ -83,18 +123,29 @@ export async function POST(request: NextRequest) {
       .select('id')
       .single();
 
-    if (orderError) throw orderError;
+    if (orderError) {
+      console.error('Error creating order record:', orderError);
+      throw orderError;
+    }
     const orderId = orderData.id;
 
-    // Save order items
+    // 5. Save order items with strict error handling & cleanup
     const orderItemsToInsert = itemRecords.map((item) => ({
       ...item,
       order_id: orderId
     }));
 
-    await supabaseAdmin.from('order_items').insert(orderItemsToInsert);
+    const { error: itemsError } = await supabaseAdmin
+      .from('order_items')
+      .insert(orderItemsToInsert);
 
-    // 4. Construct WhatsApp message
+    if (itemsError) {
+      console.error('Error inserting order_items, cleaning up orphan order:', itemsError);
+      await supabaseAdmin.from('orders').delete().eq('id', orderId);
+      throw itemsError;
+    }
+
+    // 6. Construct WhatsApp message
     let messageLines = ['طلب جديد: idelbi gida'];
     cart.forEach((item: any, index: number) => {
       let line = `${index + 1}. ${item.name} (x${item.quantity})`;
@@ -130,3 +181,4 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: 'حدث خطأ أثناء معالجة الطلب' }, { status: 500 });
   }
 }
+
