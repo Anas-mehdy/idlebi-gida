@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { supabase } from '@/lib/supabase';
+import { supabaseAdmin } from '@/lib/supabaseAdmin';
 import { verifyCustomerSession } from '@/lib/auth/customerSession';
 
 export async function POST(request: NextRequest) {
@@ -21,7 +21,7 @@ export async function POST(request: NextRequest) {
     // 1. Get WhatsApp number from settings
     let whatsappNumber = '905000000000';
     try {
-      const { data: settingData } = await supabase
+      const { data: settingData } = await supabaseAdmin
         .from('settings')
         .select('value')
         .eq('key', 'whatsapp_number')
@@ -41,7 +41,7 @@ export async function POST(request: NextRequest) {
       let actualPrice = item.price || 0;
 
       if (item.id && !item.id.startsWith('p')) {
-        const { data: prodData } = await supabase
+        const { data: prodData } = await supabaseAdmin
           .from('products')
           .select('price, offer_type, offer_used_quantity')
           .eq('id', item.id)
@@ -52,7 +52,7 @@ export async function POST(request: NextRequest) {
           // Update offer used quantity if applicable
           if (prodData.offer_type === 'stock_limited') {
             const currentUsed = prodData.offer_used_quantity || 0;
-            await supabase
+            await supabaseAdmin
               .from('products')
               .update({ offer_used_quantity: currentUsed + item.quantity })
               .eq('id', item.id);
@@ -73,7 +73,7 @@ export async function POST(request: NextRequest) {
     }
 
     // 3. Save order to database
-    const { data: orderData, error: orderError } = await supabase
+    const { data: orderData, error: orderError } = await supabaseAdmin
       .from('orders')
       .insert({
         customer_name: nameToSave,
@@ -92,7 +92,7 @@ export async function POST(request: NextRequest) {
       order_id: orderId
     }));
 
-    await supabase.from('order_items').insert(orderItemsToInsert);
+    await supabaseAdmin.from('order_items').insert(orderItemsToInsert);
 
     // 4. Construct WhatsApp message
     let messageLines = ['طلب جديد: idelbi gida'];

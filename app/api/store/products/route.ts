@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { supabase } from '@/lib/supabase';
+import { supabaseAdmin } from '@/lib/supabaseAdmin';
 import { verifyCustomerSession } from '@/lib/auth/customerSession';
 
 export async function GET(request: NextRequest) {
@@ -15,7 +15,7 @@ export async function GET(request: NextRequest) {
     }
 
     // 2. Fetch categories
-    const { data: categories, error: catError } = await supabase
+    const { data: categories, error: catError } = await supabaseAdmin
       .from('categories')
       .select('*')
       .order('sort_order', { ascending: true })
@@ -24,7 +24,7 @@ export async function GET(request: NextRequest) {
     if (catError) throw catError;
 
     // 3. Fetch products
-    const { data: products, error: prodError } = await supabase
+    const { data: products, error: prodError } = await supabaseAdmin
       .from('products')
       .select('*')
       .order('name', { ascending: true });

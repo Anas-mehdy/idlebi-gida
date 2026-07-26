@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { supabase } from '@/lib/supabase';
+import { supabaseAdmin } from '@/lib/supabaseAdmin';
 import { hashToken, verifyPin, generateRandomToken } from '@/lib/auth/crypto';
 
 export async function POST(request: NextRequest) {
@@ -13,7 +13,7 @@ export async function POST(request: NextRequest) {
     const tokenHash = hashToken(token.trim());
 
     // 1. Fetch access link & customer
-    const { data: linkData, error: linkError } = await supabase
+    const { data: linkData, error: linkError } = await supabaseAdmin
       .from('customer_access_links')
       .select('id, customer_id, customers(id, name, status, pin_hash, max_devices)')
       .eq('token_hash', tokenHash)
@@ -34,7 +34,7 @@ export async function POST(request: NextRequest) {
     const isValidPin = verifyPin(pin.trim(), customer.pin_hash);
     if (!isValidPin) {
       // Log security event
-      await supabase.from('security_events').insert({
+      await supabaseAdmin.from('security_events').insert({
         customer_id: customer.id,
         event_type: 'pin_failed',
         ip: request.headers.get('x-forwarded-for') || 'unknown',
@@ -46,7 +46,7 @@ export async function POST(request: NextRequest) {
     }
 
     // Log successful PIN verification
-    await supabase.from('security_events').insert({
+    await supabaseAdmin.from('security_events').insert({
       customer_id: customer.id,
       event_type: 'pin_verified',
       ip: request.headers.get('x-forwarded-for') || 'unknown',
@@ -54,7 +54,7 @@ export async function POST(request: NextRequest) {
     });
 
     // 3. Count current approved devices
-    const { count: approvedCount } = await supabase
+    const { count: approvedCount } = await supabaseAdmin
       .from('customer_devices')
       .select('id', { count: 'exact', head: true })
       .eq('customer_id', customer.id)
@@ -70,7 +70,7 @@ export async function POST(request: NextRequest) {
     const userAgent = request.headers.get('user-agent') || '';
     const ip = request.headers.get('x-forwarded-for') || '127.0.0.1';
 
-    const { data: deviceData, error: deviceError } = await supabase
+    const { data: deviceData, error: deviceError } = await supabaseAdmin
       .from('customer_devices')
       .insert({
         customer_id: customer.id,

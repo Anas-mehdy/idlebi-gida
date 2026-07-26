@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { supabase } from '@/lib/supabase';
+import { supabaseAdmin } from '@/lib/supabaseAdmin';
 import { hashToken } from '@/lib/auth/crypto';
 
 export async function POST(request: NextRequest) {
@@ -13,7 +13,7 @@ export async function POST(request: NextRequest) {
     const tokenHash = hashToken(token.trim());
 
     // Find active access link
-    const { data: linkData, error: linkError } = await supabase
+    const { data: linkData, error: linkError } = await supabaseAdmin
       .from('customer_access_links')
       .select('id, customer_id, status, customers(id, name, status, pin_hash)')
       .eq('token_hash', tokenHash)
@@ -37,7 +37,7 @@ export async function POST(request: NextRequest) {
     }
 
     // Update last_used_at timestamp on the access link
-    await supabase
+    await supabaseAdmin
       .from('customer_access_links')
       .update({ last_used_at: new Date().toISOString() })
       .eq('id', linkData.id);

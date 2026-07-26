@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { supabase } from '@/lib/supabase';
+import { supabaseAdmin } from '@/lib/supabaseAdmin';
 import { checkAdminAuth } from '@/lib/auth/adminAuth';
 
 export async function POST(request: NextRequest) {
@@ -15,7 +15,7 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'customerId and showPrices (boolean) are required' }, { status: 400 });
     }
 
-    const { error } = await supabase
+    const { error } = await supabaseAdmin
       .from('customers')
       .update({ show_prices: showPrices })
       .eq('id', customerId);

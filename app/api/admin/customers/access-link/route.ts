@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { supabase } from '@/lib/supabase';
+import { supabaseAdmin } from '@/lib/supabaseAdmin';
 import { checkAdminAuth } from '@/lib/auth/adminAuth';
 import { generateRandomToken, hashToken, hashPin } from '@/lib/auth/crypto';
 
@@ -17,7 +17,7 @@ export async function GET(request: NextRequest) {
   }
 
   try {
-    const { data: linkData } = await supabase
+    const { data: linkData } = await supabaseAdmin
       .from('customer_access_links')
       .select('id, status, created_at, last_used_at')
       .eq('customer_id', customerId)
@@ -25,7 +25,7 @@ export async function GET(request: NextRequest) {
       .order('created_at', { ascending: false })
       .maybeSingle();
 
-    const { data: customerData } = await supabase
+    const { data: customerData } = await supabaseAdmin
       .from('customers')
       .select('pin_hash, max_devices, show_prices, status')
       .eq('id', customerId)
@@ -61,7 +61,7 @@ export async function POST(request: NextRequest) {
 
     if (action === 'set_pin' && pin) {
       const pinHash = hashPin(pin);
-      const { error: pinError } = await supabase
+      const { error: pinError } = await supabaseAdmin
         .from('customers')
         .update({ pin_hash: pinHash })
         .eq('id', customerId);
@@ -71,7 +71,7 @@ export async function POST(request: NextRequest) {
     }
 
     if (action === 'update_max_devices' && typeof maxDevices === 'number') {
-      const { error: devError } = await supabase
+      const { error: devError } = await supabaseAdmin
         .from('customers')
         .update({ max_devices: Math.max(1, maxDevices) })
         .eq('id', customerId);
@@ -82,7 +82,7 @@ export async function POST(request: NextRequest) {
 
     // Action: generate or regenerate access link
     // 1. Revoke existing links
-    await supabase
+    await supabaseAdmin
       .from('customer_access_links')
       .update({ status: 'revoked', revoked_at: new Date().toISOString() })
       .eq('customer_id', customerId)
@@ -93,7 +93,7 @@ export async function POST(request: NextRequest) {
     const tokenHash = hashToken(rawToken);
 
     // 3. Create new access link record
-    const { error: insertError } = await supabase
+    const { error: insertError } = await supabaseAdmin
       .from('customer_access_links')
       .insert({
         customer_id: customerId,
@@ -106,7 +106,7 @@ export async function POST(request: NextRequest) {
     // Optional: if PIN provided during link creation, set it as well
     if (pin) {
       const pinHash = hashPin(pin);
-      await supabase
+      await supabaseAdmin
         .from('customers')
         .update({ pin_hash: pinHash })
         .eq('id', customerId);
@@ -142,7 +142,7 @@ export async function DELETE(request: NextRequest) {
       return NextResponse.json({ error: 'customerId is required' }, { status: 400 });
     }
 
-    await supabase
+    await supabaseAdmin
       .from('customer_access_links')
       .update({ status: 'revoked', revoked_at: new Date().toISOString() })
       .eq('customer_id', customerId)

@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { supabase } from '@/lib/supabase';
+import { supabaseAdmin } from '@/lib/supabaseAdmin';
 import { checkAdminAuth } from '@/lib/auth/adminAuth';
 import { generateRandomToken, hashToken } from '@/lib/auth/crypto';
 
@@ -14,7 +14,7 @@ export async function GET(request: NextRequest) {
   const statusFilter = searchParams.get('status');
 
   try {
-    let query = supabase
+    let query = supabaseAdmin
       .from('customer_devices')
       .select(`
         *,
@@ -62,7 +62,7 @@ export async function POST(request: NextRequest) {
 
     if (action === 'approve' && deviceId) {
       // 1. Fetch device & customer info
-      const { data: device } = await supabase
+      const { data: device } = await supabaseAdmin
         .from('customer_devices')
         .select('id, customer_id, device_token_hash')
         .eq('id', deviceId)
@@ -73,7 +73,7 @@ export async function POST(request: NextRequest) {
       }
 
       // Update device status to approved
-      await supabase
+      await supabaseAdmin
         .from('customer_devices')
         .update({ status: 'approved', approved_at: now })
         .eq('id', deviceId);
@@ -84,7 +84,7 @@ export async function POST(request: NextRequest) {
 
       const expiresAt = new Date(Date.now() + 365 * 24 * 60 * 60 * 1000).toISOString(); // 1 year session
 
-      await supabase.from('customer_sessions').insert({
+      await supabaseAdmin.from('customer_sessions').insert({
         customer_id: device.customer_id,
         device_id: deviceId,
         session_token_hash: sessionTokenHash,
@@ -92,7 +92,7 @@ export async function POST(request: NextRequest) {
       });
 
       // Log security event
-      await supabase.from('security_events').insert({
+      await supabaseAdmin.from('security_events').insert({
         customer_id: device.customer_id,
         device_id: deviceId,
         event_type: 'device_approved'
@@ -105,7 +105,7 @@ export async function POST(request: NextRequest) {
     }
 
     if (action === 'reject' && deviceId) {
-      await supabase
+      await supabaseAdmin
         .from('customer_devices')
         .update({ status: 'rejected', rejected_at: now })
         .eq('id', deviceId);
@@ -114,13 +114,13 @@ export async function POST(request: NextRequest) {
     }
 
     if (action === 'block' && deviceId) {
-      await supabase
+      await supabaseAdmin
         .from('customer_devices')
         .update({ status: 'blocked', blocked_at: now })
         .eq('id', deviceId);
 
       // Revoke any active sessions for this device
-      await supabase
+      await supabaseAdmin
         .from('customer_sessions')
         .update({ revoked_at: now })
         .eq('device_id', deviceId);
@@ -129,12 +129,12 @@ export async function POST(request: NextRequest) {
     }
 
     if (action === 'revoke' && deviceId) {
-      await supabase
+      await supabaseAdmin
         .from('customer_devices')
         .update({ status: 'revoked', revoked_at: now })
         .eq('id', deviceId);
 
-      await supabase
+      await supabaseAdmin
         .from('customer_sessions')
         .update({ revoked_at: now })
         .eq('device_id', deviceId);
@@ -143,13 +143,13 @@ export async function POST(request: NextRequest) {
     }
 
     if (action === 'delete' && deviceId) {
-      await supabase.from('customer_devices').delete().eq('id', deviceId);
+      await supabaseAdmin.from('customer_devices').delete().eq('id', deviceId);
       return NextResponse.json({ success: true, message: 'تم حذف الجهاز بنجاح' });
     }
 
     if (action === 'logout_all' && customerId) {
       // Revoke all sessions for this customer
-      await supabase
+      await supabaseAdmin
         .from('customer_sessions')
         .update({ revoked_at: now })
         .eq('customer_id', customerId);
@@ -159,7 +159,7 @@ export async function POST(request: NextRequest) {
 
     if (action === 'update_customer_status' && customerId) {
       const { status } = await request.json(); // 'active' or 'suspended'
-      await supabase
+      await supabaseAdmin
         .from('customers')
         .update({ status: status === 'suspended' ? 'suspended' : 'active' })
         .eq('id', customerId);

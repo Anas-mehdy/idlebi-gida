@@ -1,5 +1,5 @@
 import { NextRequest } from 'next/server';
-import { supabase } from '@/lib/supabase';
+import { supabaseAdmin } from '@/lib/supabaseAdmin';
 import { hashToken } from './crypto';
 
 export interface CustomerSessionResult {
@@ -38,7 +38,7 @@ export async function verifyCustomerSession(request: NextRequest): Promise<Custo
     try {
       const sessionHash = hashToken(approvedCookie.value);
 
-      const { data: sessionData, error: sessionError } = await supabase
+      const { data: sessionData, error: sessionError } = await supabaseAdmin
         .from('customer_sessions')
         .select(`
           id,
@@ -110,7 +110,7 @@ export async function verifyCustomerSession(request: NextRequest): Promise<Custo
   if (pendingCookie?.value) {
     try {
       const deviceHash = hashToken(pendingCookie.value);
-      const { data: deviceData } = await supabase
+      const { data: deviceData } = await supabaseAdmin
         .from('customer_devices')
         .select('id, status, customer_id, customers(name, status)')
         .eq('device_token_hash', deviceHash)
