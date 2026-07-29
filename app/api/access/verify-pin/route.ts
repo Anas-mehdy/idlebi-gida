@@ -106,49 +106,6 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    // 5. Check if matching device already exists by customer_id and user_agent (to prevent duplicate rows)
-    const { data: matchingDevice } = await supabaseAdmin
-      .from('customer_devices')
-      .select('id, status')
-      .eq('customer_id', customer.id)
-      .eq('user_agent', userAgent)
-      .order('last_seen_at', { ascending: false })
-      .limit(1)
-      .maybeSingle();
-
-    if (matchingDevice && (matchingDevice.status === 'pending' || matchingDevice.status === 'approved')) {
-      console.log('[VerifyPin] Reusing device record matching user agent:', matchingDevice.id);
-      const deviceToken = generateRandomToken(32);
-      const deviceTokenHash = hashToken(deviceToken);
-
-      await supabaseAdmin
-        .from('customer_devices')
-        .update({
-          device_token_hash: deviceTokenHash,
-          last_seen_at: now,
-          last_ip: ip
-        })
-        .eq('id', matchingDevice.id);
-
-      const response = NextResponse.json({
-        success: true,
-        status: matchingDevice.status,
-        customerName: customer.name,
-        message: matchingDevice.status === 'approved' 
-          ? 'الجهاز معتمد بالفعل' 
-          : 'تم تسجيل الطلب بنجاح وهو بانتظار موافقة الأدمن.'
-      });
-
-      response.cookies.set('customer_pending_session', deviceToken, {
-        httpOnly: true,
-        secure: process.env.NODE_ENV === 'production',
-        sameSite: 'lax',
-        path: '/',
-        maxAge: 7 * 24 * 60 * 60 // 7 days
-      });
-
-      return response;
-    }
 
     // 6. Count current approved devices
     const { count: approvedCount } = await supabaseAdmin
