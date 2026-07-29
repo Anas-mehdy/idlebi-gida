@@ -38,7 +38,28 @@ export async function GET(request: NextRequest) {
     const { data: devices, error } = await query;
     if (error) throw error;
 
-    return NextResponse.json({ devices: devices || [] });
+    // Calculate approved counts per customer
+    const customerIds = Array.from(new Set((devices || []).map((d: any) => d.customer_id)));
+    const approvedCountsMap: Record<string, number> = {};
+
+    if (customerIds.length > 0) {
+      const { data: approvedDevices } = await supabaseAdmin
+        .from('customer_devices')
+        .select('customer_id')
+        .in('customer_id', customerIds)
+        .eq('status', 'approved');
+
+      (approvedDevices || []).forEach((d: any) => {
+        approvedCountsMap[d.customer_id] = (approvedCountsMap[d.customer_id] || 0) + 1;
+      });
+    }
+
+    const enrichedDevices = (devices || []).map((d: any) => ({
+      ...d,
+      customer_approved_count: approvedCountsMap[d.customer_id] || 0
+    }));
+
+    return NextResponse.json({ devices: enrichedDevices });
   } catch (err: any) {
     console.error('Error fetching admin devices:', err);
     return NextResponse.json({ error: 'حدث خطأ في قراءة قائمة الأجهزة' }, { status: 500 });
@@ -64,12 +85,28 @@ export async function POST(request: NextRequest) {
       // 1. Fetch device & customer info
       const { data: device } = await supabaseAdmin
         .from('customer_devices')
-        .select('id, customer_id, device_token_hash')
+        .select('id, customer_id, status, device_token_hash, customers!inner(max_devices)')
         .eq('id', deviceId)
         .single();
 
       if (!device) {
         return NextResponse.json({ error: 'الجهاز غير موجود' }, { status: 404 });
+      }
+
+      // 2. Check approved devices count vs max_devices limit
+      if (device.status !== 'approved') {
+        const { count: approvedCount } = await supabaseAdmin
+          .from('customer_devices')
+          .select('id', { count: 'exact', head: true })
+          .eq('customer_id', device.customer_id)
+          .eq('status', 'approved');
+
+        const maxDevices = (device.customers as any)?.max_devices || 2;
+        if ((approvedCount || 0) >= maxDevices) {
+          return NextResponse.json({
+            error: `تعذر اعتماد الجهاز: وصل الزبون للحد الأقصى للأجهزة المعتمدة (${approvedCount || 0} من ${maxDevices}). يرجى إلغاء اعتماد جهاز سابق أو زيادة الحد الأقصى أولاً.`
+          }, { status: 409 });
+        }
       }
 
       // Update device status to approved

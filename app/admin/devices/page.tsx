@@ -19,6 +19,7 @@ interface CustomerDevice {
   first_seen_at: string;
   last_seen_at: string;
   approved_at?: string;
+  customer_approved_count?: number;
   customers: {
     id: string;
     name: string;
@@ -182,7 +183,7 @@ export default function AdminDevicesPage() {
                   <div>
                     <h3 className="text-sm font-black text-slate-800">{device.customers.name}</h3>
                     <p className="text-[11px] text-slate-400 mt-0.5 font-medium">
-                      الحد الأقصى للأجهزة: {device.customers.max_devices}
+                      الأجهزة المعتمدة: {device.customer_approved_count ?? devices.filter(d => d.customer_id === device.customer_id && d.status === 'approved').length} من {device.customers.max_devices}
                     </p>
                   </div>
 

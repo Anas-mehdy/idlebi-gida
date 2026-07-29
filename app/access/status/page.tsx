@@ -41,9 +41,9 @@ function StatusContent() {
     }
   };
 
-  // Poll status every 10 seconds if pending
+  // Poll status every 10 seconds if pending or limit_reached
   useEffect(() => {
-    if (reason === 'pending') {
+    if (reason === 'pending' || reason === 'limit_reached') {
       const interval = setInterval(() => {
         checkStatusNow();
       }, 10000);
@@ -138,6 +138,41 @@ function StatusContent() {
             <p className="text-xs text-slate-500 leading-relaxed">
               تم إدراج هذا الجهاز ضمن الأجهزة المحظورة من الوصول للمتجر.
             </p>
+          </div>
+        </>
+      )}
+
+      {reason === 'limit_reached' && (
+        <>
+          <div className="w-16 h-16 bg-amber-50 border border-amber-200/70 rounded-3xl text-amber-600 flex items-center justify-center mx-auto shadow-sm">
+            <ShieldAlert className="w-8 h-8 text-amber-600" />
+          </div>
+          <div className="space-y-2">
+            <span className="inline-block text-[11px] font-bold bg-amber-100 text-amber-800 px-3 py-1 rounded-full">
+              الحد الأقصى للأجهزة: {searchParams.get('approved') || '2'} من {searchParams.get('max') || '2'}
+            </span>
+            <h1 className="text-xl font-black text-slate-800">تم الوصول إلى الحد الأقصى للأجهزة المعتمدة</h1>
+            <p className="text-xs text-slate-500 leading-relaxed">
+              تم الوصول إلى الحد الأقصى للأجهزة المعتمدة. تم تسجيل طلب جهازك، ويجب على الإدارة إلغاء جهاز سابق أو زيادة الحد قبل اعتماده.
+            </p>
+          </div>
+
+          <div className="bg-slate-50 border border-slate-200 rounded-2xl p-4 text-xs text-slate-600 text-right space-y-1">
+            <p className="font-bold text-slate-700">ماذا أفعل الآن؟</p>
+            <p className="text-[11px] text-slate-500">
+              يرجى التواصل مع إدارة المتجر لإلغاء اعتماد أحد الأجهزة القديمة أو رفع الحد الأقصى المسموح لحسابك.
+            </p>
+          </div>
+
+          <div className="pt-2 flex flex-col gap-2">
+            <button
+              onClick={checkStatusNow}
+              disabled={checking}
+              className="w-full bg-slate-900 hover:bg-slate-800 text-white font-bold py-3 rounded-xl text-xs flex items-center justify-center gap-2 transition-all cursor-pointer shadow-sm"
+            >
+              <RefreshCw className={`w-4 h-4 ${checking ? 'animate-spin' : ''}`} />
+              <span>{checking ? 'جاري الفحص...' : 'فحص التفعيل الآن'}</span>
+            </button>
           </div>
         </>
       )}

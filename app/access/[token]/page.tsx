@@ -133,8 +133,12 @@ export default function AccessTokenPage({ params }: { params: Promise<{ token: s
         throw new Error(data.error || 'رمز PIN غير صحيح أو فشل الاعتماد.');
       }
 
-      // Redirect to status page pending approval
-      window.location.href = '/access/status?reason=pending';
+      // Redirect to status page pending approval or limit reached
+      if (data.status === 'limit_reached' || data.isOverLimit) {
+        window.location.href = `/access/status?reason=limit_reached&approved=${data.approvedCount || 0}&max=${data.maxDevices || 2}`;
+      } else {
+        window.location.href = '/access/status?reason=pending';
+      }
     } catch (err: any) {
       console.error('Error submitting PIN:', err);
       setErrorMsg(err.message || 'حدث خطأ أثناء التأكيد.');

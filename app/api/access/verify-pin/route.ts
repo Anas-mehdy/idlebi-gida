@@ -145,11 +145,13 @@ export async function POST(request: NextRequest) {
 
     const response = NextResponse.json({
       success: true,
-      status: 'pending',
+      status: isOverLimit ? 'limit_reached' : 'pending',
       isOverLimit,
+      approvedCount: approvedCount || 0,
+      maxDevices,
       customerName: customer.name,
       message: isOverLimit 
-        ? 'تم طلب إضافة جهاز جديد، ولكن حسابك وصل للحد الأقصى. يرجى تواصل الإدارة لزيادة حد الأجهزة أو الاعتماد.'
+        ? `تم الوصول إلى الحد الأقصى للأجهزة المعتمدة (${approvedCount || 0} من ${maxDevices}). تم تسجيل طلب جهازك، ويجب على الإدارة إلغاء جهاز سابق أو زيادة الحد قبل اعتماده.`
         : 'تم تسجيل الطلب بنجاح وهو بانتظار موافقة الأدمن.'
     });
 
