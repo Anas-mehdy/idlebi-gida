@@ -3,7 +3,7 @@
 import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { supabase } from '@/lib/supabase';
-import { ShoppingBag, Users, CheckSquare, ClipboardList, TrendingUp, DollarSign, Clock, AlertCircle, Trash2, Save, Copy, X, CalendarClock, Printer, Plus, Search, Download, ChevronDown, ChevronUp, Edit2, Gift, Tag, Receipt } from 'lucide-react';
+import { ShoppingBag, Users, CheckSquare, ClipboardList, TrendingUp, DollarSign, Clock, AlertCircle, Trash2, Save, Copy, X, CalendarClock, Printer, Plus, Search, Download, ChevronDown, ChevronUp, Edit2, Gift, Tag, Receipt, UserCheck, CheckCircle2 } from 'lucide-react';
 import html2canvas from 'html2canvas-pro';
 import { jsPDF } from 'jspdf';
 import { isOfferActive, getOfferBonusQuantity, getOrderBoxSummary } from '@/lib/offerHelpers';
@@ -100,6 +100,56 @@ export default function AdminDashboard() {
   const [approvedCustomers, setApprovedCustomers] = useState<Customer[]>([]);
   const [lastSoldPrices, setLastSoldPrices] = useState<Record<string, number>>({});
   const [focusedItemId, setFocusedItemId] = useState<string | null>(null);
+
+  // Assign Customer Modal State
+  const [assignModalOrder, setAssignModalOrder] = useState<Order | null>(null);
+  const [selectedCustomerForAssign, setSelectedCustomerForAssign] = useState<string>('');
+  const [assignSearchQuery, setAssignSearchQuery] = useState<string>('');
+
+  const handleAssignOrderToCustomer = async () => {
+    if (!assignModalOrder || !selectedCustomerForAssign) return;
+    const selectedCust = approvedCustomers.find(c => c.id === selectedCustomerForAssign);
+    if (!selectedCust) return;
+
+    setIsUpdating(true);
+    try {
+      const isUrlConfigured = process.env.NEXT_PUBLIC_SUPABASE_URL && !process.env.NEXT_PUBLIC_SUPABASE_URL.includes('placeholder');
+      if (isUrlConfigured) {
+        const res = await fetch('/api/admin/orders/assign-customer', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            orderId: assignModalOrder.id,
+            customerId: selectedCust.id
+          })
+        });
+        const data = await res.json();
+        if (!res.ok || !data.success) {
+          throw new Error(data.error || 'فشل ربط الفاتورة');
+        }
+      }
+
+      // Update local state
+      setOrders(prev => prev.map(o => {
+        if (o.id === assignModalOrder.id) {
+          return {
+            ...o,
+            customer_name: selectedCust.name
+          };
+        }
+        return o;
+      }));
+
+      setAssignModalOrder(null);
+      setSelectedCustomerForAssign('');
+      alert(`تم ربط الفاتورة بالزبون "${selectedCust.name}" بنجاح!`);
+    } catch (err: any) {
+      console.error(err);
+      alert(err.message || 'حدث خطأ أثناء ربط الفاتورة');
+    } finally {
+      setIsUpdating(false);
+    }
+  };
 
   const allProductsMap = React.useMemo(() => {
     const map: Record<string, any> = {};
@@ -1225,13 +1275,58 @@ export default function AdminDashboard() {
                             </button>
                           </div>
                         ) : (
-                          <div className="flex items-center gap-1.5 group">
+                          <div className="flex items-center gap-2 flex-wrap">
                             <h3 
                               className="text-sm font-bold text-slate-800 cursor-pointer hover:text-[#128C7E] transition-colors"
                               onClick={() => toggleOrderExpand(order.id)}
                             >
                               {order.customer_name}
                             </h3>
+
+                            {/* Assigning status badge button */}
+                            {(() => {
+                              const isMatched = approvedCustomers.some(
+                                c => c.name.trim().toLowerCase() === order.customer_name.trim().toLowerCase()
+                              );
+
+                              if (!isMatched) {
+                                return (
+                                  <button
+                                    type="button"
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      setAssignModalOrder(order);
+                                      setSelectedCustomerForAssign('');
+                                      setAssignSearchQuery('');
+                                    }}
+                                    className="inline-flex items-center gap-1.5 bg-amber-50 hover:bg-amber-100 text-amber-900 border border-amber-300 font-extrabold px-2.5 py-0.5 rounded-lg text-xs cursor-pointer shadow-2xs transition-all active:scale-95"
+                                    title="هذا الاسم غير مسجل في قائمة الزبائن المعتمدين - اضغط لربطه بزَبون"
+                                  >
+                                    <UserCheck className="w-3.5 h-3.5 text-amber-600 shrink-0" />
+                                    <span>غير مربوط بزَبون • اضغط للربط</span>
+                                  </button>
+                                );
+                              }
+
+                              return (
+                                <button
+                                  type="button"
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    setAssignModalOrder(order);
+                                    const matched = approvedCustomers.find(c => c.name.trim().toLowerCase() === order.customer_name.trim().toLowerCase());
+                                    setSelectedCustomerForAssign(matched ? matched.id : '');
+                                    setAssignSearchQuery('');
+                                  }}
+                                  className="inline-flex items-center gap-1 bg-emerald-50 hover:bg-emerald-100 text-emerald-800 border border-emerald-200/80 font-bold px-2 py-0.5 rounded-md text-[10.5px] cursor-pointer transition-all"
+                                  title="زبون معتمد - اضغط لتعديل الربط إذا رغبت"
+                                >
+                                  <CheckCircle2 className="w-3 h-3 text-emerald-600 shrink-0" />
+                                  <span>مربوط ✓</span>
+                                </button>
+                              );
+                            })()}
+
                             <button
                               type="button"
                               onClick={(e) => {
@@ -1240,8 +1335,8 @@ export default function AdminDashboard() {
                                 setTempCustomerName(order.customer_name);
                                 setCustomerSearchQuery(order.customer_name);
                               }}
-                              className="p-1 text-slate-400 hover:text-[#128C7E] hover:bg-slate-100 border border-slate-200 rounded-lg transition-colors cursor-pointer opacity-0 group-hover:opacity-100 focus:opacity-100 shrink-0"
-                              title="تعديل اسم الزبون"
+                              className="p-1 text-slate-400 hover:text-[#128C7E] hover:bg-slate-100 border border-slate-200 rounded-lg transition-colors cursor-pointer shrink-0"
+                              title="تعديل اسم الزبون يدوياً"
                             >
                               <Edit2 className="w-3 h-3" />
                             </button>
@@ -2027,13 +2122,58 @@ export default function AdminDashboard() {
                             </button>
                           </div>
                         ) : (
-                          <div className="flex items-center gap-1.5 group">
+                          <div className="flex items-center gap-2 flex-wrap">
                             <h3 
                               className="text-sm font-bold text-slate-800 cursor-pointer hover:text-[#128C7E] transition-colors"
                               onClick={() => toggleOrderExpand(order.id)}
                             >
                               {order.customer_name}
                             </h3>
+
+                            {/* Assigning status badge button */}
+                            {(() => {
+                              const isMatched = approvedCustomers.some(
+                                c => c.name.trim().toLowerCase() === order.customer_name.trim().toLowerCase()
+                              );
+
+                              if (!isMatched) {
+                                return (
+                                  <button
+                                    type="button"
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      setAssignModalOrder(order);
+                                      setSelectedCustomerForAssign('');
+                                      setAssignSearchQuery('');
+                                    }}
+                                    className="inline-flex items-center gap-1.5 bg-amber-50 hover:bg-amber-100 text-amber-900 border border-amber-300 font-extrabold px-2.5 py-0.5 rounded-lg text-xs cursor-pointer shadow-2xs transition-all active:scale-95"
+                                    title="هذا الاسم غير مسجل في قائمة الزبائن المعتمدين - اضغط لربطه بزَبون"
+                                  >
+                                    <UserCheck className="w-3.5 h-3.5 text-amber-600 shrink-0" />
+                                    <span>غير مربوط بزَبون • اضغط للربط</span>
+                                  </button>
+                                );
+                              }
+
+                              return (
+                                <button
+                                  type="button"
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    setAssignModalOrder(order);
+                                    const matched = approvedCustomers.find(c => c.name.trim().toLowerCase() === order.customer_name.trim().toLowerCase());
+                                    setSelectedCustomerForAssign(matched ? matched.id : '');
+                                    setAssignSearchQuery('');
+                                  }}
+                                  className="inline-flex items-center gap-1 bg-emerald-50 hover:bg-emerald-100 text-emerald-800 border border-emerald-200/80 font-bold px-2 py-0.5 rounded-md text-[10.5px] cursor-pointer transition-all"
+                                  title="زبون معتمد - اضغط لتعديل الربط إذا رغبت"
+                                >
+                                  <CheckCircle2 className="w-3 h-3 text-emerald-600 shrink-0" />
+                                  <span>مربوط ✓</span>
+                                </button>
+                              );
+                            })()}
+
                             <button
                               type="button"
                               onClick={(e) => {
@@ -2042,8 +2182,8 @@ export default function AdminDashboard() {
                                 setTempCustomerName(order.customer_name);
                                 setCustomerSearchQuery(order.customer_name);
                               }}
-                              className="p-1 text-slate-400 hover:text-[#128C7E] hover:bg-slate-100 border border-slate-200 rounded-lg transition-colors cursor-pointer opacity-0 group-hover:opacity-100 focus:opacity-100 shrink-0"
-                              title="تعديل اسم الزبون"
+                              className="p-1 text-slate-400 hover:text-[#128C7E] hover:bg-slate-100 border border-slate-200 rounded-lg transition-colors cursor-pointer shrink-0"
+                              title="تعديل اسم الزبون يدوياً"
                             >
                               <Edit2 className="w-3 h-3" />
                             </button>
@@ -2981,6 +3121,113 @@ export default function AdminDashboard() {
           <div className="text-center mt-8 pt-2.5 border-t border-dashed border-black text-[11px] text-black/85">
             <p className="font-bold">تم توليد الورقة للتعبئة السريعة</p>
             <p className="mt-1 font-mono text-[10px] text-black/60">İDELBİ GIDA • 80mm Thermal</p>
+          </div>
+        </div>
+      )}
+
+      {/* 6. Assign Customer Modal */}
+      {assignModalOrder && (
+        <div className="fixed inset-0 bg-black/50 backdrop-blur-xs z-50 flex items-center justify-center p-4">
+          <div className="bg-white rounded-3xl p-6 max-w-md w-full shadow-2xl border border-slate-200 space-y-4 text-right">
+            <div className="flex items-center justify-between border-b border-slate-100 pb-3">
+              <div className="flex items-center gap-2">
+                <UserCheck className="w-5 h-5 text-[#128C7E]" />
+                <h3 className="text-sm font-bold text-slate-800">
+                  ربط الفاتورة بزَبون معتمد
+                </h3>
+              </div>
+              <button 
+                onClick={() => {
+                  setAssignModalOrder(null);
+                  setSelectedCustomerForAssign('');
+                }}
+                className="p-1 text-slate-400 hover:bg-slate-100 rounded-lg cursor-pointer"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <div className="bg-slate-50 border border-slate-200 p-3.5 rounded-2xl text-xs space-y-1.5">
+              <div className="flex justify-between">
+                <span className="text-slate-500">الاسم الحالي في الطلب:</span>
+                <b className="text-slate-900 font-extrabold">{assignModalOrder.customer_name}</b>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-slate-500">رقم الفاتورة:</span>
+                <span className="font-mono font-bold text-slate-700">#{assignModalOrder.id.slice(0, 8).toUpperCase()}</span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-slate-500">إجمالي الفاتورة:</span>
+                <b className="text-emerald-700 font-black">{Number(assignModalOrder.total_price).toFixed(2)} TL</b>
+              </div>
+            </div>
+
+            <div className="space-y-2">
+              <label className="block text-xs font-bold text-slate-700">
+                اختر الزبون من قائمة الزبائن المعتمدين لربطها بكشف حسابه:
+              </label>
+
+              {/* Search bar inside modal */}
+              <div className="relative">
+                <Search className="w-3.5 h-3.5 text-slate-400 absolute right-3 top-1/2 -translate-y-1/2" />
+                <input
+                  type="text"
+                  placeholder="ابحث عن اسم الزبون..."
+                  value={assignSearchQuery}
+                  onChange={(e) => setAssignSearchQuery(e.target.value)}
+                  className="w-full bg-slate-50 border border-slate-250 outline-none rounded-xl pr-9 pl-3 py-1.5 text-xs text-slate-800 focus:bg-white focus:border-[#128C7E] font-medium"
+                />
+              </div>
+
+              {/* Customer selection list */}
+              <div className="max-h-48 overflow-y-auto border border-slate-200 rounded-xl divide-y divide-slate-100 bg-white">
+                {approvedCustomers
+                  .filter(c => c.name.toLowerCase().includes(assignSearchQuery.toLowerCase()))
+                  .map(c => {
+                    const isSelected = selectedCustomerForAssign === c.id;
+                    return (
+                      <button
+                        key={c.id}
+                        type="button"
+                        onClick={() => setSelectedCustomerForAssign(c.id)}
+                        className={`w-full p-2.5 text-right text-xs font-bold flex items-center justify-between cursor-pointer transition-colors ${
+                          isSelected ? 'bg-emerald-50 text-emerald-800' : 'hover:bg-slate-50 text-slate-700'
+                        }`}
+                      >
+                        <span>{c.name}</span>
+                        {isSelected && <CheckCircle2 className="w-4 h-4 text-emerald-600" />}
+                      </button>
+                    );
+                  })}
+                {approvedCustomers.filter(c => c.name.toLowerCase().includes(assignSearchQuery.toLowerCase())).length === 0 && (
+                  <div className="p-4 text-center text-xs text-slate-400">
+                    لا يوجد زبون مطابق للبحث
+                  </div>
+                )}
+              </div>
+            </div>
+
+            <div className="flex items-center justify-end gap-2 pt-2 border-t border-slate-100">
+              <button
+                type="button"
+                onClick={() => {
+                  setAssignModalOrder(null);
+                  setSelectedCustomerForAssign('');
+                }}
+                className="px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold rounded-xl text-xs cursor-pointer transition-all"
+              >
+                إلغاء
+              </button>
+              <button
+                type="button"
+                onClick={handleAssignOrderToCustomer}
+                disabled={!selectedCustomerForAssign || isUpdating}
+                className="px-5 py-2 bg-[#128C7E] hover:bg-[#128C7E]/90 disabled:bg-slate-300 text-white font-bold rounded-xl text-xs cursor-pointer shadow-xs transition-all flex items-center gap-1.5"
+              >
+                <UserCheck className="w-4 h-4" />
+                <span>{isUpdating ? 'جاري الربط...' : 'تأكيد ربط الفاتورة'}</span>
+              </button>
+            </div>
           </div>
         </div>
       )}
