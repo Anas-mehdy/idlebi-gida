@@ -1,8 +1,9 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
+import Link from 'next/link';
 import { supabase } from '@/lib/supabase';
-import { ShoppingBag, Users, CheckSquare, ClipboardList, TrendingUp, DollarSign, Clock, AlertCircle, Trash2, Save, Copy, X, CalendarClock, Printer, Plus, Search, Download, ChevronDown, ChevronUp, Edit2, Gift, Tag } from 'lucide-react';
+import { ShoppingBag, Users, CheckSquare, ClipboardList, TrendingUp, DollarSign, Clock, AlertCircle, Trash2, Save, Copy, X, CalendarClock, Printer, Plus, Search, Download, ChevronDown, ChevronUp, Edit2, Gift, Tag, Receipt } from 'lucide-react';
 import html2canvas from 'html2canvas-pro';
 import { jsPDF } from 'jspdf';
 import { isOfferActive, getOfferBonusQuantity, getOrderBoxSummary } from '@/lib/offerHelpers';
@@ -1741,6 +1742,15 @@ export default function AdminDashboard() {
                       <Printer className="w-3.5 h-3.5" />
                       <span>إيصال 80 مم</span>
                     </button>
+
+                    <Link
+                      href="/admin/ledger"
+                      className="col-span-1 sm:col-auto bg-purple-50 hover:bg-purple-100 border border-purple-250 text-purple-700 font-bold px-3 py-2 sm:py-1.5 rounded-xl text-xs flex items-center justify-center gap-1 cursor-pointer transition-all active:scale-95 shadow-sm w-full sm:w-auto"
+                      title="دفتر الدين وكشف حسابات الزبائن"
+                    >
+                      <Receipt className="w-3.5 h-3.5 text-purple-600" />
+                      <span>دفتر الدين</span>
+                    </Link>
                   </div>
 
                   <span className="text-[10px] text-slate-400 font-medium">
@@ -2534,6 +2544,15 @@ export default function AdminDashboard() {
                       <Printer className="w-3.5 h-3.5" />
                       <span>إيصال 80 مم</span>
                     </button>
+
+                    <Link
+                      href="/admin/ledger"
+                      className="col-span-1 sm:col-auto bg-purple-50 hover:bg-purple-100 border border-purple-250 text-purple-700 font-bold px-3 py-2 sm:py-1.5 rounded-xl text-xs flex items-center justify-center gap-1 cursor-pointer transition-all active:scale-95 shadow-sm w-full sm:w-auto"
+                      title="دفتر الدين وكشف حسابات الزبائن"
+                    >
+                      <Receipt className="w-3.5 h-3.5 text-purple-600" />
+                      <span>دفتر الدين</span>
+                    </Link>
                   </div>
 
                   <span className="text-[10px] text-slate-400 font-medium">

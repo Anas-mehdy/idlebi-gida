@@ -1,11 +1,12 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
+import Link from 'next/link';
 import { supabase } from '@/lib/supabase';
 import { 
   TrendingUp, DollarSign, FileText, Users, ShoppingBag, Calendar, 
   Search, RefreshCw, X, AlertCircle, Loader2,
-  Trash2, Copy, Download, Printer, Plus, Edit3, Save, ChevronUp, ChevronDown, Gift, Tag
+  Trash2, Copy, Download, Printer, Plus, Edit3, Save, ChevronUp, ChevronDown, Gift, Tag, Receipt
 } from 'lucide-react';
 import { jsPDF } from 'jspdf';
 import html2canvas from 'html2canvas-pro';
@@ -1249,6 +1250,15 @@ export default function AdminStatistics() {
                     <Printer className="w-3.5 h-3.5" />
                     <span>إيصال 80 مم</span>
                   </button>
+
+                  <Link
+                    href="/admin/ledger"
+                    className="col-span-1 sm:col-auto bg-purple-50 hover:bg-purple-100 border border-purple-250 text-purple-700 font-bold px-3 py-2 sm:py-1.5 rounded-xl text-xs flex items-center justify-center gap-1 cursor-pointer transition-all active:scale-95 shadow-sm w-full sm:w-auto"
+                    title="دفتر الدين وكشف حسابات الزبائن"
+                  >
+                    <Receipt className="w-3.5 h-3.5 text-purple-600" />
+                    <span>دفتر الدين</span>
+                  </Link>
                 </div>
                 </>)}
               </div>

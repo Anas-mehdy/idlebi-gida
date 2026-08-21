@@ -5,7 +5,7 @@ import { supabase } from '@/lib/supabase';
 import Link from 'next/link';
 import { 
   Users, Plus, Trash2, Edit2, CheckSquare, X, Search, Loader2, AlertCircle, RefreshCw,
-  Link as LinkIcon, Key, Eye, EyeOff, Laptop, Copy, Check, ShieldCheck
+  Link as LinkIcon, Key, Eye, EyeOff, Laptop, Copy, Check, ShieldCheck, Receipt
 } from 'lucide-react';
 
 interface Customer {
@@ -471,6 +471,16 @@ export default function AdminCustomers() {
                             <LinkIcon className="w-3.5 h-3.5 text-blue-600" />
                             <span>الرابط و PIN</span>
                           </button>
+
+                          {/* Customer Statement & Debt Ledger Link */}
+                          <Link
+                            href="/admin/ledger"
+                            className="px-2.5 py-1.5 bg-emerald-50 hover:bg-emerald-100 text-emerald-700 border border-emerald-200 rounded-xl text-xs font-bold flex items-center gap-1 transition-all"
+                            title="فتح دفتر الدين وكشف الحساب"
+                          >
+                            <Receipt className="w-3.5 h-3.5 text-emerald-600" />
+                            <span>دفتر الدين</span>
+                          </Link>
 
                           {/* Devices Link */}
                           <Link

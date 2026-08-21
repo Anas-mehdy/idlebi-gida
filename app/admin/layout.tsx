@@ -4,7 +4,7 @@ import React, { useState, useEffect } from 'react';
 import { useRouter, usePathname } from 'next/navigation';
 import Link from 'next/link';
 import { supabase } from '@/lib/supabase';
-import { LayoutDashboard, FolderKanban, ShoppingBag, Settings, LogOut, Store, Menu, X, User, TrendingUp, Users, Boxes, Laptop } from 'lucide-react';
+import { LayoutDashboard, FolderKanban, ShoppingBag, Settings, LogOut, Store, Menu, X, User, TrendingUp, Users, Boxes, Laptop, Receipt } from 'lucide-react';
 
 export default function AdminLayout({ children }: { children: React.ReactNode }) {
   const router = useRouter();
@@ -64,6 +64,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
 
   const navLinks = [
     { href: '/admin', label: 'لوحة التحكم والطلبات', icon: LayoutDashboard },
+    { href: '/admin/ledger', label: 'دفتر الدين وكشف الحسابات', icon: Receipt },
     { href: '/admin/categories', label: 'إدارة الأقسام', icon: FolderKanban },
     { href: '/admin/products', label: 'إدارة المنتجات', icon: ShoppingBag },
     { href: '/admin/inventory', label: 'إدارة المخزون', icon: Boxes },
