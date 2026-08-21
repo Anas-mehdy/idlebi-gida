@@ -89,6 +89,14 @@ export async function GET(request: NextRequest) {
     });
 
     orders.forEach(order => {
+      const rawTotal = (order.order_items || []).reduce(
+        (sum: number, it: any) => sum + (Number(it.quantity) * Number(it.price_at_purchase || 0)),
+        0
+      );
+      const orderTotal = order.total_price !== undefined && order.total_price !== null
+        ? Number(order.total_price)
+        : rawTotal;
+
       let matchedCustId = order.customer_id;
       if (!matchedCustId && order.customer_name) {
         const matched = customerByName.get(order.customer_name.trim().toLowerCase());
@@ -99,7 +107,8 @@ export async function GET(request: NextRequest) {
 
       if (matchedCustId && customerOrdersMap.has(matchedCustId)) {
         customerOrdersMap.get(matchedCustId)!.push(order);
-      } else {
+      } else if (orderTotal > 0) {
+        // Only include in unassigned orders if total is greater than 0
         unassignedOrders.push(order);
       }
     });

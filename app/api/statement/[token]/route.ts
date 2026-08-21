@@ -98,7 +98,9 @@ export async function GET(
     let partialCount = 0;
     let paidCount = 0;
 
-    const processedOrders = ordersList.map((order: any) => {
+    const processedOrders: any[] = [];
+
+    ordersList.forEach((order: any) => {
       const rawOrderTotal = (order.order_items || []).reduce(
         (sum: number, item: any) => sum + (Number(item.quantity) * Number(item.price_at_purchase || 0)),
         0
@@ -110,6 +112,11 @@ export async function GET(
       const orderPayments = paymentsList.filter((p: any) => p.order_id === order.id);
       const orderPaid = orderPayments.reduce((sum: number, p: any) => sum + Number(p.amount || 0), 0);
       const orderRemaining = Math.max(0, effectiveOrderTotal - orderPaid);
+
+      // Exclude old unpriced test orders (total 0 and paid 0) from statement view
+      if (effectiveOrderTotal <= 0 && orderPaid <= 0) {
+        return;
+      }
 
       let paymentStatus: 'unpaid' | 'partial' | 'paid' = 'unpaid';
       if (effectiveOrderTotal > 0 && orderPaid >= effectiveOrderTotal) {
@@ -126,7 +133,7 @@ export async function GET(
       totalInvoicesAmount += effectiveOrderTotal;
       totalPaidAmount += orderPaid;
 
-      return {
+      processedOrders.push({
         id: order.id,
         created_at: order.created_at,
         status: order.status,
@@ -151,7 +158,7 @@ export async function GET(
             applied_offer: effectiveOffer
           };
         })
-      };
+      });
     });
 
     const totalRemainingDebt = Math.max(0, totalInvoicesAmount - totalPaidAmount);

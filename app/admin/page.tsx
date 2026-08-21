@@ -1285,6 +1285,9 @@ export default function AdminDashboard() {
 
                             {/* Assigning status badge button */}
                             {(() => {
+                              const orderTotal = Number(order.total_price || 0);
+                              if (orderTotal <= 0) return null;
+
                               const isMatched = approvedCustomers.some(
                                 c => c.name.trim().toLowerCase() === order.customer_name.trim().toLowerCase()
                               );
@@ -2132,6 +2135,9 @@ export default function AdminDashboard() {
 
                             {/* Assigning status badge button */}
                             {(() => {
+                              const orderTotal = Number(order.total_price || 0);
+                              if (orderTotal <= 0) return null;
+
                               const isMatched = approvedCustomers.some(
                                 c => c.name.trim().toLowerCase() === order.customer_name.trim().toLowerCase()
                               );

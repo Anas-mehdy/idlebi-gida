@@ -939,6 +939,9 @@ export default function AdminStatistics() {
                       <div className="flex items-center gap-2 flex-wrap">
                         <h3 className="text-sm font-bold text-slate-800">{order.customer_name}</h3>
                         {(() => {
+                          const orderTotal = Number(order.total_price || 0);
+                          if (orderTotal <= 0) return null;
+
                           const isMatched = approvedCustomers.some(
                             c => c.name.trim().toLowerCase() === order.customer_name.trim().toLowerCase()
                           );
@@ -953,7 +956,7 @@ export default function AdminStatistics() {
                                   setSelectedCustomerForAssign('');
                                   setAssignSearchQuery('');
                                 }}
-                                className="inline-flex items-center gap-1.5 bg-amber-50 hover:bg-amber-100 text-amber-900 border border-amber-300 font-extrabold px-2.5 py-0.5 rounded-lg text-xs cursor-pointer shadow-2xs transition-all active:scale-95 animate-pulse"
+                                className="inline-flex items-center gap-1.5 bg-amber-50 hover:bg-amber-100 text-amber-900 border border-amber-300 font-extrabold px-2.5 py-0.5 rounded-lg text-xs cursor-pointer shadow-2xs transition-all active:scale-95"
                                 title="هذا الاسم غير مسجل في قائمة الزبائن المعتمدين - اضغط لربطه بزَبون"
                               >
                                 <UserCheck className="w-3.5 h-3.5 text-amber-600 shrink-0" />
