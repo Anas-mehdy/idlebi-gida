@@ -113,7 +113,9 @@ export async function POST(request: NextRequest) {
     }
 
     // Construct full shareable URL
-    const origin = request.headers.get('origin') || 'https://store.example.com';
+    const host = request.headers.get('x-forwarded-host') || request.headers.get('host') || '';
+    const proto = request.headers.get('x-forwarded-proto') || (host.includes('localhost') ? 'http' : 'https');
+    const origin = host ? `${proto}://${host}` : (request.headers.get('origin') || '');
     const accessUrl = `${origin}/access/${rawToken}`;
 
     return NextResponse.json({

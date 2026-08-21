@@ -227,7 +227,8 @@ export default function AdminLedgerPage() {
   }, []);
 
   const handleCopyStatementLink = (url: string, tokenId: string) => {
-    navigator.clipboard.writeText(url);
+    const fullUrl = typeof window !== 'undefined' ? `${window.location.origin}/statement/${tokenId}` : url;
+    navigator.clipboard.writeText(fullUrl);
     setCopiedToken(tokenId);
     setTimeout(() => setCopiedToken(null), 2500);
   };

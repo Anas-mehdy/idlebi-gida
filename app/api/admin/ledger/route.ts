@@ -118,7 +118,9 @@ export async function GET(request: NextRequest) {
       }
     });
 
-    const origin = request.headers.get('origin') || 'https://store.example.com';
+    const host = request.headers.get('x-forwarded-host') || request.headers.get('host') || '';
+    const proto = request.headers.get('x-forwarded-proto') || (host.includes('localhost') ? 'http' : 'https');
+    const origin = host ? `${proto}://${host}` : (request.headers.get('origin') || '');
 
     let grandTotalInvoices = 0;
     let grandTotalPaid = 0;
