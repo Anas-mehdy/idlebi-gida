@@ -151,55 +151,52 @@ export default function CustomerStatementPage({ params }: { params: Promise<{ to
   };
 
   const handleDownloadInvoicePdf = async (order: Order) => {
-    setActivePdfOrder(order);
     setGeneratingOrderId(order.id);
     setIsGeneratingPdf(true);
 
-    setTimeout(async () => {
-      try {
-        const input = document.getElementById('statement-invoice-pdf-sheet');
-        if (!input) {
-          alert('لم يتم العثور على هيكل الفاتورة للتحميل.');
-          return;
-        }
+    try {
+      const input = document.getElementById(`invoice-pdf-${order.id}`);
+      if (!input) {
+        alert('لم يتم العثور على هيكل الفاتورة للتحميل.');
+        return;
+      }
 
-        const canvas = await html2canvas(input, {
-          scale: 1.5,
-          useCORS: true,
-          logging: false,
-          backgroundColor: '#ffffff'
-        });
+      const canvas = await html2canvas(input, {
+        scale: 1.5,
+        useCORS: true,
+        logging: false,
+        backgroundColor: '#ffffff'
+      });
 
-        const imgData = canvas.toDataURL('image/jpeg', 0.75);
-        const pdf = new jsPDF('p', 'mm', 'a4');
-        const imgWidth = 210;
-        const pageHeight = 297;
-        const imgHeight = (canvas.height * imgWidth) / canvas.width;
-        let heightLeft = imgHeight;
-        let position = 0;
+      const imgData = canvas.toDataURL('image/jpeg', 0.75);
+      const pdf = new jsPDF('p', 'mm', 'a4');
+      const imgWidth = 210;
+      const pageHeight = 297;
+      const imgHeight = (canvas.height * imgWidth) / canvas.width;
+      let heightLeft = imgHeight;
+      let position = 0;
 
-        const imageAlias = `invoice-${order.id}`;
+      const imageAlias = `invoice-${order.id}`;
 
+      pdf.addImage(imgData, 'JPEG', 0, position, imgWidth, imgHeight, imageAlias, 'FAST');
+      heightLeft -= pageHeight;
+
+      while (heightLeft >= 0) {
+        position = heightLeft - imgHeight;
+        pdf.addPage();
         pdf.addImage(imgData, 'JPEG', 0, position, imgWidth, imgHeight, imageAlias, 'FAST');
         heightLeft -= pageHeight;
-
-        while (heightLeft >= 0) {
-          position = heightLeft - imgHeight;
-          pdf.addPage();
-          pdf.addImage(imgData, 'JPEG', 0, position, imgWidth, imgHeight, imageAlias, 'FAST');
-          heightLeft -= pageHeight;
-        }
-
-        const custName = data?.customer?.name || 'الزبون';
-        pdf.save(`فاتورة_${custName.replace(/\s+/g, '_')}_${order.id.substring(0, 8)}.pdf`);
-      } catch (error) {
-        console.error('Error generating PDF:', error);
-        alert('حدث خطأ أثناء تصدير ملف PDF.');
-      } finally {
-        setIsGeneratingPdf(false);
-        setGeneratingOrderId(null);
       }
-    }, 200);
+
+      const custName = data?.customer?.name || 'الزبون';
+      pdf.save(`فاتورة_${custName.replace(/\s+/g, '_')}_${order.id.substring(0, 8)}.pdf`);
+    } catch (error) {
+      console.error('Error generating PDF:', error);
+      alert('حدث خطأ أثناء تصدير ملف PDF.');
+    } finally {
+      setIsGeneratingPdf(false);
+      setGeneratingOrderId(null);
+    }
   };
 
   const formatDate = (dateString: string) => {
@@ -498,6 +495,126 @@ export default function CustomerStatementPage({ params }: { params: Promise<{ to
         </div>
 
       </main>
+
+      {/* Hidden Official PDF Print Layouts for Each Invoice */}
+      <div className="print:hidden">
+        {orders.map((ord) => (
+          <div 
+            key={`pdf-${ord.id}`}
+            id={`invoice-pdf-${ord.id}`} 
+            className="fixed left-[-9999px] top-[-9999px] w-[790px] bg-white font-sans text-right p-8 pointer-events-none" 
+            dir="rtl"
+          >
+            {/* Header */}
+            <div className="border-b-2 border-slate-900 pb-4 mb-6">
+              <div className="flex justify-between items-start">
+                <div>
+                  <h1 className="text-xl font-black text-slate-850">İDELBİ GIDA TİCARET LİMİTED ŞİRKETİ</h1>
+                  <p className="text-xs text-slate-500 font-bold mt-1">Gıda Ürünleri İthalat İhracat ve Toptan Ticareti</p>
+                  <p className="text-[11px] text-slate-400 mt-0.5">Esenler, İstanbul</p>
+                </div>
+                <div className="text-left font-mono text-xs text-slate-500">
+                  <p>تاريخ الفاتورة: {new Date(ord.created_at).toLocaleDateString('ar-EG', { dateStyle: 'long' })}</p>
+                  <p>رقم الفاتورة: #{ord.id.substring(0, 8).toUpperCase()}</p>
+                </div>
+              </div>
+              <div className="text-center mt-4">
+                <span className="text-2xl font-black border-2 border-slate-900 px-6 py-1.5 inline-block bg-slate-50 rounded-lg">فـاتـورة مـبـيـعـات</span>
+              </div>
+            </div>
+
+            {/* Customer Metadata */}
+            <div className="grid grid-cols-2 gap-4 bg-slate-50 border border-slate-200 rounded-xl p-4 mb-6 text-sm">
+              <div>
+                <span className="text-slate-500 font-bold">السيد / السادة: </span>
+                <span className="font-extrabold text-slate-800">{customer.name}</span>
+              </div>
+              <div className="text-left">
+                <span className="text-slate-550 font-bold">حالة الدفع: </span>
+                <span className="font-extrabold text-[#128C7E]">معلق / عند التسليم</span>
+              </div>
+            </div>
+
+            {/* Pricing Grid */}
+            <table className="w-full border-collapse border border-slate-350 text-sm">
+              <thead>
+                <tr className="bg-slate-100 border-b border-slate-350">
+                  <th className="border border-slate-350 px-3 py-2 text-center font-black w-12">م</th>
+                  <th className="border border-slate-350 px-3 py-2 text-right font-black">الصنف (اسم المادة)</th>
+                  <th className="border border-slate-350 px-3 py-2 text-center font-black w-24">الكمية</th>
+                  <th className="border border-slate-350 px-3 py-2 text-center font-black w-32">السعر الإفرادي</th>
+                  <th className="border border-slate-350 px-3 py-2 text-center font-black w-32">الإجمالي</th>
+                </tr>
+              </thead>
+              <tbody>
+                {ord.order_items.map((item, idx) => {
+                  const price = Number(item.price_at_purchase || 0);
+                  const qty = item.quantity;
+                  const total = price * qty;
+                  const bonusQty = item.applied_offer ? getOfferBonusQuantity(item.applied_offer, qty) : 0;
+                  return (
+                    <tr key={item.id} className="border-b border-slate-300">
+                      <td className="border border-slate-355 px-3 py-2.5 text-center font-bold font-mono">{idx + 1}</td>
+                      <td className="border border-slate-355 px-3 py-2.5 font-bold text-slate-800">
+                        <div>{item.product_name}</div>
+                        {item.applied_offer && (
+                          <div className="text-[11px] text-amber-900 font-extrabold mt-1 bg-amber-50 border border-amber-200/80 rounded-md px-2 py-0.5 inline-flex items-center gap-1">
+                            <span>🎁 عرض خاص: {item.applied_offer}</span>
+                            {bonusQty > 0 && <span className="text-amber-950 font-black">(+ {bonusQty} صندوق مجاناً)</span>}
+                          </div>
+                        )}
+                      </td>
+                      <td className="border border-slate-355 px-3 py-2.5 text-center font-black font-mono">{qty} صندوق</td>
+                      <td className="border border-slate-355 px-3 py-2.5 text-center font-extrabold font-mono">{price.toFixed(2)} TL</td>
+                      <td className="border border-slate-355 px-3 py-2.5 text-center font-black font-mono">{total.toFixed(2)} TL</td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+
+            {/* Summary / Total section */}
+            <div className="mt-6 border border-slate-350 rounded-xl p-4 bg-slate-50 flex justify-between items-center">
+              <div className="text-xs text-slate-550 font-bold">
+                <span>إجمالي الصناديق: </span>
+                <span className="font-extrabold text-slate-800 text-sm font-mono mr-1">
+                  {(() => {
+                    const summary = getOrderBoxSummary(ord.order_items);
+                    return summary.bonusBoxes > 0 ? (
+                      `${summary.totalBoxes} صندوق (${summary.paidBoxes} أصلية + ${summary.bonusBoxes} مجاناً بالعروض)`
+                    ) : (
+                      `${summary.paidBoxes} صندوق`
+                    );
+                  })()}
+                </span>
+              </div>
+
+              <div className="text-right">
+                <span className="text-slate-700 font-black text-md">المجموع الكلي النهائي:</span>
+                <span className="text-xl font-black text-[#128C7E] font-mono mr-2 bg-emerald-50 border border-emerald-200 px-3 py-1 rounded-lg">
+                  {Number(ord.total_price).toFixed(2)} TL
+                </span>
+              </div>
+            </div>
+
+            {/* Signature / Notes */}
+            <div className="grid grid-cols-2 gap-4 mt-16 text-center text-xs">
+              <div>
+                <p className="text-slate-400 font-bold mb-8">توقيع المستلم</p>
+                <div className="border-b border-slate-300 w-40 mx-auto"></div>
+              </div>
+              <div>
+                <p className="text-slate-400 font-bold mb-8">خاتم وتوقيع الشركة</p>
+                <div className="border-b border-slate-300 w-40 mx-auto"></div>
+              </div>
+            </div>
+
+            <div className="mt-16 text-center text-[10px] text-slate-400 border-t border-slate-200 pt-4 font-bold">
+              * شكراً لتعاملكم معنا • تمنياتنا لكم بالرزق والتوفيق • İDELBİ GIDA
+            </div>
+          </div>
+        ))}
+      </div>
     </div>
   );
 }
