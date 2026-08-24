@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabaseAdmin';
-import { hashToken } from '@/lib/auth/crypto';
+import { hashToken, generateRandomToken } from '@/lib/auth/crypto';
 
 export async function POST(request: NextRequest) {
   try {
@@ -26,7 +26,7 @@ export async function POST(request: NextRequest) {
     // 1. Fetch access link record by token_hash
     const { data: linkData, error: linkError } = await supabaseAdmin
       .from('customer_access_links')
-      .select('id, customer_id, status, customers(id, name, status, pin_hash)')
+      .select('id, customer_id, status, customers(id, name, status, max_devices)')
       .eq('token_hash', tokenHash)
       .maybeSingle();
 
@@ -64,10 +64,13 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // 5. Check if browser already has an active approved customer_device_session for this customer
-    const approvedCookie = request.cookies.get('customer_device_session');
-    if (approvedCookie?.value) {
-      const sessionHash = hashToken(approvedCookie.value);
+    // 5. Check if browser already has an active approved customer_device_session (from Cookie OR Header/Body backupToken)
+    const approvedCookie = request.cookies.get('customer_device_session')?.value;
+    const backupToken = body.backupToken || request.headers.get('x-customer-device-token');
+    const tokenToCheck = approvedCookie || backupToken;
+
+    if (tokenToCheck) {
+      const sessionHash = hashToken(tokenToCheck);
       const { data: sessionData } = await supabaseAdmin
         .from('customer_sessions')
         .select('id, expires_at, customer_id, customer_devices!inner(status)')
@@ -78,14 +81,29 @@ export async function POST(request: NextRequest) {
         const device = sessionData.customer_devices as any;
         const expiresAt = new Date(sessionData.expires_at).getTime();
         if (device?.status === 'approved' && expiresAt > Date.now()) {
-          console.log('[VerifyLink] Active approved customer_device_session found. Bypassing PIN for customer:', customer.id);
-          return NextResponse.json({
+          console.log('[VerifyLink] Active approved session found for customer:', customer.id);
+          const res = NextResponse.json({
             success: true,
             alreadyApproved: true,
             redirectTo: '/',
             customerId: customer.id,
-            customerName: customer.name
+            customerName: customer.name,
+            sessionToken: tokenToCheck
           }, { status: 200 });
+
+          // Refresh cookie if it was absent
+          if (!approvedCookie && backupToken) {
+            const DURATION_180_DAYS_SEC = 180 * 24 * 60 * 60;
+            res.cookies.set('customer_device_session', backupToken, {
+              httpOnly: true,
+              secure: process.env.NODE_ENV === 'production',
+              sameSite: 'lax',
+              path: '/',
+              maxAge: DURATION_180_DAYS_SEC
+            });
+          }
+
+          return res;
         }
       }
     }
@@ -96,13 +114,102 @@ export async function POST(request: NextRequest) {
       .update({ last_used_at: new Date().toISOString() })
       .eq('id', linkData.id);
 
-    return NextResponse.json({
+    const userAgent = request.headers.get('user-agent') || body.userAgent || '';
+    const ip = request.headers.get('x-forwarded-for') || '127.0.0.1';
+    const now = new Date().toISOString();
+
+    // 7. Check if pending cookie / backup pending token exists
+    const pendingCookie = request.cookies.get('customer_pending_session')?.value;
+    const backupPendingToken = body.backupPendingToken || request.headers.get('x-customer-pending-token');
+    const pendingToCheck = pendingCookie || backupPendingToken;
+
+    if (pendingToCheck) {
+      const pendingHash = hashToken(pendingToCheck);
+      const { data: existingDevice } = await supabaseAdmin
+        .from('customer_devices')
+        .select('id, status, customer_id')
+        .eq('device_token_hash', pendingHash)
+        .maybeSingle();
+
+      if (existingDevice && existingDevice.customer_id === customer.id) {
+        await supabaseAdmin
+          .from('customer_devices')
+          .update({ last_seen_at: now, last_ip: ip })
+          .eq('id', existingDevice.id);
+
+        const res = NextResponse.json({
+          success: true,
+          status: existingDevice.status,
+          customerName: customer.name,
+          pendingToken: pendingToCheck,
+          alreadyApproved: existingDevice.status === 'approved',
+          redirectTo: existingDevice.status === 'approved' ? '/' : '/access/status?reason=pending'
+        });
+
+        return res;
+      }
+    }
+
+    // 8. Count current approved devices
+    const { count: approvedCount } = await supabaseAdmin
+      .from('customer_devices')
+      .select('id', { count: 'exact', head: true })
+      .eq('customer_id', customer.id)
+      .eq('status', 'approved');
+
+    const maxDevices = customer.max_devices || 2;
+    const isOverLimit = (approvedCount || 0) >= maxDevices;
+
+    // 9. Automatically register new device in customer_devices
+    const deviceToken = generateRandomToken(32);
+    const deviceTokenHash = hashToken(deviceToken);
+
+    const { data: newDeviceData, error: deviceError } = await supabaseAdmin
+      .from('customer_devices')
+      .insert({
+        customer_id: customer.id,
+        device_token_hash: deviceTokenHash,
+        status: 'pending',
+        device_name: body.deviceName || 'متصفح جديد',
+        browser: body.browser || 'غير معروف',
+        operating_system: body.os || 'غير معروف',
+        user_agent: userAgent,
+        first_ip: ip,
+        last_ip: ip
+      })
+      .select('id, status')
+      .single();
+
+    if (deviceError) {
+      console.error('Error inserting new device in verify-link:', deviceError);
+      return NextResponse.json({ success: false, error: 'تعذر تسجيل الجهاز الجديد' }, { status: 500 });
+    }
+
+    const DURATION_180_DAYS_SEC = 180 * 24 * 60 * 60;
+    const response = NextResponse.json({
       success: true,
-      alreadyApproved: false,
-      customerId: customer.id,
+      status: 'pending',
+      pendingToken: deviceToken,
       customerName: customer.name,
-      hasPin: Boolean(customer.pin_hash)
+      deviceId: newDeviceData.id,
+      isOverLimit,
+      approvedCount: approvedCount || 0,
+      maxDevices,
+      redirectTo: isOverLimit 
+        ? `/access/status?reason=limit_reached&approved=${approvedCount || 0}&max=${maxDevices}`
+        : '/access/status?reason=pending'
     }, { status: 200 });
+
+    // Set pending cookie
+    response.cookies.set('customer_pending_session', deviceToken, {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === 'production',
+      sameSite: 'lax',
+      path: '/',
+      maxAge: DURATION_180_DAYS_SEC
+    });
+
+    return response;
 
   } catch (err: any) {
     console.error('Unhandled exception in verify-link API handler:', err);

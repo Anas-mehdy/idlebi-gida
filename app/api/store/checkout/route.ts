@@ -171,11 +171,24 @@ export async function POST(request: NextRequest) {
     const encodedText = encodeURIComponent(messageLines.join('\n'));
     const whatsappUrl = `https://wa.me/${whatsappNumber}?text=${encodedText}`;
 
-    return NextResponse.json({
+    const response = NextResponse.json({
       success: true,
       orderId,
       whatsappUrl
     });
+
+    if (auth.rehydrateToken) {
+      const DURATION_180_DAYS_SEC = 180 * 24 * 60 * 60;
+      response.cookies.set('customer_device_session', auth.rehydrateToken, {
+        httpOnly: true,
+        secure: process.env.NODE_ENV === 'production',
+        sameSite: 'lax',
+        path: '/',
+        maxAge: DURATION_180_DAYS_SEC
+      });
+    }
+
+    return response;
   } catch (err: any) {
     console.error('Error in store checkout API:', err);
     return NextResponse.json({ error: 'حدث خطأ أثناء معالجة الطلب' }, { status: 500 });

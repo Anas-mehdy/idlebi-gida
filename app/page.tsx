@@ -113,8 +113,15 @@ export default function CatalogPage() {
       try {
         setLoading(true);
         
+        // Pass backup token in headers for iOS Safari ITP resilience
+        const backupToken = typeof window !== 'undefined' ? localStorage.getItem('customer_device_backup_token') : null;
+        const headers: Record<string, string> = {};
+        if (backupToken) {
+          headers['x-customer-device-token'] = backupToken;
+        }
+
         // Call secure Store Products API
-        const res = await fetch('/api/store/products');
+        const res = await fetch('/api/store/products', { headers });
         
         if (res.status === 401 || res.status === 403) {
           const data = await res.json();

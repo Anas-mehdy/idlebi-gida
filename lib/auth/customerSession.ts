@@ -10,6 +10,7 @@ export interface CustomerSessionResult {
   deviceId?: string;
   showPrices: boolean;
   redirectUrl?: string;
+  rehydrateToken?: string; // Token from header to re-set as cookie if cookie was lost
 }
 
 export function isDeviceProtectionEnabled(): boolean {
@@ -19,6 +20,7 @@ export function isDeviceProtectionEnabled(): boolean {
 /**
  * Verify customer device session on server.
  * Handles approved, pending, rejected, blocked, and suspended states.
+ * Supports dual-persistence (Cookie + Header token) to safeguard against iOS Safari ITP cookie deletion.
  */
 export async function verifyCustomerSession(request: NextRequest): Promise<CustomerSessionResult> {
   // If protection feature flag is explicitly disabled, grant access with prices enabled
@@ -30,13 +32,14 @@ export async function verifyCustomerSession(request: NextRequest): Promise<Custo
     };
   }
 
-  const approvedCookie = request.cookies.get('customer_device_session');
-  const pendingCookie = request.cookies.get('customer_pending_session');
+  // 1. Check approved device session token (from Cookie OR Header)
+  const cookieApprovedToken = request.cookies.get('customer_device_session')?.value;
+  const headerApprovedToken = request.headers.get('x-customer-device-token')?.trim();
+  const approvedToken = cookieApprovedToken || headerApprovedToken;
 
-  // Check approved device session first
-  if (approvedCookie?.value) {
+  if (approvedToken) {
     try {
-      const sessionHash = hashToken(approvedCookie.value);
+      const sessionHash = hashToken(approvedToken);
 
       const { data: sessionData, error: sessionError } = await supabaseAdmin
         .from('customer_sessions')
@@ -83,7 +86,8 @@ export async function verifyCustomerSession(request: NextRequest): Promise<Custo
             customerId: customer.id,
             customerName: customer.name,
             deviceId: device.id,
-            showPrices: customer.show_prices ?? true
+            showPrices: customer.show_prices ?? true,
+            rehydrateToken: !cookieApprovedToken && headerApprovedToken ? headerApprovedToken : undefined
           };
         } else if (device.status === 'blocked') {
           return {
@@ -106,10 +110,14 @@ export async function verifyCustomerSession(request: NextRequest): Promise<Custo
     }
   }
 
-  // Check pending device session
-  if (pendingCookie?.value) {
+  // 2. Check pending device session token (from Cookie OR Header)
+  const cookiePendingToken = request.cookies.get('customer_pending_session')?.value;
+  const headerPendingToken = request.headers.get('x-customer-pending-token')?.trim();
+  const pendingToken = cookiePendingToken || headerPendingToken;
+
+  if (pendingToken) {
     try {
-      const deviceHash = hashToken(pendingCookie.value);
+      const deviceHash = hashToken(pendingToken);
       const { data: deviceData } = await supabaseAdmin
         .from('customer_devices')
         .select('id, status, customer_id, customers(name, status)')
@@ -128,7 +136,6 @@ export async function verifyCustomerSession(request: NextRequest): Promise<Custo
         }
 
         if (deviceData.status === 'approved') {
-          // Device has been approved by admin! Needs full session upgrade.
           return {
             isAllowed: true,
             status: 'approved',

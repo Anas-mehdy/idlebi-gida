@@ -17,7 +17,14 @@ function StatusContent() {
   const checkStatusNow = async () => {
     setChecking(true);
     try {
-      const res = await fetch('/api/access/status');
+      const backupToken = typeof window !== 'undefined' ? localStorage.getItem('customer_device_backup_token') : null;
+      const backupPending = typeof window !== 'undefined' ? localStorage.getItem('customer_pending_backup_token') : null;
+
+      const headers: Record<string, string> = {};
+      if (backupToken) headers['x-customer-device-token'] = backupToken;
+      if (backupPending) headers['x-customer-pending-token'] = backupPending;
+
+      const res = await fetch('/api/access/status', { headers });
       const text = await res.text();
       let data: any = null;
       try {
@@ -27,6 +34,9 @@ function StatusContent() {
       }
 
       if (data && data.approved === true) {
+        if (data.sessionToken) {
+          localStorage.setItem('customer_device_backup_token', data.sessionToken);
+        }
         setAutoApproved(true);
         setTimeout(() => {
           window.location.href = data.redirectTo || '/';
@@ -108,7 +118,7 @@ function StatusContent() {
           <div className="bg-slate-50 border border-slate-200 rounded-2xl p-4 text-xs text-slate-600 text-right space-y-1">
             <p className="font-bold text-slate-700">كيف أحصل على صلاحية الوصول؟</p>
             <p className="text-[11px] text-slate-500">
-              تواصل مع إدارة المتجر للحصول على رابطك الخاص وإدخال الـ PIN واعتماد جهازك.
+              تواصل مع إدارة المتجر للحصول على رابطك الخاص واعتماد جهازك.
             </p>
           </div>
         </>

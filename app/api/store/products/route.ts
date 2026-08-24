@@ -43,12 +43,26 @@ export async function GET(request: NextRequest) {
       return product;
     });
 
-    return NextResponse.json({
+    const response = NextResponse.json({
       categories: categories || [],
       products: sanitizedProducts,
       showPrices: auth.showPrices,
       customerName: auth.customerName || null
     });
+
+    // Rehydrate cookie if it was wiped by Safari ITP
+    if (auth.rehydrateToken) {
+      const DURATION_180_DAYS_SEC = 180 * 24 * 60 * 60;
+      response.cookies.set('customer_device_session', auth.rehydrateToken, {
+        httpOnly: true,
+        secure: process.env.NODE_ENV === 'production',
+        sameSite: 'lax',
+        path: '/',
+        maxAge: DURATION_180_DAYS_SEC
+      });
+    }
+
+    return response;
   } catch (err: any) {
     console.error('Error in store products API:', err);
     return NextResponse.json({ error: 'حدث خطأ في جلب بيانات المتجر' }, { status: 500 });

@@ -34,7 +34,6 @@ export default function AdminCustomers() {
   // Access Link Modal / Active Link State
   const [activeModalCust, setActiveModalCust] = useState<Customer | null>(null);
   const [custAccessUrl, setCustAccessUrl] = useState<string | null>(null);
-  const [modalPinInput, setModalPinInput] = useState('');
   const [modalMaxDevices, setModalMaxDevices] = useState(2);
   const [copiedLink, setCopiedLink] = useState(false);
   const [actionMsg, setActionMsg] = useState('');
@@ -159,7 +158,6 @@ export default function AdminCustomers() {
     setActiveModalCust(customer);
     setCustAccessUrl(null);
     setActionMsg('');
-    setModalPinInput('');
     setModalMaxDevices(customer.max_devices ?? 2);
 
     try {
@@ -183,8 +181,7 @@ export default function AdminCustomers() {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          customerId: activeModalCust.id,
-          pin: modalPinInput.trim() || undefined
+          customerId: activeModalCust.id
         })
       });
 
@@ -192,38 +189,11 @@ export default function AdminCustomers() {
       if (!res.ok) throw new Error(data.error || 'فشل التوليد');
 
       setCustAccessUrl(data.accessUrl);
-      setActionMsg('تم إنشاء رابط الدخول وتحديث البيانات بنجاح!');
+      setActionMsg('تم إنشاء رابط الدخول الخاص وتحديث البيانات بنجاح!');
       fetchCustomers();
     } catch (err: any) {
       console.error(err);
       alert(err.message || 'حدث خطأ أثناء إنشاء الرابط');
-    } finally {
-      setIsUpdating(false);
-    }
-  };
-
-  const handleSavePinOnly = async () => {
-    if (!activeModalCust || !modalPinInput.trim()) return;
-    setIsUpdating(true);
-
-    try {
-      const res = await fetch('/api/admin/customers/access-link', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          customerId: activeModalCust.id,
-          action: 'set_pin',
-          pin: modalPinInput.trim()
-        })
-      });
-
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error || 'فشل الحفظ');
-
-      setActionMsg('تم تحديث رمز PIN الخاص بالزبون بنجاح!');
-      fetchCustomers();
-    } catch (err: any) {
-      alert(err.message || 'حدث خطأ في حفظ PIN');
     } finally {
       setIsUpdating(false);
     }
@@ -549,27 +519,6 @@ export default function AdminCustomers() {
                 {actionMsg}
               </div>
             )}
-
-            {/* Set / Update PIN */}
-            <div className="space-y-2 bg-slate-50 p-4 rounded-2xl border border-slate-200">
-              <label className="block text-xs font-bold text-slate-700">تعيين / تحديث رمز PIN للزبون</label>
-              <div className="flex items-center gap-2">
-                <input
-                  type="text"
-                  placeholder="أدخل 4-6 أرقام للـ PIN..."
-                  value={modalPinInput}
-                  onChange={(e) => setModalPinInput(e.target.value)}
-                  className="flex-1 bg-white border border-slate-300 rounded-xl px-3 py-2 text-xs text-slate-800 font-bold outline-none"
-                />
-                <button
-                  onClick={handleSavePinOnly}
-                  disabled={!modalPinInput.trim() || isUpdating}
-                  className="px-3 py-2 bg-emerald-600 hover:bg-emerald-700 text-white font-bold rounded-xl text-xs transition-all cursor-pointer"
-                >
-                  حفظ PIN
-                </button>
-              </div>
-            </div>
 
             {/* Max Devices */}
             <div className="space-y-2 bg-slate-50 p-4 rounded-2xl border border-slate-200">

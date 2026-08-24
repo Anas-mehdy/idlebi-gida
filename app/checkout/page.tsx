@@ -77,9 +77,15 @@ export default function CheckoutPage() {
 
     try {
       // Call secure API checkout
+      const backupToken = typeof window !== 'undefined' ? localStorage.getItem('customer_device_backup_token') : null;
+      const headers: Record<string, string> = { 'Content-Type': 'application/json' };
+      if (backupToken) {
+        headers['x-customer-device-token'] = backupToken;
+      }
+
       const res = await fetch('/api/store/checkout', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers,
         body: JSON.stringify({
           cart,
           customerName: customerName.trim()

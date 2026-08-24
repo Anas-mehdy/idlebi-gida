@@ -4,12 +4,17 @@ import { hashToken, generateRandomToken } from '@/lib/auth/crypto';
 
 export async function GET(request: NextRequest) {
   try {
-    const approvedCookie = request.cookies.get('customer_device_session');
-    const pendingCookie = request.cookies.get('customer_pending_session');
+    const cookieApproved = request.cookies.get('customer_device_session')?.value;
+    const headerApproved = request.headers.get('x-customer-device-token')?.trim();
+    const approvedToken = cookieApproved || headerApproved;
+
+    const cookiePending = request.cookies.get('customer_pending_session')?.value;
+    const headerPending = request.headers.get('x-customer-pending-token')?.trim();
+    const pendingToken = cookiePending || headerPending;
 
     // 1. If already has approved device session
-    if (approvedCookie?.value) {
-      const sessionHash = hashToken(approvedCookie.value);
+    if (approvedToken) {
+      const sessionHash = hashToken(approvedToken);
       const { data: sessionData } = await supabaseAdmin
         .from('customer_sessions')
         .select('id, expires_at, customer_devices!inner(id, status)')
@@ -19,19 +24,34 @@ export async function GET(request: NextRequest) {
       if (sessionData) {
         const device = sessionData.customer_devices as any;
         if (device?.status === 'approved') {
-          console.log('[DeviceStatus] Active approved customer_device_session found for device_id:', device.id);
-          return NextResponse.json({
+          console.log('[DeviceStatus] Active approved session found for device_id:', device.id);
+          const res = NextResponse.json({
             approved: true,
             status: 'approved',
+            sessionToken: approvedToken,
+            deviceId: device.id,
             redirectTo: '/'
           });
+
+          if (!cookieApproved && headerApproved) {
+            const DURATION_180_DAYS_SEC = 180 * 24 * 60 * 60;
+            res.cookies.set('customer_device_session', headerApproved, {
+              httpOnly: true,
+              secure: process.env.NODE_ENV === 'production',
+              sameSite: 'lax',
+              path: '/',
+              maxAge: DURATION_180_DAYS_SEC
+            });
+          }
+
+          return res;
         }
       }
     }
 
-    // 2. If has pending device cookie, check DB for status upgrade
-    if (pendingCookie?.value) {
-      const deviceHash = hashToken(pendingCookie.value);
+    // 2. If has pending device cookie/header, check DB for status upgrade
+    if (pendingToken) {
+      const deviceHash = hashToken(pendingToken);
       
       const { data: deviceData, error: deviceError } = await supabaseAdmin
         .from('customer_devices')
@@ -56,7 +76,7 @@ export async function GET(request: NextRequest) {
       }
 
       const currentStatus = deviceData.status;
-      console.log('[DeviceStatus] Checked pending cookie, device_id:', deviceData.id, 'DB status:', currentStatus);
+      console.log('[DeviceStatus] Checked pending token, device_id:', deviceData.id, 'DB status:', currentStatus);
 
       if (currentStatus === 'pending') {
         return NextResponse.json({
@@ -101,6 +121,8 @@ export async function GET(request: NextRequest) {
         const response = NextResponse.json({
           approved: true,
           status: 'approved',
+          sessionToken,
+          deviceId: deviceData.id,
           redirectTo: '/'
         });
 
