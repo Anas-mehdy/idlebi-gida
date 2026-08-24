@@ -72,19 +72,114 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    const newPayment = {
-      order_id: orderId || null,
+    // Find a fallback order_id for the customer if order_id is null (to satisfy NOT NULL DB constraints if migration wasn't run)
+    let fallbackOrderId = orderId || null;
+    if (!fallbackOrderId && finalCustomerId) {
+      // 1. Try by customer_id
+      const { data: orderById } = await supabaseAdmin
+        .from('orders')
+        .select('id')
+        .eq('customer_id', finalCustomerId)
+        .order('created_at', { ascending: false })
+        .limit(1)
+        .maybeSingle();
+
+      if (orderById?.id) {
+        fallbackOrderId = orderById.id;
+      } else {
+        // 2. Try by customer name
+        const { data: cust } = await supabaseAdmin
+          .from('customers')
+          .select('name')
+          .eq('id', finalCustomerId)
+          .maybeSingle();
+
+        if (cust?.name) {
+          const { data: orderByName } = await supabaseAdmin
+            .from('orders')
+            .select('id')
+            .eq('customer_name', cust.name)
+            .order('created_at', { ascending: false })
+            .limit(1)
+            .maybeSingle();
+
+          if (orderByName?.id) {
+            fallbackOrderId = orderByName.id;
+          }
+        }
+      }
+    }
+
+    // Attempt 1: Insert with customer_id and fallbackOrderId
+    let newPayment: any = {
+      order_id: fallbackOrderId || orderId || null,
       customer_id: finalCustomerId || null,
       amount: numAmount,
       note: (note || '').trim() || null,
       created_at: createdAt || new Date().toISOString()
     };
 
-    const { data, error } = await supabaseAdmin
+    let { data, error } = await supabaseAdmin
       .from('order_payments')
       .insert(newPayment)
       .select()
       .single();
+
+    // Fallback 1: If column customer_id doesn't exist yet on order_payments table
+    if (error && (error.message?.includes('customer_id') || error.code === '42703')) {
+      console.warn('customer_id column not found in order_payments, retrying without customer_id');
+      const retryPayment = {
+        order_id: fallbackOrderId || orderId || null,
+        amount: numAmount,
+        note: (note || '').trim() || null,
+        created_at: createdAt || new Date().toISOString()
+      };
+      const retryRes = await supabaseAdmin
+        .from('order_payments')
+        .insert(retryPayment)
+        .select()
+        .single();
+      data = retryRes.data;
+      error = retryRes.error;
+    }
+
+    // Fallback 2: If order_id NOT NULL constraint fails and no fallbackOrderId was found
+    if (error && error.message?.includes('violates not-null constraint') && !fallbackOrderId) {
+      // Create a zero-amount adjustment order for the customer so payment can attach to it
+      const { data: cust } = await supabaseAdmin
+        .from('customers')
+        .select('name')
+        .eq('id', finalCustomerId)
+        .maybeSingle();
+
+      const { data: adjOrder } = await supabaseAdmin
+        .from('orders')
+        .insert({
+          customer_id: finalCustomerId,
+          customer_name: cust?.name || 'دفتر الحساب',
+          total_price: 0,
+          status: 'delivered'
+        })
+        .select('id')
+        .single();
+
+      if (adjOrder?.id) {
+        const retryWithAdj = {
+          order_id: adjOrder.id,
+          customer_id: finalCustomerId || null,
+          amount: numAmount,
+          note: (note || '').trim() || null,
+          created_at: createdAt || new Date().toISOString()
+        };
+        const retryRes = await supabaseAdmin
+          .from('order_payments')
+          .insert(retryWithAdj)
+          .select()
+          .single();
+        data = retryRes.data;
+        error = retryRes.error;
+      }
+    }
 
     if (error) throw error;
 

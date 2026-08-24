@@ -242,7 +242,7 @@ export default function AdminLedgerPage() {
 
         const data = await res.json();
         if (!res.ok || !data.success) {
-          throw new Error(data.error || 'فشل إضافة الدفعة');
+          throw new Error(data.details ? `${data.error} (${data.details})` : (data.error || 'فشل إضافة الدفعة'));
         }
       }
 
