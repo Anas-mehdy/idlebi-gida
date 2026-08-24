@@ -2,8 +2,10 @@
 
 import React, { useState, useEffect, use } from 'react';
 import { supabase } from '@/lib/supabase';
-import { ShoppingBag, Loader2, Calendar, User, Clock, CheckCircle2, Printer, ChevronRight, Store, Gift, Tag } from 'lucide-react';
+import { ShoppingBag, Loader2, Calendar, User, Clock, CheckCircle2, Printer, ChevronRight, Store, Gift, Tag, Download } from 'lucide-react';
 import Link from 'next/link';
+import { jsPDF } from 'jspdf';
+import html2canvas from 'html2canvas-pro';
 import { isOfferActive, getOfferBonusQuantity, getOrderBoxSummary } from '@/lib/offerHelpers';
 
 interface OrderItem {
@@ -27,8 +29,6 @@ interface OrderItem {
   } | null;
 }
 
-
-
 interface Order {
   id: string;
   customer_name: string;
@@ -43,6 +43,53 @@ export default function PublicInvoicePage({ params }: { params: Promise<{ id: st
   const [order, setOrder] = useState<Order | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [isGeneratingPdf, setIsGeneratingPdf] = useState(false);
+
+  const handleDownloadPDF = async () => {
+    if (!order) return;
+    setIsGeneratingPdf(true);
+    try {
+      const input = document.getElementById('invoice-printable-card');
+      if (!input) {
+        alert('لم يتم العثور على هيكل الفاتورة للتحميل.');
+        return;
+      }
+
+      const canvas = await html2canvas(input, {
+        scale: 2,
+        useCORS: true,
+        logging: false,
+        backgroundColor: '#ffffff'
+      });
+
+      const imgData = canvas.toDataURL('image/jpeg', 0.85);
+      const pdf = new jsPDF('p', 'mm', 'a4');
+      const imgWidth = 210;
+      const pageHeight = 297;
+      const imgHeight = (canvas.height * imgWidth) / canvas.width;
+      let heightLeft = imgHeight;
+      let position = 0;
+
+      const imageAlias = `invoice-${order.id}`;
+
+      pdf.addImage(imgData, 'JPEG', 0, position, imgWidth, imgHeight, imageAlias, 'FAST');
+      heightLeft -= pageHeight;
+
+      while (heightLeft >= 0) {
+        position = heightLeft - imgHeight;
+        pdf.addPage();
+        pdf.addImage(imgData, 'JPEG', 0, position, imgWidth, imgHeight, imageAlias, 'FAST');
+        heightLeft -= pageHeight;
+      }
+
+      pdf.save(`فاتورة_${order.customer_name.replace(/\s+/g, '_')}_${order.id.substring(0, 8)}.pdf`);
+    } catch (error) {
+      console.error('Error generating PDF:', error);
+      alert('حدث خطأ أثناء تصدير ملف PDF.');
+    } finally {
+      setIsGeneratingPdf(false);
+    }
+  };
 
   const fetchInvoice = async () => {
     try {
@@ -168,7 +215,7 @@ export default function PublicInvoicePage({ params }: { params: Promise<{ id: st
   return (
     <div className="min-h-screen bg-slate-50 pb-10 font-sans text-right" dir="rtl">
       {/* Printable Invoice Container */}
-      <div className="max-w-xl mx-auto bg-white border border-slate-200 shadow-md sm:rounded-3xl p-6 sm:mt-10 print:mt-0 print:border-none print:shadow-none space-y-6">
+      <div id="invoice-printable-card" className="max-w-xl mx-auto bg-white border border-slate-200 shadow-md sm:rounded-3xl p-6 sm:mt-10 print:mt-0 print:border-none print:shadow-none space-y-6">
         
         {/* Brand Header */}
         <div className="flex items-center justify-between pb-5 border-b border-slate-200">
@@ -306,18 +353,32 @@ export default function PublicInvoicePage({ params }: { params: Promise<{ id: st
         {/* Footer info & Printable Actions */}
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 pt-5 border-t border-slate-200 text-center sm:text-right print:hidden">
           <p className="text-[10px] text-slate-400 font-bold">شكراً لتعاملكم معنا • idelbi gıda</p>
-          <div className="flex items-center justify-center gap-2.5">
+          <div className="flex items-center justify-center gap-2 flex-wrap">
+            <button
+              onClick={handleDownloadPDF}
+              disabled={isGeneratingPdf}
+              className="bg-emerald-50 hover:bg-emerald-100 border border-emerald-200 text-emerald-800 font-bold px-3.5 py-2.5 rounded-xl text-xs flex items-center justify-center gap-1.5 cursor-pointer transition-all active:scale-95 shadow-2xs disabled:opacity-50"
+              title="تنزيل الفاتورة كملف PDF"
+            >
+              {isGeneratingPdf ? (
+                <Loader2 className="w-4 h-4 animate-spin text-emerald-700" />
+              ) : (
+                <Download className="w-4 h-4 text-emerald-700" />
+              )}
+              <span>{isGeneratingPdf ? 'جاري التنزيل...' : 'تنزيل PDF'}</span>
+            </button>
+
             <button
               onClick={handlePrint}
-              className="bg-slate-100 hover:bg-slate-200 border border-slate-200 text-slate-700 font-bold px-4 py-2.5 rounded-xl text-xs flex items-center justify-center gap-1.5 cursor-pointer transition-all active:scale-95 shadow-2xs"
+              className="bg-slate-100 hover:bg-slate-200 border border-slate-200 text-slate-700 font-bold px-3.5 py-2.5 rounded-xl text-xs flex items-center justify-center gap-1.5 cursor-pointer transition-all active:scale-95 shadow-2xs"
             >
               <Printer className="w-4 h-4" />
-              <span>طباعة الفاتورة</span>
+              <span>طباعة</span>
             </button>
+
             <Link
               href="/"
-              className="bg-emerald-650 hover:bg-emerald-700 text-white font-bold px-4 py-2.5 rounded-xl text-xs flex items-center justify-center gap-1.5 cursor-pointer transition-all active:scale-95 shadow-sm"
-              style={{ backgroundColor: '#128C7E' }}
+              className="bg-[#128C7E] hover:bg-[#128C7E]/90 text-white font-bold px-3.5 py-2.5 rounded-xl text-xs flex items-center justify-center gap-1.5 cursor-pointer transition-all active:scale-95 shadow-sm"
             >
               <ChevronRight className="w-4 h-4" />
               <span>الذهاب للمتجر</span>
