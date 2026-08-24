@@ -304,18 +304,14 @@ export default function CustomerStatementPage({ params }: { params: Promise<{ to
             }`}>
               <span className="text-xs font-bold opacity-80">المتبقي للدفع (الذمة الحالية)</span>
               <div className="mt-2">
-                {showPrices ? (
-                  <div className="flex items-baseline gap-1">
-                    <span className={`text-2xl font-black ${
-                      summary.total_remaining_debt > 0 ? 'text-rose-650' : 'text-emerald-700'
-                    }`}>
-                      {summary.total_remaining_debt.toLocaleString('ar-EG', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                    </span>
-                    <span className="text-xs font-bold">ليرة</span>
-                  </div>
-                ) : (
-                  <span className="text-xs font-bold text-slate-500">حسب الاتفاق</span>
-                )}
+                <div className="flex items-baseline gap-1">
+                  <span className={`text-2xl font-black ${
+                    summary.total_remaining_debt > 0 ? 'text-rose-650' : 'text-emerald-700'
+                  }`}>
+                    {summary.total_remaining_debt.toLocaleString('ar-EG', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                  </span>
+                  <span className="text-xs font-bold">ليرة</span>
+                </div>
               </div>
               <span className="text-[10px] font-bold mt-1 opacity-75">
                 {summary.total_remaining_debt > 0 ? 'مبلغ الذمة المترتب حتى الآن' : 'خالص الحساب تماماً 🎉'}
@@ -326,16 +322,12 @@ export default function CustomerStatementPage({ params }: { params: Promise<{ to
             <div className="p-4 rounded-2xl bg-emerald-50/50 border border-emerald-200/80 text-emerald-950 flex flex-col justify-between">
               <span className="text-xs font-bold opacity-80">مجموع المبالغ المسددة</span>
               <div className="mt-2">
-                {showPrices ? (
-                  <div className="flex items-baseline gap-1">
-                    <span className="text-2xl font-black text-emerald-700">
-                      {summary.total_paid_amount.toLocaleString('ar-EG', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                    </span>
-                    <span className="text-xs font-bold">ليرة</span>
-                  </div>
-                ) : (
-                  <span className="text-xs font-bold text-slate-500">حسب الاتفاق</span>
-                )}
+                <div className="flex items-baseline gap-1">
+                  <span className="text-2xl font-black text-emerald-700">
+                    {summary.total_paid_amount.toLocaleString('ar-EG', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                  </span>
+                  <span className="text-xs font-bold">ليرة</span>
+                </div>
               </div>
               <span className="text-[10px] font-bold mt-1 text-emerald-800">إجمالي الدفعات المقبوضة</span>
             </div>
@@ -344,16 +336,12 @@ export default function CustomerStatementPage({ params }: { params: Promise<{ to
             <div className="p-4 rounded-2xl bg-slate-50 border border-slate-200 text-slate-900 flex flex-col justify-between">
               <span className="text-xs font-bold text-slate-500">إجمالي قيمة الفواتير</span>
               <div className="mt-2">
-                {showPrices ? (
-                  <div className="flex items-baseline gap-1">
-                    <span className="text-2xl font-black text-slate-800">
-                      {summary.total_invoices_amount.toLocaleString('ar-EG', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                    </span>
-                    <span className="text-xs font-bold text-slate-600">ليرة</span>
-                  </div>
-                ) : (
-                  <span className="text-xs font-bold text-slate-500">حسب الاتفاق</span>
-                )}
+                <div className="flex items-baseline gap-1">
+                  <span className="text-2xl font-black text-slate-800">
+                    {summary.total_invoices_amount.toLocaleString('ar-EG', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                  </span>
+                  <span className="text-xs font-bold text-slate-600">ليرة</span>
+                </div>
               </div>
               <span className="text-[10px] font-bold mt-1 text-slate-500">إجمالي {summary.total_invoices_count} فواتير مسجلة</span>
             </div>
@@ -531,22 +519,16 @@ export default function CustomerStatementPage({ params }: { params: Promise<{ to
                     {/* Financial Numbers for the Invoice */}
                     <div className="flex items-center justify-between sm:justify-end gap-4 pt-2 sm:pt-0 border-t sm:border-t-0 border-slate-100">
                       <div className="text-right sm:text-left">
-                        {showPrices ? (
-                          <>
-                            <div className="text-xs font-bold text-slate-800">
-                              الإجمالي: <span className="font-black text-sm">{order.total_price.toFixed(2)} TL</span>
-                            </div>
-                            <div className="text-[11px] font-bold mt-0.5">
-                              {order.remaining_amount > 0 ? (
-                                <span className="text-rose-600">المتبقي: {order.remaining_amount.toFixed(2)} TL</span>
-                              ) : (
-                                <span className="text-emerald-600">مسددة بالكامل ✓</span>
-                              )}
-                            </div>
-                          </>
-                        ) : (
-                          <span className="text-xs font-bold text-slate-500">الأسعار محددة بالفاتورة</span>
-                        )}
+                        <div className="text-xs font-bold text-slate-800">
+                          الإجمالي: <span className="font-black text-sm">{order.total_price.toFixed(2)} TL</span>
+                        </div>
+                        <div className="text-[11px] font-bold mt-0.5">
+                          {order.remaining_amount > 0 ? (
+                            <span className="text-rose-600">المتبقي: {order.remaining_amount.toFixed(2)} TL</span>
+                          ) : (
+                            <span className="text-emerald-600">مسددة بالكامل ✓</span>
+                          )}
+                        </div>
                       </div>
 
                       <div className="p-2 rounded-xl bg-slate-100 text-slate-600">
@@ -582,7 +564,7 @@ export default function CustomerStatementPage({ params }: { params: Promise<{ to
                                 <p className="font-bold text-slate-800 truncate">{item.product_name}</p>
                                 <div className="flex items-center gap-2 mt-0.5 text-[11px] text-slate-500 font-semibold">
                                   <span>الكمية: {item.quantity} صندوق</span>
-                                  {showPrices && item.price_at_purchase > 0 && (
+                                  {item.price_at_purchase > 0 && (
                                     <>
                                       <span>•</span>
                                       <span>سعر الصندوق: {item.price_at_purchase.toFixed(2)} TL</span>
@@ -597,11 +579,9 @@ export default function CustomerStatementPage({ params }: { params: Promise<{ to
                                 )}
                               </div>
 
-                              {showPrices && (
-                                <div className="text-left font-black text-slate-800 whitespace-nowrap">
-                                  {(item.quantity * item.price_at_purchase).toFixed(2)} TL
-                                </div>
-                              )}
+                              <div className="text-left font-black text-slate-800 whitespace-nowrap">
+                                {(item.quantity * item.price_at_purchase).toFixed(2)} TL
+                              </div>
                             </div>
                           ))}
                         </div>
@@ -614,11 +594,9 @@ export default function CustomerStatementPage({ params }: { params: Promise<{ to
                             <Receipt className="w-4 h-4 text-blue-600" />
                             <span>سجل الدفعات والمقبوضات لهذه الفاتورة ({order.payments.length})</span>
                           </h4>
-                          {showPrices && (
-                            <span className="text-[11px] font-bold text-slate-600">
-                              مجموع المقبوض: <span className="text-emerald-700 font-black">{order.paid_amount.toFixed(2)} TL</span>
-                            </span>
-                          )}
+                          <span className="text-[11px] font-bold text-slate-600">
+                            مجموع المقبوض: <span className="text-emerald-700 font-black">{order.paid_amount.toFixed(2)} TL</span>
+                          </span>
                         </div>
 
                         {order.payments.length === 0 ? (
@@ -638,7 +616,7 @@ export default function CustomerStatementPage({ params }: { params: Promise<{ to
                                       {pIdx + 1}
                                     </span>
                                     <span className="text-xs font-black text-slate-800">
-                                      دفعة بقيمة: {showPrices ? `${payment.amount.toFixed(2)} TL` : 'دفعة مسجلة'}
+                                      دفعة بقيمة: {payment.amount.toFixed(2)} TL
                                     </span>
                                     <span className="text-[10px] text-slate-400 font-medium">
                                       {formatDate(payment.created_at)} - {formatTime(payment.created_at)}

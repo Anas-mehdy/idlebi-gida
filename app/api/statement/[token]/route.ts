@@ -137,13 +137,13 @@ export async function GET(
         id: order.id,
         created_at: order.created_at,
         status: order.status,
-        total_price: showPrices ? effectiveOrderTotal : 0,
-        paid_amount: showPrices ? orderPaid : 0,
-        remaining_amount: showPrices ? orderRemaining : 0,
+        total_price: effectiveOrderTotal,
+        paid_amount: orderPaid,
+        remaining_amount: orderRemaining,
         payment_status: paymentStatus,
         payments: orderPayments.map((p: any) => ({
           id: p.id,
-          amount: showPrices ? Number(p.amount) : 0,
+          amount: Number(p.amount || 0),
           note: p.note || null,
           created_at: p.created_at
         })),
@@ -154,7 +154,7 @@ export async function GET(
             product_name: item.product_name || item.products?.name || 'منتج',
             product_image: item.product_image || item.products?.image_url || null,
             quantity: item.quantity,
-            price_at_purchase: showPrices ? Number(item.price_at_purchase || 0) : 0,
+            price_at_purchase: Number(item.price_at_purchase || 0),
             applied_offer: effectiveOffer
           };
         })
@@ -168,17 +168,17 @@ export async function GET(
       customer: {
         id: customer.id,
         name: customer.name,
-        show_prices: showPrices,
+        show_prices: true,
         statement_token: customer.statement_token
       },
       summary: {
-        total_invoices_amount: showPrices ? totalInvoicesAmount : 0,
-        total_paid_amount: showPrices ? totalPaidAmount : 0,
-        total_remaining_debt: showPrices ? totalRemainingDebt : 0,
+        total_invoices_amount: totalInvoicesAmount,
+        total_paid_amount: totalPaidAmount,
+        total_remaining_debt: totalRemainingDebt,
         unpaid_count: unpaidCount,
         partial_count: partialCount,
         paid_count: paidCount,
-        total_invoices_count: ordersList.length
+        total_invoices_count: processedOrders.length
       },
       orders: processedOrders
     });
