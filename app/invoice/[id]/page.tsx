@@ -49,20 +49,20 @@ export default function PublicInvoicePage({ params }: { params: Promise<{ id: st
     if (!order) return;
     setIsGeneratingPdf(true);
     try {
-      const input = document.getElementById('invoice-printable-card');
+      const input = document.getElementById('customer-invoice-print-sheet');
       if (!input) {
         alert('لم يتم العثور على هيكل الفاتورة للتحميل.');
         return;
       }
 
       const canvas = await html2canvas(input, {
-        scale: 2,
+        scale: 1.5,
         useCORS: true,
         logging: false,
         backgroundColor: '#ffffff'
       });
 
-      const imgData = canvas.toDataURL('image/jpeg', 0.85);
+      const imgData = canvas.toDataURL('image/jpeg', 0.75);
       const pdf = new jsPDF('p', 'mm', 'a4');
       const imgWidth = 210;
       const pageHeight = 297;
@@ -386,6 +386,122 @@ export default function PublicInvoicePage({ params }: { params: Promise<{ id: st
           </div>
         </div>
 
+      </div>
+
+      {/* Official Company Invoice Sheet for PDF Export and A4 Printing */}
+      <div 
+        id="customer-invoice-print-sheet" 
+        className="absolute left-[-9999px] top-[-9999px] w-[790px] bg-white font-sans text-right p-8 print:static print:block print:w-full print:p-0" 
+        dir="rtl"
+      >
+        {/* Header */}
+        <div className="border-b-2 border-slate-900 pb-4 mb-6">
+          <div className="flex justify-between items-start">
+            <div>
+              <h1 className="text-xl font-black text-slate-850">İDELBİ GIDA TİCARET LİMİTED ŞİRKETİ</h1>
+              <p className="text-xs text-slate-500 font-bold mt-1">Gıda Ürünleri İthalat İhracat ve Toptan Ticareti</p>
+              <p className="text-[11px] text-slate-400 mt-0.5">Esenler, İstanbul</p>
+            </div>
+            <div className="text-left font-mono text-xs text-slate-500">
+              <p>تاريخ الفاتورة: {new Date(order.created_at).toLocaleDateString('ar-EG', { dateStyle: 'long' })}</p>
+              <p>رقم الفاتورة: #{order.id.substring(0, 8).toUpperCase()}</p>
+            </div>
+          </div>
+          <div className="text-center mt-4">
+            <span className="text-2xl font-black border-2 border-slate-900 px-6 py-1.5 inline-block bg-slate-50 rounded-lg">فـاتـورة مـبـيـعـات</span>
+          </div>
+        </div>
+
+        {/* Customer Metadata */}
+        <div className="grid grid-cols-2 gap-4 bg-slate-50 border border-slate-200 rounded-xl p-4 mb-6 text-sm">
+          <div>
+            <span className="text-slate-500 font-bold">السيد / السادة: </span>
+            <span className="font-extrabold text-slate-800">{order.customer_name}</span>
+          </div>
+          <div className="text-left">
+            <span className="text-slate-550 font-bold">حالة الدفع: </span>
+            <span className="font-extrabold text-[#128C7E]">معلق / عند التسليم</span>
+          </div>
+        </div>
+
+        {/* Pricing Grid */}
+        <table className="w-full border-collapse border border-slate-350 text-sm">
+          <thead>
+            <tr className="bg-slate-100 border-b border-slate-350">
+              <th className="border border-slate-350 px-3 py-2 text-center font-black w-12">م</th>
+              <th className="border border-slate-350 px-3 py-2 text-right font-black">الصنف (اسم المادة)</th>
+              <th className="border border-slate-350 px-3 py-2 text-center font-black w-24">الكمية</th>
+              <th className="border border-slate-350 px-3 py-2 text-center font-black w-32">السعر الإفرادي</th>
+              <th className="border border-slate-350 px-3 py-2 text-center font-black w-32">الإجمالي</th>
+            </tr>
+          </thead>
+          <tbody>
+            {order.order_items.map((item, idx) => {
+              const price = Number(item.price_at_purchase || 0);
+              const qty = item.quantity;
+              const total = price * qty;
+              const offer = item.applied_offer || (item.products && isOfferActive(item.products) ? item.products.offer_title : null);
+              const bonusQty = offer ? getOfferBonusQuantity(offer, qty) : 0;
+              return (
+                <tr key={item.id} className="border-b border-slate-300">
+                  <td className="border border-slate-355 px-3 py-2.5 text-center font-bold font-mono">{idx + 1}</td>
+                  <td className="border border-slate-355 px-3 py-2.5 font-bold text-slate-800">
+                    <div>{item.product_name || item.products?.name || 'منتج غير معروف'}</div>
+                    {offer && (
+                      <div className="text-[11px] text-amber-900 font-extrabold mt-1 bg-amber-50 border border-amber-200/80 rounded-md px-2 py-0.5 inline-flex items-center gap-1">
+                        <span>🎁 عرض خاص: {offer}</span>
+                        {bonusQty > 0 && <span className="text-amber-950 font-black">(+ {bonusQty} صندوق مجاناً)</span>}
+                      </div>
+                    )}
+                  </td>
+                  <td className="border border-slate-355 px-3 py-2.5 text-center font-black font-mono">{qty} صندوق</td>
+                  <td className="border border-slate-355 px-3 py-2.5 text-center font-extrabold font-mono">{price.toFixed(2)} TL</td>
+                  <td className="border border-slate-355 px-3 py-2.5 text-center font-black font-mono">{total.toFixed(2)} TL</td>
+                </tr>
+              );
+            })}
+          </tbody>
+        </table>
+
+        {/* Summary / Total section */}
+        <div className="mt-6 border border-slate-350 rounded-xl p-4 bg-slate-50 flex justify-between items-center">
+          <div className="text-xs text-slate-550 font-bold">
+            <span>إجمالي الصناديق: </span>
+            <span className="font-extrabold text-slate-800 text-sm font-mono mr-1">
+              {(() => {
+                const summary = getOrderBoxSummary(order.order_items);
+                return summary.bonusBoxes > 0 ? (
+                  `${summary.totalBoxes} صندوق (${summary.paidBoxes} أصلية + ${summary.bonusBoxes} مجاناً بالعروض)`
+                ) : (
+                  `${summary.paidBoxes} صندوق`
+                );
+              })()}
+            </span>
+          </div>
+
+          <div className="text-right">
+            <span className="text-slate-700 font-black text-md">المجموع الكلي النهائي:</span>
+            <span className="text-xl font-black text-[#128C7E] font-mono mr-2 bg-emerald-50 border border-emerald-200 px-3 py-1 rounded-lg">
+              {Number(order.total_price).toFixed(2)} TL
+            </span>
+          </div>
+        </div>
+
+        {/* Signature / Notes */}
+        <div className="grid grid-cols-2 gap-4 mt-16 text-center text-xs">
+          <div>
+            <p className="text-slate-400 font-bold mb-8">توقيع المستلم</p>
+            <div className="border-b border-slate-300 w-40 mx-auto"></div>
+          </div>
+          <div>
+            <p className="text-slate-400 font-bold mb-8">خاتم وتوقيع الشركة</p>
+            <div className="border-b border-slate-300 w-40 mx-auto"></div>
+          </div>
+        </div>
+
+        <div className="mt-16 text-center text-[10px] text-slate-400 border-t border-slate-200 pt-4 font-bold">
+          * شكراً لتعاملكم معنا • تمنياتنا لكم بالرزق والتوفيق • İDELBİ GIDA
+        </div>
       </div>
     </div>
   );
