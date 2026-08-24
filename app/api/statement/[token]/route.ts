@@ -76,28 +76,26 @@ export async function GET(
     const ordersList = ordersData || [];
     const orderIds = ordersList.map((o: any) => o.id);
 
-    // 3. Fetch all payments for these orders
+    // 3. Fetch all payments for this customer (by customer_id or linked order_ids)
     let paymentsList: any[] = [];
-    if (orderIds.length > 0) {
-      const { data: payData, error: payError } = await supabaseAdmin
-        .from('order_payments')
-        .select('*')
-        .in('order_id', orderIds)
-        .order('created_at', { ascending: true });
+    let paymentsQuery = supabaseAdmin
+      .from('order_payments')
+      .select('*')
+      .order('created_at', { ascending: false });
 
-      if (!payError && payData) {
-        paymentsList = payData;
-      }
+    if (orderIds.length > 0) {
+      paymentsQuery = paymentsQuery.or(`customer_id.eq.${customer.id},order_id.in.(${orderIds.join(',')})`);
+    } else {
+      paymentsQuery = paymentsQuery.eq('customer_id', customer.id);
     }
 
-    // 4. Map payments to orders and calculate debts
-    const showPrices = customer.show_prices ?? true;
-    let totalInvoicesAmount = 0;
-    let totalPaidAmount = 0;
-    let unpaidCount = 0;
-    let partialCount = 0;
-    let paidCount = 0;
+    const { data: payData, error: payError } = await paymentsQuery;
+    if (!payError && payData) {
+      paymentsList = payData;
+    }
 
+    // 4. Calculate grand total invoices and grand total payments
+    let totalInvoicesAmount = 0;
     const processedOrders: any[] = [];
 
     ordersList.forEach((order: any) => {
@@ -109,44 +107,18 @@ export async function GET(
         ? Number(order.total_price) 
         : rawOrderTotal;
 
-      const orderPayments = paymentsList.filter((p: any) => p.order_id === order.id);
-      const orderPaid = orderPayments.reduce((sum: number, p: any) => sum + Number(p.amount || 0), 0);
-      const orderRemaining = Math.max(0, effectiveOrderTotal - orderPaid);
-
-      // Exclude old unpriced test orders (total 0 and paid 0) from statement view
-      if (effectiveOrderTotal <= 0 && orderPaid <= 0) {
+      // Exclude old unpriced test orders (total 0) from statement view
+      if (effectiveOrderTotal <= 0) {
         return;
       }
 
-      let paymentStatus: 'unpaid' | 'partial' | 'paid' = 'unpaid';
-      if (effectiveOrderTotal > 0 && orderPaid >= effectiveOrderTotal) {
-        paymentStatus = 'paid';
-        paidCount++;
-      } else if (orderPaid > 0) {
-        paymentStatus = 'partial';
-        partialCount++;
-      } else {
-        paymentStatus = 'unpaid';
-        unpaidCount++;
-      }
-
       totalInvoicesAmount += effectiveOrderTotal;
-      totalPaidAmount += orderPaid;
 
       processedOrders.push({
         id: order.id,
         created_at: order.created_at,
         status: order.status,
         total_price: effectiveOrderTotal,
-        paid_amount: orderPaid,
-        remaining_amount: orderRemaining,
-        payment_status: paymentStatus,
-        payments: orderPayments.map((p: any) => ({
-          id: p.id,
-          amount: Number(p.amount || 0),
-          note: p.note || null,
-          created_at: p.created_at
-        })),
         order_items: (order.order_items || []).map((item: any) => {
           const effectiveOffer = item.applied_offer || (item.products && isOfferActive(item.products) ? item.products.offer_title : null);
           return {
@@ -161,6 +133,7 @@ export async function GET(
       });
     });
 
+    const totalPaidAmount = paymentsList.reduce((sum: number, p: any) => sum + Number(p.amount || 0), 0);
     const totalRemainingDebt = Math.max(0, totalInvoicesAmount - totalPaidAmount);
 
     return NextResponse.json({
@@ -175,12 +148,16 @@ export async function GET(
         total_invoices_amount: totalInvoicesAmount,
         total_paid_amount: totalPaidAmount,
         total_remaining_debt: totalRemainingDebt,
-        unpaid_count: unpaidCount,
-        partial_count: partialCount,
-        paid_count: paidCount,
-        total_invoices_count: processedOrders.length
+        total_invoices_count: processedOrders.length,
+        total_payments_count: paymentsList.length
       },
-      orders: processedOrders
+      orders: processedOrders,
+      payments: paymentsList.map((p: any) => ({
+        id: p.id,
+        amount: Number(p.amount || 0),
+        note: p.note || null,
+        created_at: p.created_at
+      }))
     });
   } catch (err: any) {
     console.error('Error loading customer statement API:', err);

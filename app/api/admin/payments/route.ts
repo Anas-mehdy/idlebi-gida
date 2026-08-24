@@ -40,8 +40,8 @@ export async function POST(request: NextRequest) {
     const body = await request.json();
     const { orderId, customerId, amount, note, createdAt } = body;
 
-    if (!orderId) {
-      return NextResponse.json({ error: 'معرف الفاتورة مطلوب' }, { status: 400 });
+    if (!customerId && !orderId) {
+      return NextResponse.json({ error: 'يرجى تحديد الزبون لتسجيل الدفعة' }, { status: 400 });
     }
 
     const numAmount = parseFloat(amount);
@@ -51,7 +51,7 @@ export async function POST(request: NextRequest) {
 
     // Determine customer_id if not explicitly provided
     let finalCustomerId = customerId;
-    if (!finalCustomerId) {
+    if (!finalCustomerId && orderId) {
       const { data: orderData } = await supabaseAdmin
         .from('orders')
         .select('customer_id, customer_name')
@@ -73,7 +73,7 @@ export async function POST(request: NextRequest) {
     }
 
     const newPayment = {
-      order_id: orderId,
+      order_id: orderId || null,
       customer_id: finalCustomerId || null,
       amount: numAmount,
       note: (note || '').trim() || null,

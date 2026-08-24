@@ -23,12 +23,15 @@ WHERE o.customer_id IS NULL AND TRIM(LOWER(o.customer_name)) = TRIM(LOWER(c.name
 -- 3. Create order_payments table (للدفعات المتعددة مع التوضيح)
 CREATE TABLE IF NOT EXISTS order_payments (
     id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
-    order_id UUID NOT NULL REFERENCES orders(id) ON DELETE CASCADE,
+    order_id UUID REFERENCES orders(id) ON DELETE CASCADE,
     customer_id UUID REFERENCES customers(id) ON DELETE SET NULL,
     amount DECIMAL(10, 2) NOT NULL CHECK (amount > 0),
     note TEXT,
     created_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now()) NOT NULL
 );
+
+-- Ensure order_id is nullable if table already existed with NOT NULL
+ALTER TABLE order_payments ALTER COLUMN order_id DROP NOT NULL;
 
 -- Enable RLS
 ALTER TABLE order_payments ENABLE ROW LEVEL SECURITY;

@@ -57,6 +57,7 @@ interface CustomerSummary {
   total_paid_amount: number;
   total_remaining_debt: number;
   orders: Order[];
+  payments?: Payment[];
 }
 
 export default function AdminLedgerPage() {
@@ -80,9 +81,9 @@ export default function AdminLedgerPage() {
   const [selectedCustTab, setSelectedCustTab] = useState<'all' | 'unpaid' | 'partial' | 'paid'>('all');
   const [expandedOrders, setExpandedOrders] = useState<Record<string, boolean>>({});
 
-  // Payment form states (per order)
-  const [paymentAmount, setPaymentAmount] = useState<Record<string, string>>({});
-  const [paymentNote, setPaymentNote] = useState<Record<string, string>>({});
+  // Direct Customer Payment Form State
+  const [directPaymentAmount, setDirectPaymentAmount] = useState('');
+  const [directPaymentNote, setDirectPaymentNote] = useState('');
 
   // Filters & Search
   const [searchQuery, setSearchQuery] = useState('');
@@ -139,7 +140,6 @@ export default function AdminLedgerPage() {
       { id: 'c4', name: 'مطعم السلام الدمشقي', created_at: new Date().toISOString(), show_prices: true }
     ];
 
-    // Seed mock orders and payments
     const mockCustSummaries: CustomerSummary[] = localCustList.map((c: any, idx: number) => {
       const token = c.statement_token || c.id;
       const origin = typeof window !== 'undefined' ? window.location.origin : 'http://localhost:3000';
@@ -149,44 +149,30 @@ export default function AdminLedgerPage() {
           id: `m-ord-${c.id}-1`,
           customer_id: c.id,
           customer_name: c.name,
-          total_price: 5000 + idx * 1500,
-          calculated_total: 5000 + idx * 1500,
-          status: 'pending',
-          created_at: new Date(Date.now() - idx * 86400000).toISOString(),
-          paid_amount: idx === 1 ? 0 : 2000,
-          remaining_amount: (5000 + idx * 1500) - (idx === 1 ? 0 : 2000),
-          payment_status: idx === 1 ? 'unpaid' : 'partial',
-          payments: idx === 1 ? [] : [
-            { id: `p-${c.id}-1`, order_id: `m-ord-${c.id}-1`, amount: 2000, note: 'دفعة نقدية باليد', created_at: new Date().toISOString() }
-          ],
-          order_items: [
-            { id: `it-1`, product_name: 'شاي تركي غوكسو 100 ظرف', quantity: 20, price_at_purchase: 85 },
-            { id: `it-2`, product_name: 'كوكا كولا علب 330 مل', quantity: 132, price_at_purchase: 25 }
-          ]
-        },
-        {
-          id: `m-ord-${c.id}-2`,
-          customer_id: c.id,
-          customer_name: c.name,
-          total_price: 3500,
-          calculated_total: 3500,
+          total_price: 1500,
+          calculated_total: 1500,
           status: 'delivered',
-          created_at: new Date(Date.now() - (idx + 3) * 86400000).toISOString(),
-          paid_amount: 3500,
-          remaining_amount: 0,
-          payment_status: 'paid',
-          payments: [
-            { id: `p-${c.id}-2`, order_id: `m-ord-${c.id}-2`, amount: 3500, note: 'حوالة بنكية كاملة', created_at: new Date(Date.now() - 2 * 86400000).toISOString() }
-          ],
+          created_at: new Date(Date.now() - 86400000 * 2).toISOString(),
           order_items: [
-            { id: `it-3`, product_name: 'صلصة طماطم تات 800 غ', quantity: 50, price_at_purchase: 70 }
+            { id: 'mi-1', product_name: 'سمنة البقرة الحلوب 800غ', quantity: 10, price_at_purchase: 150 }
           ]
         }
       ];
 
-      const totalInvoices = mockOrders.reduce((sum, o) => sum + (o.calculated_total || o.total_price), 0);
-      const totalPaid = mockOrders.reduce((sum, o) => sum + (o.paid_amount || 0), 0);
-      const remainingDebt = totalInvoices - totalPaid;
+      const mockPayments: Payment[] = [
+        {
+          id: `m-pay-${c.id}-1`,
+          order_id: `m-ord-${c.id}-1`,
+          customer_id: c.id,
+          amount: 500,
+          note: 'دفعة نقدية مع السائق',
+          created_at: new Date(Date.now() - 86400000 * 1).toISOString()
+        }
+      ];
+
+      const totalInvoices = 1500;
+      const totalPaid = 500;
+      const remainingDebt = 1000;
 
       return {
         id: c.id,
@@ -196,13 +182,14 @@ export default function AdminLedgerPage() {
         statement_url: `${origin}/statement/${token}`,
         created_at: c.created_at || new Date().toISOString(),
         total_invoices_count: mockOrders.length,
-        unpaid_count: mockOrders.filter(o => o.payment_status === 'unpaid').length,
-        partial_count: mockOrders.filter(o => o.payment_status === 'partial').length,
-        paid_count: mockOrders.filter(o => o.payment_status === 'paid').length,
+        unpaid_count: 0,
+        partial_count: 0,
+        paid_count: 0,
         total_invoices_amount: totalInvoices,
         total_paid_amount: totalPaid,
         total_remaining_debt: remainingDebt,
-        orders: mockOrders
+        orders: mockOrders,
+        payments: mockPayments
       };
     });
 
@@ -233,11 +220,8 @@ export default function AdminLedgerPage() {
     setTimeout(() => setCopiedToken(null), 2500);
   };
 
-  const handleAddPayment = async (orderId: string, customerId: string) => {
-    const amtStr = paymentAmount[orderId];
-    const note = paymentNote[orderId] || '';
-
-    const numAmt = parseFloat(amtStr);
+  const handleAddCustomerPayment = async (customerId: string) => {
+    const numAmt = parseFloat(directPaymentAmount);
     if (isNaN(numAmt) || numAmt <= 0) {
       alert('يرجى إدخال مبلغ صحيح أكبر من الصفر.');
       return;
@@ -250,10 +234,9 @@ export default function AdminLedgerPage() {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
-            orderId,
             customerId,
             amount: numAmt,
-            note: note.trim() || undefined
+            note: directPaymentNote.trim() || undefined
           })
         });
 
@@ -263,60 +246,10 @@ export default function AdminLedgerPage() {
         }
       }
 
-      // Update local state
-      setCustomers(prev => prev.map(cust => {
-        if (cust.id === customerId) {
-          const updatedOrders = cust.orders.map(order => {
-            if (order.id === orderId) {
-              const currentPaid = order.paid_amount || 0;
-              const newPaid = currentPaid + numAmt;
-              const orderTotal = order.calculated_total || order.total_price;
-              const newRemaining = Math.max(0, orderTotal - newPaid);
-              const newStatus: 'unpaid' | 'partial' | 'paid' = newPaid >= orderTotal ? 'paid' : 'partial';
-
-              const newPayObj: Payment = {
-                id: 'pay-' + Date.now(),
-                order_id: orderId,
-                customer_id: customerId,
-                amount: numAmt,
-                note: note.trim() || null,
-                created_at: new Date().toISOString()
-              };
-
-              return {
-                ...order,
-                paid_amount: newPaid,
-                remaining_amount: newRemaining,
-                payment_status: newStatus,
-                payments: [...(order.payments || []), newPayObj]
-              };
-            }
-            return order;
-          });
-
-          const newTotalInvoices = updatedOrders.reduce((sum, o) => sum + (o.calculated_total || o.total_price), 0);
-          const newTotalPaid = updatedOrders.reduce((sum, o) => sum + (o.paid_amount || 0), 0);
-          const newRemainingDebt = Math.max(0, newTotalInvoices - newTotalPaid);
-
-          return {
-            ...cust,
-            total_invoices_amount: newTotalInvoices,
-            total_paid_amount: newTotalPaid,
-            total_remaining_debt: newRemainingDebt,
-            unpaid_count: updatedOrders.filter(o => o.payment_status === 'unpaid').length,
-            partial_count: updatedOrders.filter(o => o.payment_status === 'partial').length,
-            paid_count: updatedOrders.filter(o => o.payment_status === 'paid').length,
-            orders: updatedOrders
-          };
-        }
-        return cust;
-      }));
-
-      // Clear input fields for this order
-      setPaymentAmount(prev => ({ ...prev, [orderId]: '' }));
-      setPaymentNote(prev => ({ ...prev, [orderId]: '' }));
-
-      alert('تم تسجيل الدفعة وخصمها من الحساب بنجاح!');
+      await fetchLedgerData();
+      setDirectPaymentAmount('');
+      setDirectPaymentNote('');
+      alert('تم تسجيل الدفعة وخصمها من مجموع مستحقات الزبون بنجاح!');
     } catch (err: any) {
       console.error(err);
       alert(err.message || 'حدث خطأ أثناء إضافة الدفعة');
@@ -325,7 +258,7 @@ export default function AdminLedgerPage() {
     }
   };
 
-  const handleDeletePayment = async (paymentId: string, orderId: string, customerId: string, amount: number) => {
+  const handleDeleteCustomerPayment = async (paymentId: string, customerId: string, amount: number) => {
     const confirm = window.confirm(`هل أنت متأكد من حذف هذه الدفعة بقيمة ${amount.toFixed(2)} TL؟`);
     if (!confirm) return;
 
@@ -341,47 +274,8 @@ export default function AdminLedgerPage() {
         }
       }
 
-      // Update state
-      setCustomers(prev => prev.map(cust => {
-        if (cust.id === customerId) {
-          const updatedOrders = cust.orders.map(order => {
-            if (order.id === orderId) {
-              const newPayments = (order.payments || []).filter(p => p.id !== paymentId);
-              const newPaid = newPayments.reduce((sum, p) => sum + Number(p.amount), 0);
-              const orderTotal = order.calculated_total || order.total_price;
-              const newRemaining = Math.max(0, orderTotal - newPaid);
-              const newStatus: 'unpaid' | 'partial' | 'paid' = newPaid <= 0 ? 'unpaid' : (newPaid >= orderTotal ? 'paid' : 'partial');
-
-              return {
-                ...order,
-                paid_amount: newPaid,
-                remaining_amount: newRemaining,
-                payment_status: newStatus,
-                payments: newPayments
-              };
-            }
-            return order;
-          });
-
-          const newTotalInvoices = updatedOrders.reduce((sum, o) => sum + (o.calculated_total || o.total_price), 0);
-          const newTotalPaid = updatedOrders.reduce((sum, o) => sum + (o.paid_amount || 0), 0);
-          const newRemainingDebt = Math.max(0, newTotalInvoices - newTotalPaid);
-
-          return {
-            ...cust,
-            total_invoices_amount: newTotalInvoices,
-            total_paid_amount: newTotalPaid,
-            total_remaining_debt: newRemainingDebt,
-            unpaid_count: updatedOrders.filter(o => o.payment_status === 'unpaid').length,
-            partial_count: updatedOrders.filter(o => o.payment_status === 'partial').length,
-            paid_count: updatedOrders.filter(o => o.payment_status === 'paid').length,
-            orders: updatedOrders
-          };
-        }
-        return cust;
-      }));
-
-      alert('تم حذف الدفعة وتحديث الرصيد!');
+      await fetchLedgerData();
+      alert('تم حذف الدفعة بنجاح.');
     } catch (err: any) {
       console.error(err);
       alert(err.message || 'حدث خطأ أثناء حذف الدفعة');
@@ -390,10 +284,10 @@ export default function AdminLedgerPage() {
     }
   };
 
-  const handleAssignOrder = async () => {
+  const handleAssignUnassignedOrder = async () => {
     if (!assigningOrder || !selectedCustomerForAssign) return;
-    setIsUpdating(true);
 
+    setIsUpdating(true);
     try {
       if (!usingMock) {
         const res = await fetch('/api/admin/orders/assign-customer', {
@@ -407,14 +301,15 @@ export default function AdminLedgerPage() {
 
         const data = await res.json();
         if (!res.ok || !data.success) {
-          throw new Error(data.error || 'فشل ربط الفاتورة');
+          throw new Error(data.error || 'فشل تعيين الزبون');
         }
       }
 
-      alert('تم ربط الفاتورة بالزبون بنجاح!');
+      await fetchLedgerData();
       setShowUnassignedModal(false);
       setAssigningOrder(null);
-      fetchLedgerData();
+      setSelectedCustomerForAssign('');
+      alert('تم ربط الفاتورة بالزبون بنجاح!');
     } catch (err: any) {
       console.error(err);
       alert(err.message || 'حدث خطأ أثناء ربط الفاتورة');
@@ -432,117 +327,120 @@ export default function AdminLedgerPage() {
     }
   };
 
-  // Filtered customers list
+  // Filter customers by search and debt status
   const filteredCustomers = customers.filter(c => {
-    const matchesSearch = c.name.toLowerCase().includes(searchQuery.toLowerCase());
-    if (!matchesSearch) return false;
+    const matchSearch = c.name.toLowerCase().includes(searchQuery.toLowerCase());
+    if (!matchSearch) return false;
 
     if (statusFilter === 'debt_only') return c.total_remaining_debt > 0;
-    if (statusFilter === 'settled_only') return c.total_remaining_debt === 0;
+    if (statusFilter === 'settled_only') return c.total_remaining_debt <= 0;
     return true;
   });
 
   const selectedCustomer = customers.find(c => c.id === selectedCustomerId);
 
   return (
-    <div className="space-y-6 dir-rtl font-sans text-right">
+    <div className="space-y-8 pb-16 font-sans text-right" dir="rtl">
       
-      {/* Offline Banner */}
-      {usingMock && (
-        <div className="bg-amber-500/10 border border-amber-500/20 text-amber-800 px-4 py-3 rounded-2xl text-xs flex items-center gap-2.5 shadow-xs">
-          <AlertCircle className="w-5 h-5 shrink-0 text-amber-600" />
-          <span>وضع العرض التجريبي لدفتر الديون نشط. يتم الحساب وتجربة الدفعات محلياً.</span>
-        </div>
-      )}
-
-      {/* Main View: Overview or Detailed Customer View */}
-      {!selectedCustomer ? (
-        <>
-          {/* Header */}
-          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-            <div>
-              <h1 className="text-xl font-bold text-slate-800">دفتر الدين وكشف حسابات الزبائن</h1>
-              <p className="text-xs text-slate-500 mt-1">متابعة أرصدة الزبائن، تسجيل الدفعات الجزئية، والروابط الدائمة لكشوف الحسابات</p>
+      {/* Top Header */}
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+        <div>
+          <div className="flex items-center gap-2.5">
+            <div className="p-2.5 bg-purple-50 text-purple-700 border border-purple-200/80 rounded-2xl">
+              <Receipt className="w-6 h-6" />
             </div>
-            <button
-              onClick={fetchLedgerData}
-              disabled={loading}
-              className="p-2.5 bg-white border border-slate-250 hover:border-slate-350 text-slate-600 rounded-xl transition-all cursor-pointer shadow-xs disabled:opacity-50 flex items-center gap-2 self-start"
-            >
-              <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} />
-              <span className="text-xs font-bold">تحديث البيانات</span>
-            </button>
+            <div>
+              <h1 className="text-xl font-black text-slate-900">دفتر الدين وكشف حسابات الزبائن</h1>
+              <p className="text-xs text-slate-500 mt-0.5">متابعة إجمالي فواتير الزبائن، المبالغ المقبوضة، والأرصدة المتبقية</p>
+            </div>
           </div>
+        </div>
 
-          {/* Grand Statistics Summary Cards */}
+        <div className="flex items-center gap-2">
+          <button
+            onClick={fetchLedgerData}
+            disabled={loading || isUpdating}
+            className="px-3.5 py-2 bg-white border border-slate-250 hover:bg-slate-50 text-slate-700 rounded-xl text-xs font-bold flex items-center gap-1.5 cursor-pointer shadow-2xs transition-all active:scale-95"
+            title="تحديث البيانات"
+          >
+            <RefreshCw className={`w-3.5 h-3.5 ${loading ? 'animate-spin text-emerald-600' : ''}`} />
+            <span>تحديث</span>
+          </button>
+        </div>
+      </div>
+
+      {/* Main Ledger Overview vs Single Customer View */}
+      {!selectedCustomerId || !selectedCustomer ? (
+        <>
+          {/* Top Overall Financial Metrics */}
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
             
-            {/* 1. Total Unpaid Debt Across All Customers */}
-            <div className="bg-rose-50/70 border border-rose-200/80 rounded-3xl p-5 shadow-xs space-y-2">
-              <div className="flex items-center justify-between text-rose-800">
-                <span className="text-xs font-bold">إجمالي الديون المتبقية (كافة الزبائن)</span>
-                <div className="w-8 h-8 rounded-xl bg-rose-100 flex items-center justify-center">
-                  <AlertCircle className="w-4 h-4 text-rose-600" />
-                </div>
+            {/* Grand Total Remaining Debt */}
+            <div className="p-5 rounded-3xl bg-rose-50/80 border border-rose-200/90 text-rose-950 shadow-xs space-y-1">
+              <div className="flex items-center justify-between">
+                <span className="text-xs font-bold text-rose-800">إجمالي الديون المتبقية في السوق</span>
+                <AlertCircle className="w-4 h-4 text-rose-600" />
               </div>
-              <div className="flex items-baseline gap-1.5">
+              <div className="flex items-baseline gap-1 pt-1">
                 <span className="text-2xl font-black text-rose-650">
                   {grandSummary.grand_total_debt.toLocaleString('ar-EG', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                 </span>
-                <span className="text-xs font-bold text-rose-900">ليرة</span>
+                <span className="text-xs font-bold text-rose-800">ليرة</span>
               </div>
-              <p className="text-[11px] text-rose-700 font-medium">المبلغ الإجمالي المستحق بذمة الزبائن</p>
+              <p className="text-[11px] font-bold text-rose-700 mt-0.5">
+                مستحقات بذمة {grandSummary.customers_with_debt} زبائن
+              </p>
             </div>
 
-            {/* 2. Total Collected Payments */}
-            <div className="bg-emerald-50/70 border border-emerald-200/80 rounded-3xl p-5 shadow-xs space-y-2">
-              <div className="flex items-center justify-between text-emerald-800">
-                <span className="text-xs font-bold">إجمالي المقبوضات والمدفوعات</span>
-                <div className="w-8 h-8 rounded-xl bg-emerald-100 flex items-center justify-center">
-                  <CheckCircle2 className="w-4 h-4 text-emerald-600" />
-                </div>
+            {/* Grand Total Paid */}
+            <div className="p-5 rounded-3xl bg-emerald-50/70 border border-emerald-200/90 text-emerald-950 shadow-xs space-y-1">
+              <div className="flex items-center justify-between">
+                <span className="text-xs font-bold text-emerald-800">مجموع المبالغ المقبوضة</span>
+                <CheckCircle2 className="w-4 h-4 text-emerald-600" />
               </div>
-              <div className="flex items-baseline gap-1.5">
+              <div className="flex items-baseline gap-1 pt-1">
                 <span className="text-2xl font-black text-emerald-700">
                   {grandSummary.grand_total_paid.toLocaleString('ar-EG', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                 </span>
-                <span className="text-xs font-bold text-emerald-900">ليرة</span>
+                <span className="text-xs font-bold text-emerald-800">ليرة</span>
               </div>
-              <p className="text-[11px] text-emerald-700 font-medium">المبالغ المسددة والمقبوضة فعلياً</p>
+              <p className="text-[11px] font-bold text-emerald-700 mt-0.5">
+                إجمالي كافة الدفعات المسددة
+              </p>
             </div>
 
-            {/* 3. Total Invoices Value */}
-            <div className="bg-white border border-slate-200 rounded-3xl p-5 shadow-xs space-y-2">
-              <div className="flex items-center justify-between text-slate-700">
-                <span className="text-xs font-bold">إجمالي قيمة الفواتير الكلية</span>
-                <div className="w-8 h-8 rounded-xl bg-slate-100 flex items-center justify-center">
-                  <Receipt className="w-4 h-4 text-slate-600" />
-                </div>
+            {/* Grand Total Invoices */}
+            <div className="p-5 rounded-3xl bg-white border border-slate-200 text-slate-900 shadow-xs space-y-1">
+              <div className="flex items-center justify-between">
+                <span className="text-xs font-bold text-slate-500">إجمالي قيمة الفواتير</span>
+                <DollarSign className="w-4 h-4 text-slate-400" />
               </div>
-              <div className="flex items-baseline gap-1.5">
+              <div className="flex items-baseline gap-1 pt-1">
                 <span className="text-2xl font-black text-slate-800">
                   {grandSummary.grand_total_invoices.toLocaleString('ar-EG', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                 </span>
                 <span className="text-xs font-bold text-slate-600">ليرة</span>
               </div>
-              <p className="text-[11px] text-slate-450 font-medium">مجموع قيمة كافة الفواتير المسجلة</p>
+              <p className="text-[11px] font-bold text-slate-450 mt-0.5">
+                مجموع مشتريات كافة الزبائن
+              </p>
             </div>
 
-            {/* 4. Customers with Debt Count */}
-            <div className="bg-white border border-slate-200 rounded-3xl p-5 shadow-xs space-y-2">
-              <div className="flex items-center justify-between text-slate-700">
-                <span className="text-xs font-bold">زبائن مترتب عليهم ديون</span>
-                <div className="w-8 h-8 rounded-xl bg-amber-100 flex items-center justify-center">
-                  <Users className="w-4 h-4 text-amber-700" />
-                </div>
+            {/* Customers with Debts count */}
+            <div className="p-5 rounded-3xl bg-white border border-slate-200 text-slate-900 shadow-xs space-y-1">
+              <div className="flex items-center justify-between">
+                <span className="text-xs font-bold text-slate-500">عدد الزبائن الكلي</span>
+                <Users className="w-4 h-4 text-slate-400" />
               </div>
-              <div className="flex items-baseline gap-1.5">
-                <span className="text-2xl font-black text-amber-700">
-                  {grandSummary.customers_with_debt}
+              <div className="flex items-baseline gap-1 pt-1">
+                <span className="text-2xl font-black text-slate-800">
+                  {grandSummary.total_customers}
                 </span>
-                <span className="text-xs font-bold text-slate-500">من أصل {grandSummary.total_customers} زبون</span>
+                <span className="text-xs font-bold text-slate-600">زبون</span>
               </div>
-              <p className="text-[11px] text-slate-450 font-medium">عدد الزبائن الذين لديهم رصيد متبقي</p>
+              <p className="text-[11px] font-bold text-slate-500 mt-0.5">
+                {grandSummary.customers_with_debt} عليهم ديون • {grandSummary.total_customers - grandSummary.customers_with_debt} حسابهم خالص
+              </p>
             </div>
 
           </div>
@@ -664,13 +562,9 @@ export default function AdminLedgerPage() {
                           </div>
 
                           <div className="flex items-center gap-3 text-[11px] text-slate-450 font-medium">
-                            <span>{cust.total_invoices_count} فواتير</span>
+                            <span>{cust.total_invoices_count} فواتير مسجلة</span>
                             <span>•</span>
-                            <span className="text-rose-600 font-bold">{cust.unpaid_count} غير مدفوعة</span>
-                            <span>•</span>
-                            <span className="text-amber-600 font-bold">{cust.partial_count} جزئية</span>
-                            <span>•</span>
-                            <span className="text-emerald-600 font-bold">{cust.paid_count} مسددة</span>
+                            <span>{cust.payments?.length || 0} دفعات مقبوضة</span>
                           </div>
                         </div>
                       </div>
@@ -695,10 +589,7 @@ export default function AdminLedgerPage() {
                           <button
                             onClick={() => {
                               setSelectedCustomerId(cust.id);
-                              // Auto expand first order if any
-                              if (cust.orders && cust.orders.length > 0) {
-                                setExpandedOrders({ [cust.orders[0].id]: true });
-                              }
+                              setExpandedOrders({});
                             }}
                             className="px-3 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-bold flex items-center gap-1.5 cursor-pointer shadow-xs transition-all"
                           >
@@ -792,7 +683,7 @@ export default function AdminLedgerPage() {
                 ? 'bg-rose-50/80 border-rose-200 text-rose-950' 
                 : 'bg-emerald-50/80 border-emerald-200 text-emerald-950'
             }`}>
-              <span className="text-xs font-bold opacity-80">المتبقي كدين بذمة الزبون</span>
+              <span className="text-xs font-bold opacity-80">المتبقي كدين بذمة الزبون (الذمة الحالية)</span>
               <div className="flex items-baseline gap-1 pt-1">
                 <span className={`text-2xl font-black ${
                   selectedCustomer.total_remaining_debt > 0 ? 'text-rose-650' : 'text-emerald-700'
@@ -832,257 +723,201 @@ export default function AdminLedgerPage() {
 
           </div>
 
-          {/* Filter Tabs for Customer Invoices */}
-          <div className="bg-white border border-slate-200 rounded-2xl p-1.5 shadow-2xs flex items-center gap-1.5 overflow-x-auto">
-            
-            <button
-              onClick={() => setSelectedCustTab('all')}
-              className={`flex-1 py-2 px-3 rounded-xl text-xs font-bold flex items-center justify-center gap-1.5 transition-all cursor-pointer ${
-                selectedCustTab === 'all' ? 'bg-slate-900 text-white shadow-2xs' : 'text-slate-600 hover:bg-slate-100'
-              }`}
-            >
-              <span>جميع الفواتير ({selectedCustomer.total_invoices_count})</span>
-            </button>
+          {/* Direct Add Payment Form to Customer Balance */}
+          <div className="bg-white border border-slate-200 rounded-3xl p-5 sm:p-6 shadow-xs space-y-4">
+            <h3 className="text-sm font-black text-slate-800 flex items-center gap-2">
+              <Plus className="w-5 h-5 text-[#128C7E]" />
+              <span>تسجيل دفعة جديدة لحساب الزبون (خصم مباشر من إجمالي الدين)</span>
+            </h3>
 
-            <button
-              onClick={() => setSelectedCustTab('unpaid')}
-              className={`flex-1 py-2 px-3 rounded-xl text-xs font-bold flex items-center justify-center gap-1.5 transition-all cursor-pointer ${
-                selectedCustTab === 'unpaid' ? 'bg-rose-600 text-white shadow-2xs' : 'text-rose-700 hover:bg-rose-50'
-              }`}
-            >
-              <AlertCircle className="w-3.5 h-3.5" />
-              <span>غير مدفوعة ({selectedCustomer.unpaid_count})</span>
-            </button>
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 pt-1">
+              <div className="space-y-1">
+                <label className="text-xs font-bold text-slate-700">المبلغ المدفوع (TL)</label>
+                <input
+                  type="number"
+                  step="any"
+                  placeholder={`المتبقي: ${selectedCustomer.total_remaining_debt.toFixed(2)}`}
+                  value={directPaymentAmount}
+                  onChange={(e) => setDirectPaymentAmount(e.target.value)}
+                  className="w-full bg-slate-50 border border-slate-250 rounded-xl px-3.5 py-2.5 text-xs font-bold text-slate-800 outline-none focus:bg-white focus:border-[#128C7E]"
+                />
+              </div>
 
-            <button
-              onClick={() => setSelectedCustTab('partial')}
-              className={`flex-1 py-2 px-3 rounded-xl text-xs font-bold flex items-center justify-center gap-1.5 transition-all cursor-pointer ${
-                selectedCustTab === 'partial' ? 'bg-amber-600 text-white shadow-2xs' : 'text-amber-700 hover:bg-amber-50'
-              }`}
-            >
-              <Hourglass className="w-3.5 h-3.5" />
-              <span>مدفوعة جزئياً ({selectedCustomer.partial_count})</span>
-            </button>
-
-            <button
-              onClick={() => setSelectedCustTab('paid')}
-              className={`flex-1 py-2 px-3 rounded-xl text-xs font-bold flex items-center justify-center gap-1.5 transition-all cursor-pointer ${
-                selectedCustTab === 'paid' ? 'bg-emerald-600 text-white shadow-2xs' : 'text-emerald-700 hover:bg-emerald-50'
-              }`}
-            >
-              <CheckCircle2 className="w-3.5 h-3.5" />
-              <span>مدفوعة بالكامل ({selectedCustomer.paid_count})</span>
-            </button>
-
+              <div className="sm:col-span-2 space-y-1">
+                <label className="text-xs font-bold text-slate-700">توضيح الدفعة (يظهر للزبون في كشف الحساب)</label>
+                <div className="flex items-center gap-2">
+                  <input
+                    type="text"
+                    placeholder="مثال: نقداً باليد، حوالة بنكية، مع السائق..."
+                    value={directPaymentNote}
+                    onChange={(e) => setDirectPaymentNote(e.target.value)}
+                    className="flex-1 bg-slate-50 border border-slate-250 rounded-xl px-3.5 py-2.5 text-xs font-bold text-slate-800 outline-none focus:bg-white focus:border-[#128C7E]"
+                  />
+                  <button
+                    onClick={() => handleAddCustomerPayment(selectedCustomer.id)}
+                    disabled={isUpdating || !directPaymentAmount}
+                    className="px-5 py-2.5 bg-[#128C7E] hover:bg-[#128C7E]/90 disabled:bg-slate-300 text-white font-bold rounded-xl text-xs flex items-center gap-1.5 cursor-pointer shadow-xs transition-all whitespace-nowrap"
+                  >
+                    <Plus className="w-4 h-4" />
+                    <span>{isUpdating ? 'جاري الحفظ...' : 'تسجيل الدفعة'}</span>
+                  </button>
+                </div>
+              </div>
+            </div>
           </div>
 
-          {/* List of Invoices & Payment Adding Forms */}
-          <div className="space-y-4">
-            {selectedCustomer.orders
-              .filter(order => {
-                if (selectedCustTab === 'unpaid') return order.payment_status === 'unpaid';
-                if (selectedCustTab === 'partial') return order.payment_status === 'partial';
-                if (selectedCustTab === 'paid') return order.payment_status === 'paid';
-                return true;
-              })
-              .map((order) => {
-                const isExpanded = Boolean(expandedOrders[order.id]);
-                const orderTotal = order.calculated_total || order.total_price;
-                const paid = order.paid_amount || 0;
-                const remaining = order.remaining_amount !== undefined ? order.remaining_amount : Math.max(0, orderTotal - paid);
+          {/* Recorded Payments List for Customer */}
+          <div className="bg-white border border-slate-200 rounded-3xl p-5 sm:p-6 shadow-xs space-y-4">
+            <div className="flex items-center justify-between pb-3 border-b border-slate-100">
+              <h3 className="text-sm font-black text-slate-800 flex items-center gap-2">
+                <Receipt className="w-4 h-4 text-emerald-600" />
+                <span>سجل الدفعات والمقبوضات للزبون ({selectedCustomer.payments?.length || 0})</span>
+              </h3>
+              <span className="text-xs font-bold text-slate-600">
+                مجموع المقبوض: <span className="text-emerald-700 font-black">{selectedCustomer.total_paid_amount.toFixed(2)} TL</span>
+              </span>
+            </div>
 
-                return (
+            {(!selectedCustomer.payments || selectedCustomer.payments.length === 0) ? (
+              <div className="p-8 bg-slate-50 border border-dashed border-slate-250 rounded-2xl text-center text-xs text-slate-400 font-bold">
+                لم يتم تسجيل أي دفعات لهذا الزبون حتى الآن.
+              </div>
+            ) : (
+              <div className="divide-y divide-slate-100">
+                {selectedCustomer.payments.map((p, pIdx) => (
                   <div
-                    key={order.id}
-                    className={`bg-white border rounded-3xl shadow-xs overflow-hidden transition-all ${
-                      isExpanded ? 'border-emerald-500/60 ring-2 ring-emerald-500/10' : 'border-slate-200'
-                    }`}
+                    key={p.id}
+                    className="py-3 flex items-center justify-between gap-3"
                   >
-                    {/* Invoice Summary Header */}
-                    <div
-                      onClick={() => setExpandedOrders(prev => ({ ...prev, [order.id]: !prev[order.id] }))}
-                      className="p-4 sm:p-5 flex flex-col sm:flex-row sm:items-center justify-between gap-3 cursor-pointer hover:bg-slate-50/70 select-none"
-                    >
-                      <div className="flex items-center gap-3">
-                        <div className={`p-2.5 rounded-2xl shrink-0 ${
-                          order.payment_status === 'paid'
-                            ? 'bg-emerald-100 text-emerald-700'
-                            : order.payment_status === 'partial'
-                            ? 'bg-amber-100 text-amber-700'
-                            : 'bg-rose-100 text-rose-700'
-                        }`}>
-                          {order.payment_status === 'paid' ? <CheckCircle2 className="w-5 h-5" /> : order.payment_status === 'partial' ? <Hourglass className="w-5 h-5" /> : <AlertCircle className="w-5 h-5" />}
-                        </div>
-
-                        <div className="space-y-1">
-                          <div className="flex items-center gap-2 flex-wrap">
-                            <span className="text-xs font-black text-slate-800">فاتورة #{order.id.slice(0, 8).toUpperCase()}</span>
-                            <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${
-                              order.payment_status === 'paid' ? 'bg-emerald-100 text-emerald-800' : order.payment_status === 'partial' ? 'bg-amber-100 text-amber-800' : 'bg-rose-100 text-rose-800'
-                            }`}>
-                              {order.payment_status === 'paid' ? 'مدفوعة بالكامل' : order.payment_status === 'partial' ? 'مدفوعة جزئياً' : 'غير مدفوعة (دين كامل)'}
-                            </span>
-                          </div>
-                          <div className="text-[11px] text-slate-450 font-medium flex items-center gap-3">
-                            <span className="flex items-center gap-1">
-                              <Calendar className="w-3.5 h-3.5" />
-                              {formatDate(order.created_at)}
-                            </span>
-                            <span>•</span>
-                            <span>{order.order_items.length} مواد</span>
-                          </div>
-                        </div>
+                    <div className="space-y-1 min-w-0">
+                      <div className="flex items-center gap-2">
+                        <span className="w-5 h-5 rounded-full bg-emerald-100 text-emerald-800 text-[10px] font-bold flex items-center justify-center shrink-0">
+                          {pIdx + 1}
+                        </span>
+                        <span className="text-xs font-black text-emerald-700">
+                          دفعة بقيمة: {Number(p.amount).toFixed(2)} TL
+                        </span>
+                        <span className="text-[10px] text-slate-400 font-medium">
+                          {formatDate(p.created_at)}
+                        </span>
                       </div>
-
-                      {/* Amounts */}
-                      <div className="flex items-center justify-between sm:justify-end gap-4 pt-2 sm:pt-0 border-t sm:border-t-0 border-slate-100">
-                        <div className="text-right sm:text-left">
-                          <div className="text-xs font-bold text-slate-700">
-                            الإجمالي: <span className="font-black text-sm">{orderTotal.toFixed(2)} TL</span>
-                          </div>
-                          <div className="text-[11px] font-bold mt-0.5">
-                            {remaining > 0 ? (
-                              <span className="text-rose-600">المتبقي: {remaining.toFixed(2)} TL</span>
-                            ) : (
-                              <span className="text-emerald-600">خالصة بالكامل ✓</span>
-                            )}
-                          </div>
-                        </div>
-                        <div className="p-2 rounded-xl bg-slate-100 text-slate-600">
-                          {isExpanded ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
-                        </div>
-                      </div>
+                      {p.note && (
+                        <p className="text-xs text-slate-600 font-medium mr-7">
+                          توضيح: <span className="font-bold text-slate-800">{p.note}</span>
+                        </p>
+                      )}
                     </div>
 
-                    {/* Expanded Body */}
-                    {isExpanded && (
-                      <div className="border-t border-slate-200 p-5 bg-slate-50/60 space-y-5">
-                        
-                        {/* 1. Items breakdown */}
-                        <div className="space-y-2">
-                          <div className="flex items-center justify-between text-xs font-bold text-slate-700">
-                            <span>المواد والأسعار</span>
-                            <Link
-                              href={`/invoice/${order.id}`}
-                              target="_blank"
-                              className="text-emerald-700 hover:underline flex items-center gap-1"
-                            >
-                              <span>معاينة الفاتورة المستقلة</span>
-                              <ExternalLink className="w-3 h-3" />
-                            </Link>
+                    <button
+                      onClick={() => handleDeleteCustomerPayment(p.id, selectedCustomer.id, Number(p.amount))}
+                      disabled={isUpdating}
+                      className="p-2 text-rose-500 hover:bg-rose-50 rounded-xl transition-colors cursor-pointer shrink-0"
+                      title="حذف هذه الدفعة"
+                    >
+                      <Trash2 className="w-4 h-4" />
+                    </button>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+
+          {/* List of Invoices for Reference */}
+          <div className="bg-white border border-slate-200 rounded-3xl p-5 sm:p-6 shadow-xs space-y-4">
+            <div className="flex items-center justify-between pb-3 border-b border-slate-100">
+              <h3 className="text-sm font-black text-slate-800 flex items-center gap-2">
+                <ShoppingBag className="w-4 h-4 text-slate-700" />
+                <span>قائمة فواتير الزبون ({selectedCustomer.orders.length})</span>
+              </h3>
+              <span className="text-xs font-bold text-slate-600">
+                إجمالي قيمة الفواتير: <span className="text-slate-900 font-black">{selectedCustomer.total_invoices_amount.toFixed(2)} TL</span>
+              </span>
+            </div>
+
+            {selectedCustomer.orders.length === 0 ? (
+              <div className="p-8 bg-slate-50 border border-dashed border-slate-250 rounded-2xl text-center text-xs text-slate-400 font-bold">
+                لا توجد فواتير مسجلة لهذا الزبون.
+              </div>
+            ) : (
+              <div className="space-y-3">
+                {selectedCustomer.orders.map((order) => {
+                  const isExpanded = Boolean(expandedOrders[order.id]);
+                  const orderTotal = order.calculated_total || order.total_price;
+
+                  return (
+                    <div
+                      key={order.id}
+                      className={`border rounded-2xl overflow-hidden transition-all ${
+                        isExpanded ? 'border-slate-300 bg-slate-50/40' : 'border-slate-200 bg-white hover:border-slate-300'
+                      }`}
+                    >
+                      {/* Invoice Summary Header */}
+                      <div
+                        onClick={() => setExpandedOrders(prev => ({ ...prev, [order.id]: !prev[order.id] }))}
+                        className="p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3 cursor-pointer select-none"
+                      >
+                        <div className="flex items-center gap-3">
+                          <div className="p-2 rounded-xl bg-slate-100 text-slate-700 shrink-0">
+                            <Receipt className="w-4 h-4" />
                           </div>
 
-                          <div className="bg-white rounded-2xl border border-slate-200 divide-y divide-slate-100 p-2">
+                          <div className="space-y-0.5">
+                            <div className="flex items-center gap-2">
+                              <span className="text-xs font-black text-slate-800">فاتورة #{order.id.slice(0, 8).toUpperCase()}</span>
+                            </div>
+                            <div className="text-[11px] text-slate-450 font-medium flex items-center gap-3">
+                              <span className="flex items-center gap-1">
+                                <Calendar className="w-3.5 h-3.5 text-slate-400" />
+                                {formatDate(order.created_at)}
+                              </span>
+                              <span>•</span>
+                              <span>{order.order_items.length} مواد</span>
+                            </div>
+                          </div>
+                        </div>
+
+                        {/* Amounts and Actions */}
+                        <div className="flex items-center justify-between sm:justify-end gap-3 pt-2 sm:pt-0 border-t sm:border-t-0 border-slate-100">
+                          <div className="text-right sm:text-left">
+                            <div className="text-xs font-bold text-slate-700">
+                              الإجمالي: <span className="font-black text-sm text-slate-900">{orderTotal.toFixed(2)} TL</span>
+                            </div>
+                          </div>
+                          <Link
+                            href={`/invoice/${order.id}`}
+                            target="_blank"
+                            onClick={(e) => e.stopPropagation()}
+                            className="p-1.5 text-emerald-700 hover:bg-emerald-50 rounded-lg text-xs font-bold flex items-center gap-1"
+                            title="فتح الفاتورة المستقلة"
+                          >
+                            <ExternalLink className="w-3.5 h-3.5" />
+                          </Link>
+                          <div className="p-1.5 rounded-lg bg-slate-100 text-slate-600">
+                            {isExpanded ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* Expanded Body: Items list */}
+                      {isExpanded && (
+                        <div className="border-t border-slate-200 p-4 bg-white space-y-2">
+                          <div className="divide-y divide-slate-100">
                             {order.order_items.map((item) => (
-                              <div key={item.id} className="p-2 flex items-center justify-between text-xs">
+                              <div key={item.id} className="py-2 flex items-center justify-between text-xs">
                                 <span className="font-bold text-slate-800">{item.product_name}</span>
                                 <div className="text-slate-600 font-medium">
-                                  {item.quantity} صندوق × {item.price_at_purchase.toFixed(2)} TL = <b className="text-slate-900">{(item.quantity * item.price_at_purchase).toFixed(2)} TL</b>
+                                  {item.quantity} صندوق × {Number(item.price_at_purchase).toFixed(2)} TL = <b className="text-slate-900">{(item.quantity * item.price_at_purchase).toFixed(2)} TL</b>
                                 </div>
                               </div>
                             ))}
                           </div>
                         </div>
-
-                        {/* 2. Recorded Payments List */}
-                        <div className="space-y-2">
-                          <div className="flex items-center justify-between text-xs font-bold text-slate-700">
-                            <span>سجل الدفعات المسجلة لهذه الفاتورة ({order.payments?.length || 0})</span>
-                            <span className="text-emerald-700">المسدد حتى الآن: {paid.toFixed(2)} TL</span>
-                          </div>
-
-                          {(!order.payments || order.payments.length === 0) ? (
-                            <div className="p-3.5 bg-white border border-dashed border-slate-300 rounded-2xl text-center text-xs text-slate-400 font-bold">
-                              لم يتم تسجيل أي دفعة لهذه الفاتورة بعد.
-                            </div>
-                          ) : (
-                            <div className="space-y-2">
-                              {order.payments.map((p, pIdx) => (
-                                <div
-                                  key={p.id}
-                                  className="bg-white border border-slate-200 rounded-2xl p-3 flex items-center justify-between gap-3 shadow-2xs"
-                                >
-                                  <div className="space-y-0.5">
-                                    <div className="flex items-center gap-2">
-                                      <span className="w-5 h-5 rounded-full bg-emerald-100 text-emerald-800 text-[10px] font-bold flex items-center justify-center">
-                                        {pIdx + 1}
-                                      </span>
-                                      <span className="text-xs font-black text-emerald-700">
-                                        {p.amount.toFixed(2)} TL
-                                      </span>
-                                      <span className="text-[10px] text-slate-400 font-medium">
-                                        {formatDate(p.created_at)}
-                                      </span>
-                                    </div>
-                                    {p.note && (
-                                      <p className="text-xs text-slate-600 font-medium mr-7">
-                                        توضيح: <span className="font-bold">{p.note}</span>
-                                      </p>
-                                    )}
-                                  </div>
-
-                                  <button
-                                    onClick={() => handleDeletePayment(p.id, order.id, selectedCustomer.id, p.amount)}
-                                    disabled={isUpdating}
-                                    className="p-1.5 text-rose-500 hover:bg-rose-50 rounded-lg transition-colors cursor-pointer"
-                                    title="حذف هذه الدفعة"
-                                  >
-                                    <Trash2 className="w-4 h-4" />
-                                  </button>
-                                </div>
-                              ))}
-                            </div>
-                          )}
-                        </div>
-
-                        {/* 3. Add Payment to this Invoice Form */}
-                        <div className="bg-white border border-slate-200 rounded-2xl p-4 space-y-3">
-                          <h4 className="text-xs font-bold text-slate-800 flex items-center gap-1.5">
-                            <Plus className="w-4 h-4 text-emerald-600" />
-                            <span>إضافة دفعة جديدة لهذه الفاتورة</span>
-                          </h4>
-
-                          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-                            <div className="space-y-1">
-                              <label className="text-[11px] font-bold text-slate-600">المبلغ المدفوع (TL)</label>
-                              <input
-                                type="number"
-                                step="any"
-                                placeholder={`المتبقي: ${remaining.toFixed(2)}`}
-                                value={paymentAmount[order.id] || ''}
-                                onChange={(e) => setPaymentAmount(prev => ({ ...prev, [order.id]: e.target.value }))}
-                                className="w-full bg-slate-50 border border-slate-300 rounded-xl px-3 py-2 text-xs font-bold text-slate-800 outline-none focus:bg-white focus:border-emerald-600"
-                              />
-                            </div>
-
-                            <div className="sm:col-span-2 space-y-1">
-                              <label className="text-[11px] font-bold text-slate-600">التوضيح (اختياري - يظهر للزبون في كشف الحساب)</label>
-                              <div className="flex items-center gap-2">
-                                <input
-                                  type="text"
-                                  placeholder="مثال: نقداً باليد، حوالة بنكية، مع السائق..."
-                                  value={paymentNote[order.id] || ''}
-                                  onChange={(e) => setPaymentNote(prev => ({ ...prev, [order.id]: e.target.value }))}
-                                  className="flex-1 bg-slate-50 border border-slate-300 rounded-xl px-3 py-2 text-xs font-bold text-slate-800 outline-none focus:bg-white focus:border-emerald-600"
-                                />
-                                <button
-                                  onClick={() => handleAddPayment(order.id, selectedCustomer.id)}
-                                  disabled={isUpdating || !paymentAmount[order.id]}
-                                  className="px-4 py-2 bg-[#128C7E] hover:bg-[#128C7E]/90 disabled:bg-slate-300 text-white font-bold rounded-xl text-xs flex items-center gap-1.5 cursor-pointer shadow-xs transition-all whitespace-nowrap"
-                                >
-                                  <Plus className="w-4 h-4" />
-                                  <span>{isUpdating ? 'جاري الحفظ...' : 'تسجيل الدفعة'}</span>
-                                </button>
-                              </div>
-                            </div>
-                          </div>
-                        </div>
-
-                      </div>
-                    )}
-                  </div>
-                );
-              })}
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+            )}
           </div>
 
         </div>
@@ -1127,7 +962,7 @@ export default function AdminLedgerPage() {
                 إلغاء
               </button>
               <button
-                onClick={handleAssignOrder}
+                onClick={handleAssignUnassignedOrder}
                 disabled={!selectedCustomerForAssign || isUpdating}
                 className="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 disabled:bg-slate-300 text-white font-bold rounded-xl text-xs cursor-pointer shadow-xs"
               >

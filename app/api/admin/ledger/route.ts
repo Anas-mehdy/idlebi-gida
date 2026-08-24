@@ -138,13 +138,11 @@ export async function GET(request: NextRequest) {
 
     const customerSummaries = customers.map(cust => {
       const custOrders = customerOrdersMap.get(cust.id) || [];
-      const custPayments = customerPaymentsMap.get(cust.id) || [];
+      const custPayments = (customerPaymentsMap.get(cust.id) || []).sort(
+        (a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
+      );
 
       let custTotalInvoices = 0;
-      let custTotalPaid = 0;
-      let unpaidCount = 0;
-      let partialCount = 0;
-      let paidCount = 0;
 
       const processedCustOrders = custOrders.map(order => {
         const rawTotal = (order.order_items || []).reduce(
@@ -155,35 +153,15 @@ export async function GET(request: NextRequest) {
           ? Number(order.total_price)
           : rawTotal;
 
-        const orderPays = payments.filter(p => p.order_id === order.id);
-        const orderPaid = orderPays.reduce((sum, p) => sum + Number(p.amount || 0), 0);
-        const orderRemaining = Math.max(0, orderTotal - orderPaid);
-
-        let status: 'unpaid' | 'partial' | 'paid' = 'unpaid';
-        if (orderTotal > 0 && orderPaid >= orderTotal) {
-          status = 'paid';
-          paidCount++;
-        } else if (orderPaid > 0) {
-          status = 'partial';
-          partialCount++;
-        } else {
-          status = 'unpaid';
-          unpaidCount++;
-        }
-
         custTotalInvoices += orderTotal;
-        custTotalPaid += orderPaid;
 
         return {
           ...order,
-          calculated_total: orderTotal,
-          paid_amount: orderPaid,
-          remaining_amount: orderRemaining,
-          payment_status: status,
-          payments: orderPays
+          calculated_total: orderTotal
         };
       });
 
+      const custTotalPaid = custPayments.reduce((sum, p) => sum + Number(p.amount || 0), 0);
       const custRemainingDebt = Math.max(0, custTotalInvoices - custTotalPaid);
 
       if (custRemainingDebt > 0) {
@@ -205,13 +183,11 @@ export async function GET(request: NextRequest) {
         statement_url: statementUrl,
         created_at: cust.created_at,
         total_invoices_count: custOrders.length,
-        unpaid_count: unpaidCount,
-        partial_count: partialCount,
-        paid_count: paidCount,
         total_invoices_amount: custTotalInvoices,
         total_paid_amount: custTotalPaid,
         total_remaining_debt: custRemainingDebt,
-        orders: processedCustOrders
+        orders: processedCustOrders,
+        payments: custPayments
       };
     });
 
