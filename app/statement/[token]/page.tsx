@@ -202,7 +202,7 @@ export default function CustomerStatementPage({ params }: { params: Promise<{ to
   const formatDate = (dateString: string) => {
     try {
       const date = new Date(dateString);
-      return date.toLocaleDateString('ar-EG', {
+      return date.toLocaleDateString('ar-EG-u-nu-latn', {
         year: 'numeric',
         month: 'short',
         day: 'numeric'
@@ -215,7 +215,7 @@ export default function CustomerStatementPage({ params }: { params: Promise<{ to
   const formatTime = (dateString: string) => {
     try {
       const date = new Date(dateString);
-      return date.toLocaleTimeString('ar-EG', {
+      return date.toLocaleTimeString('ar-EG-u-nu-latn', {
         hour: '2-digit',
         minute: '2-digit'
       });
@@ -306,7 +306,7 @@ export default function CustomerStatementPage({ params }: { params: Promise<{ to
               <div className="mt-2">
                 <div className="flex items-baseline gap-1">
                   <span className={`text-2xl font-black ${summary.total_remaining_debt > 0 ? 'text-rose-650' : 'text-emerald-700'}`}>
-                    {summary.total_remaining_debt.toLocaleString('ar-EG', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                    {summary.total_remaining_debt.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                   </span>
                   <span className="text-xs font-bold">ليرة</span>
                 </div>
@@ -319,7 +319,7 @@ export default function CustomerStatementPage({ params }: { params: Promise<{ to
               <div className="mt-2">
                 <div className="flex items-baseline gap-1">
                   <span className="text-2xl font-black text-emerald-700">
-                    {summary.total_paid_amount.toLocaleString('ar-EG', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                    {summary.total_paid_amount.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                   </span>
                   <span className="text-xs font-bold">ليرة</span>
                 </div>
@@ -332,7 +332,7 @@ export default function CustomerStatementPage({ params }: { params: Promise<{ to
               <div className="mt-2">
                 <div className="flex items-baseline gap-1">
                   <span className="text-2xl font-black text-slate-800">
-                    {summary.total_invoices_amount.toLocaleString('ar-EG', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                    {summary.total_invoices_amount.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                   </span>
                   <span className="text-xs font-bold text-slate-600">ليرة</span>
                 </div>
@@ -514,7 +514,7 @@ export default function CustomerStatementPage({ params }: { params: Promise<{ to
                   <p className="text-[11px] text-slate-400 mt-0.5">Esenler, İstanbul</p>
                 </div>
                 <div className="text-left font-mono text-xs text-slate-500">
-                  <p>تاريخ الفاتورة: {new Date(ord.created_at).toLocaleDateString('ar-EG', { dateStyle: 'long' })}</p>
+                  <p>تاريخ الفاتورة: {new Date(ord.created_at).toLocaleDateString('ar-EG-u-nu-latn', { dateStyle: 'long' })}</p>
                   <p>رقم الفاتورة: #{ord.id.substring(0, 8).toUpperCase()}</p>
                 </div>
               </div>

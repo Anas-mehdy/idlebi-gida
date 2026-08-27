@@ -321,7 +321,7 @@ export default function AdminLedgerPage() {
   const formatDate = (dateStr: string) => {
     try {
       const d = new Date(dateStr);
-      return d.toLocaleDateString('ar-EG', { year: 'numeric', month: 'short', day: 'numeric' });
+      return d.toLocaleDateString('ar-EG-u-nu-latn', { year: 'numeric', month: 'short', day: 'numeric' });
     } catch {
       return dateStr;
     }
@@ -383,7 +383,7 @@ export default function AdminLedgerPage() {
               </div>
               <div className="flex items-baseline gap-1 pt-1">
                 <span className="text-2xl font-black text-rose-650">
-                  {grandSummary.grand_total_debt.toLocaleString('ar-EG', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                  {grandSummary.grand_total_debt.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                 </span>
                 <span className="text-xs font-bold text-rose-800">ليرة</span>
               </div>
@@ -400,7 +400,7 @@ export default function AdminLedgerPage() {
               </div>
               <div className="flex items-baseline gap-1 pt-1">
                 <span className="text-2xl font-black text-emerald-700">
-                  {grandSummary.grand_total_paid.toLocaleString('ar-EG', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                  {grandSummary.grand_total_paid.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                 </span>
                 <span className="text-xs font-bold text-emerald-800">ليرة</span>
               </div>
@@ -417,7 +417,7 @@ export default function AdminLedgerPage() {
               </div>
               <div className="flex items-baseline gap-1 pt-1">
                 <span className="text-2xl font-black text-slate-800">
-                  {grandSummary.grand_total_invoices.toLocaleString('ar-EG', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                  {grandSummary.grand_total_invoices.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                 </span>
                 <span className="text-xs font-bold text-slate-600">ليرة</span>
               </div>
