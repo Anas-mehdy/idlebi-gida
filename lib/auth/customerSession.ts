@@ -120,7 +120,7 @@ export async function verifyCustomerSession(request: NextRequest): Promise<Custo
       const deviceHash = hashToken(pendingToken);
       const { data: deviceData } = await supabaseAdmin
         .from('customer_devices')
-        .select('id, status, customer_id, customers(name, status)')
+        .select('id, status, customer_id, customers(name, status, show_prices)')
         .eq('device_token_hash', deviceHash)
         .single();
 
@@ -142,7 +142,7 @@ export async function verifyCustomerSession(request: NextRequest): Promise<Custo
             customerId: deviceData.customer_id,
             customerName: customer?.name,
             deviceId: deviceData.id,
-            showPrices: true
+            showPrices: customer?.show_prices ?? true
           };
         } else if (deviceData.status === 'pending') {
           return {

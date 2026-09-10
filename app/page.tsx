@@ -113,11 +113,15 @@ export default function CatalogPage() {
       try {
         setLoading(true);
         
-        // Pass backup token in headers for iOS Safari ITP resilience
+        // Pass backup tokens in headers for iOS Safari ITP resilience
         const backupToken = typeof window !== 'undefined' ? localStorage.getItem('customer_device_backup_token') : null;
+        const backupPending = typeof window !== 'undefined' ? localStorage.getItem('customer_pending_backup_token') : null;
         const headers: Record<string, string> = {};
         if (backupToken) {
           headers['x-customer-device-token'] = backupToken;
+        }
+        if (backupPending) {
+          headers['x-customer-pending-token'] = backupPending;
         }
 
         // Call secure Store Products API

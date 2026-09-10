@@ -165,6 +165,9 @@ export default function AdminCustomers() {
       const data = await res.json();
       if (res.ok) {
         setModalMaxDevices(data.maxDevices ?? 2);
+        if (data.accessUrl) {
+          setCustAccessUrl(data.accessUrl);
+        }
       }
     } catch (err) {
       console.error(err);
@@ -542,32 +545,56 @@ export default function AdminCustomers() {
               </div>
             </div>
 
-            {/* Generate & Copy Access Link */}
+            {/* Active Permanent Access Link Display */}
             <div className="space-y-3 pt-2">
-              <button
-                onClick={handleGenerateLink}
-                disabled={isUpdating}
-                className="w-full bg-[#128C7E] hover:bg-[#128C7E]/95 text-white font-bold py-3 rounded-xl text-xs flex items-center justify-center gap-2 shadow-md cursor-pointer transition-all"
-              >
-                <LinkIcon className="w-4 h-4" />
-                <span>إنشاء رابط دخول جديد للزبون (يلغي الرابط القديم)</span>
-              </button>
+              {custAccessUrl ? (
+                <div className="bg-slate-900 text-white p-4 rounded-2xl space-y-3 shadow-md">
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs font-bold text-emerald-400 flex items-center gap-1.5">
+                      <ShieldCheck className="w-4 h-4 text-emerald-400" />
+                      <span>رابط الدخول الدائم للزبون:</span>
+                    </span>
+                    <span className="text-[10px] text-slate-400 bg-slate-800 px-2 py-0.5 rounded-md font-mono">
+                      جاهز ومستقر
+                    </span>
+                  </div>
 
-              {custAccessUrl && (
-                <div className="bg-slate-900 text-white p-3.5 rounded-2xl space-y-2">
-                  <span className="block text-[10px] font-bold text-slate-400">رابط الدخول الخاص بالتنفيذ:</span>
-                  <div className="flex items-center justify-between gap-2 bg-slate-800 p-2 rounded-xl text-xs font-mono break-all dir-ltr">
-                    <span className="truncate">{custAccessUrl}</span>
+                  <div className="flex items-center justify-between gap-2 bg-slate-800 p-2.5 rounded-xl text-xs font-mono break-all dir-ltr">
+                    <span className="truncate flex-1 text-slate-200">{custAccessUrl}</span>
                     <button
                       onClick={handleCopyLink}
-                      className="p-1.5 bg-emerald-600 hover:bg-emerald-500 text-white rounded-lg cursor-pointer shrink-0"
+                      className="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-500 text-white rounded-lg cursor-pointer shrink-0 font-sans font-bold flex items-center gap-1.5 transition-all text-xs"
                       title="نسخ الرابط"
                     >
-                      {copiedLink ? <Check className="w-4 h-4" /> : <Copy className="w-4 h-4" />}
+                      {copiedLink ? <Check className="w-3.5 h-3.5" /> : <Copy className="w-3.5 h-3.5" />}
+                      <span>{copiedLink ? 'تم النسخ!' : 'نسخ الرابط'}</span>
                     </button>
                   </div>
+                  <p className="text-[11px] text-slate-400 leading-relaxed text-right">
+                    هذا الرابط دائم وخاص بهذا الزبون، يمكنك نسخه وإرساله له عبر واتساب في أي وقت دون أن ينتهي.
+                  </p>
+                </div>
+              ) : (
+                <div className="py-4 text-center text-slate-400 flex items-center justify-center gap-2 text-xs">
+                  <Loader2 className="w-4 h-4 animate-spin text-emerald-600" />
+                  <span>جاري استخراج رابط الدخول...</span>
                 </div>
               )}
+
+              {/* Optional: Regenerate Link (Emergency revocation only) */}
+              <div className="pt-2 border-t border-slate-100">
+                <button
+                  onClick={() => {
+                    const confirmRegen = window.confirm('تحذير: هل أنت متأكد من إلغاء الرابط الحالي وإصدار رابط جديد؟ الرابط القديم سيتوقف عن العمل عند الزبون.');
+                    if (confirmRegen) handleGenerateLink();
+                  }}
+                  disabled={isUpdating}
+                  className="w-full bg-slate-100 hover:bg-rose-50 text-slate-600 hover:text-rose-700 border border-slate-200 hover:border-rose-200 font-bold py-2 rounded-xl text-[11px] flex items-center justify-center gap-1.5 cursor-pointer transition-all"
+                >
+                  <RefreshCw className="w-3.5 h-3.5" />
+                  <span>إلغاء الرابط الحالي وتوليد رابط جديد (فقط في حال تسريب الرابط القديم)</span>
+                </button>
+              </div>
             </div>
           </div>
         </div>

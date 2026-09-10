@@ -29,3 +29,11 @@ export function verifyPin(pin: string, storedHash: string | null, salt: string =
   const hash = hashPin(pin, salt);
   return crypto.timingSafeEqual(Buffer.from(hash), Buffer.from(storedHash));
 }
+
+/**
+ * Generate a deterministic, cryptographically secure permanent access token for a customer.
+ */
+export function generateCustomerPermanentToken(customerId: string): string {
+  const secret = process.env.SUPABASE_SERVICE_ROLE_KEY || 'idelbi_customer_link_secret_v1';
+  return crypto.createHmac('sha256', secret).update(`customer_access_${customerId}`).digest('hex').slice(0, 24);
+}

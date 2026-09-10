@@ -36,6 +36,7 @@ function StatusContent() {
       if (data && data.approved === true) {
         if (data.sessionToken) {
           localStorage.setItem('customer_device_backup_token', data.sessionToken);
+          localStorage.removeItem('customer_pending_backup_token');
         }
         setAutoApproved(true);
         setTimeout(() => {

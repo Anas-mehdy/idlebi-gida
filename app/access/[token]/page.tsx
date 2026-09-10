@@ -17,7 +17,7 @@ export default function AccessTokenPage({ params }: { params: Promise<{ token: s
         setLoading(true);
         setErrorMsg('');
 
-        // Detect device metadata
+        // Collect device metadata & lightweight stable fingerprint
         const ua = typeof navigator !== 'undefined' ? navigator.userAgent : '';
         let browser = 'غير معروف';
         let os = 'غير معروف';
@@ -32,6 +32,11 @@ export default function AccessTokenPage({ params }: { params: Promise<{ token: s
         else if (ua.includes('iPhone') || ua.includes('iPad')) os = 'iOS';
         else if (ua.includes('Mac')) os = 'macOS';
 
+        const screenInfo = typeof window !== 'undefined' && window.screen ? `${window.screen.width}x${window.screen.height}x${window.screen.colorDepth}` : '';
+        const lang = typeof navigator !== 'undefined' ? (navigator.language || '') : '';
+        const tz = typeof Intl !== 'undefined' ? (Intl.DateTimeFormat().resolvedOptions().timeZone || '') : '';
+        const fingerprint = `${screenInfo}|${lang}|${tz}|${os}`;
+
         const backupToken = typeof window !== 'undefined' ? localStorage.getItem('customer_device_backup_token') : null;
         const backupPendingToken = typeof window !== 'undefined' ? localStorage.getItem('customer_pending_backup_token') : null;
 
@@ -43,6 +48,7 @@ export default function AccessTokenPage({ params }: { params: Promise<{ token: s
             deviceName: `${os} - ${browser}`,
             browser,
             os,
+            fingerprint,
             backupToken,
             backupPendingToken
           })
@@ -85,11 +91,11 @@ export default function AccessTokenPage({ params }: { params: Promise<{ token: s
         }
 
         // Store backup pending or session token in localStorage to safeguard against Safari ITP
-        if (data.pendingToken) {
-          localStorage.setItem('customer_pending_backup_token', data.pendingToken);
-        }
         if (data.sessionToken) {
           localStorage.setItem('customer_device_backup_token', data.sessionToken);
+          localStorage.removeItem('customer_pending_backup_token');
+        } else if (data.pendingToken) {
+          localStorage.setItem('customer_pending_backup_token', data.pendingToken);
         }
 
         if (data.alreadyApproved === true) {

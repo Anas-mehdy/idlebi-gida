@@ -78,9 +78,13 @@ export default function CheckoutPage() {
     try {
       // Call secure API checkout
       const backupToken = typeof window !== 'undefined' ? localStorage.getItem('customer_device_backup_token') : null;
+      const backupPending = typeof window !== 'undefined' ? localStorage.getItem('customer_pending_backup_token') : null;
       const headers: Record<string, string> = { 'Content-Type': 'application/json' };
       if (backupToken) {
         headers['x-customer-device-token'] = backupToken;
+      }
+      if (backupPending) {
+        headers['x-customer-pending-token'] = backupPending;
       }
 
       const res = await fetch('/api/store/checkout', {

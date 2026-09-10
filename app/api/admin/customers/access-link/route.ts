@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabaseAdmin';
 import { checkAdminAuth } from '@/lib/auth/adminAuth';
-import { generateRandomToken, hashToken, hashPin } from '@/lib/auth/crypto';
+import { generateRandomToken, hashToken, hashPin, generateCustomerPermanentToken } from '@/lib/auth/crypto';
 
 export async function GET(request: NextRequest) {
   const auth = checkAdminAuth(request);
@@ -31,10 +31,35 @@ export async function GET(request: NextRequest) {
       .eq('id', customerId)
       .single();
 
+    // Ensure active permanent access link exists in database
+    const permanentToken = generateCustomerPermanentToken(customerId);
+    const permanentHash = hashToken(permanentToken);
+
+    let activeLink = linkData;
+    if (!activeLink) {
+      const { data: insertedLink } = await supabaseAdmin
+        .from('customer_access_links')
+        .insert({
+          customer_id: customerId,
+          token_hash: permanentHash,
+          status: 'active'
+        })
+        .select('id, status, created_at, last_used_at')
+        .single();
+      activeLink = insertedLink;
+    }
+
+    const host = request.headers.get('x-forwarded-host') || request.headers.get('host') || '';
+    const proto = request.headers.get('x-forwarded-proto') || (host.includes('localhost') ? 'http' : 'https');
+    const origin = host ? `${proto}://${host}` : (request.headers.get('origin') || '');
+    const accessUrl = `${origin}/access/${permanentToken}`;
+
     return NextResponse.json({
-      hasLink: Boolean(linkData),
-      linkStatus: linkData?.status || null,
-      lastUsedAt: linkData?.last_used_at || null,
+      hasLink: true,
+      accessUrl,
+      rawToken: permanentToken,
+      linkStatus: activeLink?.status || 'active',
+      lastUsedAt: activeLink?.last_used_at || null,
       hasPin: Boolean(customerData?.pin_hash),
       maxDevices: customerData?.max_devices ?? 2,
       showPrices: customerData?.show_prices ?? true,

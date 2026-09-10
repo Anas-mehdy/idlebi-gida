@@ -73,7 +73,8 @@ export async function POST(request: NextRequest) {
   }
 
   try {
-    const { deviceId, customerId, action } = await request.json();
+    const body = await request.json().catch(() => ({}));
+    const { deviceId, customerId, action, status } = body;
 
     if (!action) {
       return NextResponse.json({ error: 'Action is required' }, { status: 400 });
@@ -195,15 +196,15 @@ export async function POST(request: NextRequest) {
     }
 
     if (action === 'update_customer_status' && customerId) {
-      const { status } = await request.json(); // 'active' or 'suspended'
+      const newStatus = status === 'suspended' ? 'suspended' : 'active';
       await supabaseAdmin
         .from('customers')
-        .update({ status: status === 'suspended' ? 'suspended' : 'active' })
+        .update({ status: newStatus })
         .eq('id', customerId);
 
       return NextResponse.json({
         success: true,
-        message: `تم ${status === 'suspended' ? 'إيقاف' : 'تفعيل'} حساب الزبون بنجاح`
+        message: `تم ${newStatus === 'suspended' ? 'إيقاف' : 'تفعيل'} حساب الزبون بنجاح`
       });
     }
 
