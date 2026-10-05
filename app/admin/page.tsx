@@ -45,6 +45,10 @@ interface AggregatedItem {
   totalQty: number;
   imageUrl?: string | null;
   inventoryStock?: number | null;
+  customerBreakdown: {
+    customerName: string;
+    quantity: number;
+  }[];
 }
 
 interface Customer {
@@ -418,7 +422,8 @@ export default function AdminDashboard() {
         productName: string, 
         qty: number, 
         imageUrl?: string | null,
-        inventoryStock?: number | null 
+        inventoryStock?: number | null,
+        customers: Record<string, number>
       } 
     } = {};
     
@@ -441,10 +446,15 @@ export default function AdminDashboard() {
             productName, 
             qty: 0, 
             imageUrl: imgUrl,
-            inventoryStock: stock 
+            inventoryStock: stock,
+            customers: {}
           };
         }
         productAggregation[groupKey].qty += item.quantity;
+
+        const customerName = order.customer_name?.trim() || 'زبون غير معروف';
+        productAggregation[groupKey].customers[customerName] =
+          (productAggregation[groupKey].customers[customerName] || 0) + item.quantity;
       });
     });
 
@@ -453,6 +463,9 @@ export default function AdminDashboard() {
       totalQty: productAggregation[key].qty,
       imageUrl: productAggregation[key].imageUrl,
       inventoryStock: productAggregation[key].inventoryStock,
+      customerBreakdown: Object.entries(productAggregation[key].customers)
+        .map(([customerName, quantity]) => ({ customerName, quantity }))
+        .sort((a, b) => b.quantity - a.quantity || a.customerName.localeCompare(b.customerName, 'ar')),
     }));
 
     setAggregatedItems(aggregatedList);
@@ -1946,40 +1959,62 @@ export default function AdminDashboard() {
                   return (
                     <div 
                       key={idx}
-                      className="bg-slate-50 p-4 rounded-2xl border border-slate-200/60 flex items-center justify-between hover:border-slate-300 transition-colors"
+                      className="bg-slate-50 p-4 rounded-2xl border border-slate-200/60 hover:border-slate-300 transition-colors"
                     >
-                      <div className="flex items-center gap-3">
-                        <input
-                          type="checkbox"
-                          checked={isChecked}
-                          onChange={() => toggleAggregatedItem(item.productName)}
-                          className="w-4 h-4 rounded text-[#128C7E] focus:ring-[#128C7E] border-slate-350 cursor-pointer"
-                        />
-                        {item.imageUrl ? (
-                          <img 
-                            src={item.imageUrl} 
-                            onClick={() => setActivePreviewImage(item.imageUrl || null)}
-                            className="w-14 h-14 rounded-xl object-cover shrink-0 border border-slate-205 cursor-zoom-in hover:brightness-95 transition-all" 
-                            alt={item.productName} 
+                      <div className="flex items-center justify-between gap-3">
+                        <div className="flex items-center gap-3 min-w-0">
+                          <input
+                            type="checkbox"
+                            checked={isChecked}
+                            onChange={() => toggleAggregatedItem(item.productName)}
+                            className="w-4 h-4 rounded text-[#128C7E] focus:ring-[#128C7E] border-slate-350 cursor-pointer shrink-0"
                           />
-                        ) : (
-                          <ShoppingBag className="w-14 h-14 p-2.5 bg-white text-slate-400 border border-slate-200 rounded-xl shrink-0" />
-                        )}
-                        <div className="flex flex-col">
-                          <span className="text-sm font-semibold text-slate-700">{item.productName}</span>
-                          {item.inventoryStock !== null && item.inventoryStock !== undefined && (
-                            <span className="text-[10px] font-bold mt-0.5 text-slate-450">
-                              باقي في المخزون:{' '}
-                              <span className={item.inventoryStock <= 0 ? 'text-rose-600 font-black' : 'text-[#128C7E] font-black'}>
-                                {item.inventoryStock} صندوق
-                              </span>
-                            </span>
+                          {item.imageUrl ? (
+                            <img 
+                              src={item.imageUrl} 
+                              onClick={() => setActivePreviewImage(item.imageUrl || null)}
+                              className="w-14 h-14 rounded-xl object-cover shrink-0 border border-slate-205 cursor-zoom-in hover:brightness-95 transition-all" 
+                              alt={item.productName} 
+                            />
+                          ) : (
+                            <ShoppingBag className="w-14 h-14 p-2.5 bg-white text-slate-400 border border-slate-200 rounded-xl shrink-0" />
                           )}
+                          <div className="flex flex-col min-w-0">
+                            <span className="text-sm font-semibold text-slate-700">{item.productName}</span>
+                            {item.inventoryStock !== null && item.inventoryStock !== undefined && (
+                              <span className="text-[10px] font-bold mt-0.5 text-slate-450">
+                                باقي في المخزون:{' '}
+                                <span className={item.inventoryStock <= 0 ? 'text-rose-600 font-black' : 'text-[#128C7E] font-black'}>
+                                  {item.inventoryStock} صندوق
+                                </span>
+                              </span>
+                            )}
+                          </div>
                         </div>
+                        <span className="bg-white text-emerald-600 font-extrabold px-3 py-1.5 rounded-xl text-sm border border-slate-200 shrink-0">
+                          {item.totalQty} علبة / صندوق
+                        </span>
                       </div>
-                      <span className="bg-white text-emerald-600 font-extrabold px-3 py-1.5 rounded-xl text-sm border border-slate-200 shrink-0">
-                        {item.totalQty} علبة / صندوق
-                      </span>
+
+                      <details className="group mt-3 border-t border-slate-200/80 pt-3">
+                        <summary className="cursor-pointer list-none flex items-center justify-between gap-2 text-xs font-bold text-slate-600 hover:text-slate-800 [&::-webkit-details-marker]:hidden">
+                          <span>تفصيل الزبائن ({item.customerBreakdown.length})</span>
+                          <ChevronDown className="w-4 h-4 text-slate-400 transition-transform group-open:rotate-180" />
+                        </summary>
+                        <div className="mt-2 space-y-1.5">
+                          {item.customerBreakdown.map((customer) => (
+                            <div
+                              key={customer.customerName}
+                              className="flex items-center justify-between gap-3 rounded-xl bg-white border border-slate-200/80 px-3 py-2 text-xs"
+                            >
+                              <span className="font-semibold text-slate-700 truncate">{customer.customerName}</span>
+                              <span className="font-black text-[#128C7E] whitespace-nowrap">
+                                {customer.quantity} علبة / صندوق
+                              </span>
+                            </div>
+                          ))}
+                        </div>
+                      </details>
                     </div>
                   );
                 })}

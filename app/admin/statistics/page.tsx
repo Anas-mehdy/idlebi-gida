@@ -48,6 +48,10 @@ interface AggregatedItem {
   totalQty: number;
   totalSales: number;
   imageUrl?: string | null;
+  customerBreakdown: {
+    customerName: string;
+    quantity: number;
+  }[];
 }
 
 export default function AdminStatistics() {
@@ -707,21 +711,31 @@ export default function AdminStatistics() {
   // Aggregate quantities sold in the filtered range
   const calculateAggregatedSoldItems = (): AggregatedItem[] => {
     const productAggregation: { 
-      [productIdOrName: string]: { productName: string, qty: number, sales: number, imageUrl?: string | null } 
+      [productIdOrName: string]: {
+        productName: string,
+        qty: number,
+        sales: number,
+        imageUrl?: string | null,
+        customers: Record<string, number>
+      } 
     } = {};
     
     filteredOrders.forEach((order) => {
       order.order_items.forEach((item) => {
-        const productName = item.products?.name || 'منتج غير معروف';
-        const imgUrl = item.products?.image_url || null;
+        const productName = item.product_name || item.products?.name || 'منتج غير معروف';
+        const imgUrl = item.product_image || item.products?.image_url || null;
         const itemSales = item.quantity * Number(item.price_at_purchase);
         const groupKey = item.product_id || productName;
         
         if (!productAggregation[groupKey]) {
-          productAggregation[groupKey] = { productName, qty: 0, sales: 0, imageUrl: imgUrl };
+          productAggregation[groupKey] = { productName, qty: 0, sales: 0, imageUrl: imgUrl, customers: {} };
         }
         productAggregation[groupKey].qty += item.quantity;
         productAggregation[groupKey].sales += itemSales;
+
+        const customerName = order.customer_name?.trim() || 'زبون غير معروف';
+        productAggregation[groupKey].customers[customerName] =
+          (productAggregation[groupKey].customers[customerName] || 0) + item.quantity;
       });
     });
 
@@ -730,6 +744,9 @@ export default function AdminStatistics() {
       totalQty: productAggregation[key].qty,
       totalSales: productAggregation[key].sales,
       imageUrl: productAggregation[key].imageUrl,
+      customerBreakdown: Object.entries(productAggregation[key].customers)
+        .map(([customerName, quantity]) => ({ customerName, quantity }))
+        .sort((a, b) => b.quantity - a.quantity || a.customerName.localeCompare(b.customerName, 'ar')),
     })).sort((a, b) => b.totalQty - a.totalQty); // Sort by quantity sold descending
   };
 
@@ -1402,27 +1419,49 @@ export default function AdminStatistics() {
             {aggregatedSoldItems.map((item, idx) => (
               <div 
                 key={idx}
-                className="bg-slate-50 p-4 rounded-2xl border border-slate-200 flex items-center justify-between hover:border-slate-300 transition-colors shadow-xs"
+                className="bg-slate-50 p-4 rounded-2xl border border-slate-200 hover:border-slate-300 transition-colors shadow-xs"
               >
-                <div className="flex items-center gap-3">
-                  {item.imageUrl ? (
-                    <img 
-                      src={item.imageUrl} 
-                      onClick={() => setActivePreviewImage(item.imageUrl || null)}
-                      className="w-14 h-14 rounded-xl object-cover shrink-0 border border-slate-200 shadow-xs cursor-zoom-in hover:brightness-95 transition-all" 
-                      alt={item.productName} 
-                    />
-                  ) : (
-                    <ShoppingBag className="w-14 h-14 p-2.5 bg-white text-slate-400 border border-slate-200 rounded-xl shrink-0" />
-                  )}
-                  <div className="space-y-1">
-                    <span className="text-sm font-semibold text-slate-800 block">{item.productName}</span>
-                    <span className="text-[10px] text-emerald-650 font-bold font-mono block">الإيراد: {item.totalSales.toFixed(2)} TL</span>
+                <div className="flex items-center justify-between gap-3">
+                  <div className="flex items-center gap-3 min-w-0">
+                    {item.imageUrl ? (
+                      <img 
+                        src={item.imageUrl} 
+                        onClick={() => setActivePreviewImage(item.imageUrl || null)}
+                        className="w-14 h-14 rounded-xl object-cover shrink-0 border border-slate-200 shadow-xs cursor-zoom-in hover:brightness-95 transition-all" 
+                        alt={item.productName} 
+                      />
+                    ) : (
+                      <ShoppingBag className="w-14 h-14 p-2.5 bg-white text-slate-400 border border-slate-200 rounded-xl shrink-0" />
+                    )}
+                    <div className="space-y-1 min-w-0">
+                      <span className="text-sm font-semibold text-slate-800 block">{item.productName}</span>
+                      <span className="text-[10px] text-emerald-650 font-bold font-mono block">الإيراد: {item.totalSales.toFixed(2)} TL</span>
+                    </div>
                   </div>
+                  <span className="bg-white text-emerald-600 font-extrabold px-3 py-1.5 rounded-xl text-sm border border-slate-200 shadow-sm shrink-0">
+                    {item.totalQty} علبة / صندوق
+                  </span>
                 </div>
-                <span className="bg-white text-emerald-600 font-extrabold px-3 py-1.5 rounded-xl text-sm border border-slate-200 shadow-sm shrink-0">
-                  {item.totalQty} علبة / صندوق
-                </span>
+
+                <details className="group mt-3 border-t border-slate-200 pt-3">
+                  <summary className="cursor-pointer list-none flex items-center justify-between gap-2 text-xs font-bold text-slate-600 hover:text-slate-800 [&::-webkit-details-marker]:hidden">
+                    <span>تفصيل الزبائن ({item.customerBreakdown.length})</span>
+                    <ChevronDown className="w-4 h-4 text-slate-400 transition-transform group-open:rotate-180" />
+                  </summary>
+                  <div className="mt-2 space-y-1.5">
+                    {item.customerBreakdown.map((customer) => (
+                      <div
+                        key={customer.customerName}
+                        className="flex items-center justify-between gap-3 rounded-xl bg-white border border-slate-200 px-3 py-2 text-xs"
+                      >
+                        <span className="font-semibold text-slate-700 truncate">{customer.customerName}</span>
+                        <span className="font-black text-[#128C7E] whitespace-nowrap">
+                          {customer.quantity} علبة / صندوق
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+                </details>
               </div>
             ))}
           </div>
