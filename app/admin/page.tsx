@@ -88,7 +88,7 @@ export default function AdminDashboard() {
   const [printType, setPrintType] = useState<'aggregation' | 'invoice' | 'receipt' | 'aggregation_receipt'>('aggregation');
   const [activePrintOrder, setActivePrintOrder] = useState<Order | null>(null);
   const [expandedOrders, setExpandedOrders] = useState<Record<string, boolean>>({});
-  const [excludedAggregatedItems, setExcludedAggregatedItems] = useState<Record<string, boolean>>({});
+  const [excludedAggregatedBreakdowns, setExcludedAggregatedBreakdowns] = useState<Record<string, boolean>>({});
   const [aggregationExpanded, setAggregationExpanded] = useState(true);
 
   // States for adding custom products not in the store
@@ -171,25 +171,75 @@ export default function AdminDashboard() {
     }));
   };
 
-  const toggleAggregatedItem = (productName: string) => {
-    setExcludedAggregatedItems(prev => ({
+  const getAggregatedBreakdownKey = (productName: string, customerName: string) =>
+    `${productName}::${customerName}`;
+
+  const isBreakdownSelected = (productName: string, customerName: string) =>
+    !excludedAggregatedBreakdowns[getAggregatedBreakdownKey(productName, customerName)];
+
+  const toggleAggregatedBreakdown = (productName: string, customerName: string) => {
+    const key = getAggregatedBreakdownKey(productName, customerName);
+    setExcludedAggregatedBreakdowns(prev => ({
       ...prev,
-      [productName]: !prev[productName]
+      [key]: !prev[key]
     }));
   };
 
-  const printedAggregatedItems = aggregatedItems.filter(item => !excludedAggregatedItems[item.productName]);
-  const allSelected = aggregatedItems.length > 0 && aggregatedItems.every(item => !excludedAggregatedItems[item.productName]);
+  const isAggregatedItemFullySelected = (item: AggregatedItem) =>
+    item.customerBreakdown.length > 0 &&
+    item.customerBreakdown.every(customer => isBreakdownSelected(item.productName, customer.customerName));
+
+  const isAggregatedItemPartiallySelected = (item: AggregatedItem) => {
+    const selectedCount = item.customerBreakdown.filter(customer =>
+      isBreakdownSelected(item.productName, customer.customerName)
+    ).length;
+    return selectedCount > 0 && selectedCount < item.customerBreakdown.length;
+  };
+
+  const toggleAggregatedItem = (item: AggregatedItem) => {
+    const shouldExcludeAll = isAggregatedItemFullySelected(item);
+    setExcludedAggregatedBreakdowns(prev => {
+      const next = { ...prev };
+      item.customerBreakdown.forEach(customer => {
+        const key = getAggregatedBreakdownKey(item.productName, customer.customerName);
+        if (shouldExcludeAll) {
+          next[key] = true;
+        } else {
+          delete next[key];
+        }
+      });
+      return next;
+    });
+  };
+
+  const printedAggregatedItems = aggregatedItems
+    .map(item => {
+      const selectedCustomerBreakdown = item.customerBreakdown.filter(customer =>
+        isBreakdownSelected(item.productName, customer.customerName)
+      );
+      return {
+        ...item,
+        customerBreakdown: selectedCustomerBreakdown,
+        totalQty: selectedCustomerBreakdown.reduce((sum, customer) => sum + customer.quantity, 0)
+      };
+    })
+    .filter(item => item.totalQty > 0);
+
+  const allSelected =
+    aggregatedItems.length > 0 &&
+    aggregatedItems.every(item => isAggregatedItemFullySelected(item));
 
   const toggleSelectAllAggregatedItems = () => {
     if (allSelected) {
       const newExcluded: Record<string, boolean> = {};
       aggregatedItems.forEach(item => {
-        newExcluded[item.productName] = true;
+        item.customerBreakdown.forEach(customer => {
+          newExcluded[getAggregatedBreakdownKey(item.productName, customer.customerName)] = true;
+        });
       });
-      setExcludedAggregatedItems(newExcluded);
+      setExcludedAggregatedBreakdowns(newExcluded);
     } else {
-      setExcludedAggregatedItems({});
+      setExcludedAggregatedBreakdowns({});
     }
   };
 
@@ -1955,7 +2005,12 @@ export default function AdminDashboard() {
             <div className="space-y-4">
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 {aggregatedItems.map((item, idx) => {
-                  const isChecked = !excludedAggregatedItems[item.productName];
+                  const isChecked = isAggregatedItemFullySelected(item);
+                  const isPartiallyChecked = isAggregatedItemPartiallySelected(item);
+                  const selectedQty = item.customerBreakdown
+                    .filter(customer => isBreakdownSelected(item.productName, customer.customerName))
+                    .reduce((sum, customer) => sum + customer.quantity, 0);
+
                   return (
                     <div 
                       key={idx}
@@ -1966,7 +2021,10 @@ export default function AdminDashboard() {
                           <input
                             type="checkbox"
                             checked={isChecked}
-                            onChange={() => toggleAggregatedItem(item.productName)}
+                            ref={(el) => {
+                              if (el) el.indeterminate = isPartiallyChecked;
+                            }}
+                            onChange={() => toggleAggregatedItem(item)}
                             className="w-4 h-4 rounded text-[#128C7E] focus:ring-[#128C7E] border-slate-350 cursor-pointer shrink-0"
                           />
                           {item.imageUrl ? (
@@ -1991,9 +2049,16 @@ export default function AdminDashboard() {
                             )}
                           </div>
                         </div>
-                        <span className="bg-white text-emerald-600 font-extrabold px-3 py-1.5 rounded-xl text-sm border border-slate-200 shrink-0">
-                          {item.totalQty} علبة / صندوق
-                        </span>
+                        <div className="flex flex-col items-end gap-1 shrink-0">
+                          <span className="bg-white text-emerald-600 font-extrabold px-3 py-1.5 rounded-xl text-sm border border-slate-200">
+                            {item.totalQty} علبة / صندوق
+                          </span>
+                          {selectedQty !== item.totalQty && (
+                            <span className="text-[10px] font-bold text-amber-700">
+                              المحدد للطباعة: {selectedQty}
+                            </span>
+                          )}
+                        </div>
                       </div>
 
                       <details className="group mt-3 border-t border-slate-200/80 pt-3">
@@ -2002,17 +2067,32 @@ export default function AdminDashboard() {
                           <ChevronDown className="w-4 h-4 text-slate-400 transition-transform group-open:rotate-180" />
                         </summary>
                         <div className="mt-2 space-y-1.5">
-                          {item.customerBreakdown.map((customer) => (
-                            <div
-                              key={customer.customerName}
-                              className="flex items-center justify-between gap-3 rounded-xl bg-white border border-slate-200/80 px-3 py-2 text-xs"
-                            >
-                              <span className="font-semibold text-slate-700 truncate">{customer.customerName}</span>
-                              <span className="font-black text-[#128C7E] whitespace-nowrap">
-                                {customer.quantity} علبة / صندوق
-                              </span>
-                            </div>
-                          ))}
+                          {item.customerBreakdown.map((customer) => {
+                            const customerChecked = isBreakdownSelected(item.productName, customer.customerName);
+                            return (
+                              <label
+                                key={customer.customerName}
+                                className={`flex items-center justify-between gap-3 rounded-xl border px-3 py-2 text-xs cursor-pointer transition-colors ${
+                                  customerChecked
+                                    ? 'bg-white border-slate-200/80'
+                                    : 'bg-slate-100/70 border-slate-200 text-slate-400'
+                                }`}
+                              >
+                                <span className="flex items-center gap-2 min-w-0">
+                                  <input
+                                    type="checkbox"
+                                    checked={customerChecked}
+                                    onChange={() => toggleAggregatedBreakdown(item.productName, customer.customerName)}
+                                    className="w-4 h-4 rounded text-[#128C7E] focus:ring-[#128C7E] border-slate-350 cursor-pointer shrink-0"
+                                  />
+                                  <span className="font-semibold truncate">{customer.customerName}</span>
+                                </span>
+                                <span className={`font-black whitespace-nowrap ${customerChecked ? 'text-[#128C7E]' : 'text-slate-400'}`}>
+                                  {customer.quantity} علبة / صندوق
+                                </span>
+                              </label>
+                            );
+                          })}
                         </div>
                       </details>
                     </div>
