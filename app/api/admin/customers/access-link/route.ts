@@ -3,6 +3,8 @@ import { supabaseAdmin } from '@/lib/supabaseAdmin';
 import { checkAdminAuth } from '@/lib/auth/adminAuth';
 import { generateRandomToken, hashToken, hashPin, generateCustomerPermanentToken } from '@/lib/auth/crypto';
 
+const CUSTOMER_ACCESS_ORIGIN = (process.env.CUSTOMER_ACCESS_ORIGIN || 'https://www.idelbigida.work').replace(/\/+$/, '');
+
 export async function GET(request: NextRequest) {
   const auth = checkAdminAuth(request);
   if (!auth.isAdmin) {
@@ -49,10 +51,7 @@ export async function GET(request: NextRequest) {
       activeLink = insertedLink;
     }
 
-    const host = request.headers.get('x-forwarded-host') || request.headers.get('host') || '';
-    const proto = request.headers.get('x-forwarded-proto') || (host.includes('localhost') ? 'http' : 'https');
-    const origin = host ? `${proto}://${host}` : (request.headers.get('origin') || '');
-    const accessUrl = `${origin}/access/${permanentToken}`;
+    const accessUrl = `${CUSTOMER_ACCESS_ORIGIN}/access/${permanentToken}`;
 
     return NextResponse.json({
       hasLink: true,
@@ -137,11 +136,8 @@ export async function POST(request: NextRequest) {
         .eq('id', customerId);
     }
 
-    // Construct full shareable URL
-    const host = request.headers.get('x-forwarded-host') || request.headers.get('host') || '';
-    const proto = request.headers.get('x-forwarded-proto') || (host.includes('localhost') ? 'http' : 'https');
-    const origin = host ? `${proto}://${host}` : (request.headers.get('origin') || '');
-    const accessUrl = `${origin}/access/${rawToken}`;
+    // Construct full shareable URL using the customer-facing custom domain
+    const accessUrl = `${CUSTOMER_ACCESS_ORIGIN}/access/${rawToken}`;
 
     return NextResponse.json({
       success: true,
