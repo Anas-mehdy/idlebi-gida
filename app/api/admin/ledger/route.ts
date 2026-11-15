@@ -162,7 +162,8 @@ export async function GET(request: NextRequest) {
       });
 
       const custTotalPaid = custPayments.reduce((sum, p) => sum + Number(p.amount || 0), 0);
-      const custRemainingDebt = Math.max(0, custTotalInvoices - custTotalPaid);
+      // Positive = customer owes us, zero = settled, negative = credit balance owed to customer.
+      const custRemainingDebt = custTotalInvoices - custTotalPaid;
 
       if (custRemainingDebt > 0) {
         customersWithDebtCount++;
@@ -170,7 +171,9 @@ export async function GET(request: NextRequest) {
 
       grandTotalInvoices += custTotalInvoices;
       grandTotalPaid += custTotalPaid;
-      grandTotalDebt += custRemainingDebt;
+      // Keep the global "market debt" metric as gross receivables only.
+      // Customer credit balances must not offset debts owed by other customers.
+      grandTotalDebt += Math.max(0, custRemainingDebt);
 
       const token = cust.statement_token || cust.id;
       const statementUrl = `${origin}/statement/${token}`;
