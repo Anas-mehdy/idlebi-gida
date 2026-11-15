@@ -300,18 +300,40 @@ export default function CustomerStatementPage({ params }: { params: Promise<{ to
 
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 pt-1">
             <div className={`p-4 rounded-2xl border flex flex-col justify-between transition-all ${
-              summary.total_remaining_debt > 0 ? 'bg-rose-50/80 border-rose-200/90 text-rose-950' : 'bg-emerald-50/80 border-emerald-200 text-emerald-950'
+              summary.total_remaining_debt > 0
+                ? 'bg-rose-50/80 border-rose-200/90 text-rose-950'
+                : summary.total_remaining_debt < 0
+                  ? 'bg-sky-50/80 border-sky-200 text-sky-950'
+                  : 'bg-emerald-50/80 border-emerald-200 text-emerald-950'
             }`}>
-              <span className="text-xs font-bold opacity-80">المتبقي للدفع</span>
+              <span className="text-xs font-bold opacity-80">
+                {summary.total_remaining_debt > 0
+                  ? 'المتبقي للدفع'
+                  : summary.total_remaining_debt < 0
+                    ? 'رصيد لصالحك'
+                    : 'حالة الحساب'}
+              </span>
               <div className="mt-2">
                 <div className="flex items-baseline gap-1">
-                  <span className={`text-2xl font-black ${summary.total_remaining_debt > 0 ? 'text-rose-650' : 'text-emerald-700'}`}>
+                  <span className={`text-2xl font-black ${
+                    summary.total_remaining_debt > 0
+                      ? 'text-rose-650'
+                      : summary.total_remaining_debt < 0
+                        ? 'text-sky-700'
+                        : 'text-emerald-700'
+                  }`}>
                     {summary.total_remaining_debt.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                   </span>
                   <span className="text-xs font-bold">ليرة</span>
                 </div>
               </div>
-              <span className="text-[10px] font-bold mt-1 opacity-75">{summary.total_remaining_debt > 0 ? 'مبلغ الذمة المترتب' : 'خالص الحساب'}</span>
+              <span className="text-[10px] font-bold mt-1 opacity-75">
+                {summary.total_remaining_debt > 0
+                  ? 'مبلغ الذمة المترتب'
+                  : summary.total_remaining_debt < 0
+                    ? `رصيد زائد بقيمة ${Math.abs(summary.total_remaining_debt).toFixed(2)} ليرة يُحسب لك في المشتريات القادمة`
+                    : 'خالص الحساب'}
+              </span>
             </div>
 
             <div className="p-4 rounded-2xl bg-emerald-50/50 border border-emerald-200/80 text-emerald-950 flex flex-col justify-between">
