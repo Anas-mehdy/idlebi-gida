@@ -134,7 +134,8 @@ export async function GET(
     });
 
     const totalPaidAmount = paymentsList.reduce((sum: number, p: any) => sum + Number(p.amount || 0), 0);
-    const totalRemainingDebt = Math.max(0, totalInvoicesAmount - totalPaidAmount);
+    // Positive = customer owes us, zero = settled, negative = credit balance owed to customer.
+    const totalRemainingDebt = totalInvoicesAmount - totalPaidAmount;
 
     return NextResponse.json({
       success: true,
