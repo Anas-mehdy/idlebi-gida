@@ -249,7 +249,7 @@ export default function AdminLedgerPage() {
       await fetchLedgerData();
       setDirectPaymentAmount('');
       setDirectPaymentNote('');
-      alert('تم تسجيل الدفعة وخصمها من مجموع مستحقات الزبون بنجاح!');
+      alert('تم تسجيل الدفعة وتحديث رصيد الزبون بنجاح!');
     } catch (err: any) {
       console.error(err);
       alert(err.message || 'حدث خطأ أثناء إضافة الدفعة');
@@ -439,7 +439,7 @@ export default function AdminLedgerPage() {
                 <span className="text-xs font-bold text-slate-600">زبون</span>
               </div>
               <p className="text-[11px] font-bold text-slate-500 mt-0.5">
-                {grandSummary.customers_with_debt} عليهم ديون • {grandSummary.total_customers - grandSummary.customers_with_debt} حسابهم خالص
+                {grandSummary.customers_with_debt} عليهم ديون • {grandSummary.total_customers - grandSummary.customers_with_debt} بدون دين
               </p>
             </div>
 
@@ -515,7 +515,7 @@ export default function AdminLedgerPage() {
                     statusFilter === 'settled_only' ? 'bg-emerald-600 text-white shadow-2xs' : 'text-emerald-700 hover:bg-emerald-50'
                   }`}
                 >
-                  حسابهم خالص ({customers.length - grandSummary.customers_with_debt})
+                  بدون دين ({customers.length - grandSummary.customers_with_debt})
                 </button>
               </div>
 
@@ -536,6 +536,7 @@ export default function AdminLedgerPage() {
               <div className="divide-y divide-slate-100">
                 {filteredCustomers.map((cust) => {
                   const hasDebt = cust.total_remaining_debt > 0;
+                  const hasCredit = cust.total_remaining_debt < 0;
                   const isCopied = copiedToken === cust.statement_token;
 
                   return (
@@ -546,7 +547,11 @@ export default function AdminLedgerPage() {
                       {/* Customer Info */}
                       <div className="flex items-center gap-3.5 min-w-0">
                         <div className={`w-11 h-11 rounded-2xl flex items-center justify-center font-black text-sm shrink-0 border ${
-                          hasDebt ? 'bg-rose-50 text-rose-700 border-rose-200' : 'bg-emerald-50 text-emerald-700 border-emerald-200'
+                          hasDebt
+                            ? 'bg-rose-50 text-rose-700 border-rose-200'
+                            : hasCredit
+                              ? 'bg-sky-50 text-sky-700 border-sky-200'
+                              : 'bg-emerald-50 text-emerald-700 border-emerald-200'
                         }`}>
                           <Users className="w-5 h-5" />
                         </div>
@@ -555,9 +560,17 @@ export default function AdminLedgerPage() {
                           <div className="flex items-center gap-2 flex-wrap">
                             <span className="text-sm font-black text-slate-900">{cust.name}</span>
                             <span className={`text-[10px] font-bold px-2.5 py-0.5 rounded-full ${
-                              hasDebt ? 'bg-rose-100 text-rose-800' : 'bg-emerald-100 text-emerald-800'
+                              hasDebt
+                                ? 'bg-rose-100 text-rose-800'
+                                : hasCredit
+                                  ? 'bg-sky-100 text-sky-800'
+                                  : 'bg-emerald-100 text-emerald-800'
                             }`}>
-                              {hasDebt ? `متبقي عليه: ${cust.total_remaining_debt.toFixed(2)} TL` : 'خالص الحساب ✓'}
+                              {hasDebt
+                                ? `متبقي عليه: ${cust.total_remaining_debt.toFixed(2)} TL`
+                                : hasCredit
+                                  ? `رصيد لصالحه: ${Math.abs(cust.total_remaining_debt).toFixed(2)} TL`
+                                  : 'خالص الحساب ✓'}
                             </span>
                           </div>
 
@@ -679,21 +692,37 @@ export default function AdminLedgerPage() {
             
             {/* Remaining Debt */}
             <div className={`p-5 rounded-3xl border shadow-xs space-y-1 ${
-              selectedCustomer.total_remaining_debt > 0 
-                ? 'bg-rose-50/80 border-rose-200 text-rose-950' 
-                : 'bg-emerald-50/80 border-emerald-200 text-emerald-950'
+              selectedCustomer.total_remaining_debt > 0
+                ? 'bg-rose-50/80 border-rose-200 text-rose-950'
+                : selectedCustomer.total_remaining_debt < 0
+                  ? 'bg-sky-50/80 border-sky-200 text-sky-950'
+                  : 'bg-emerald-50/80 border-emerald-200 text-emerald-950'
             }`}>
-              <span className="text-xs font-bold opacity-80">المتبقي كدين بذمة الزبون (الذمة الحالية)</span>
+              <span className="text-xs font-bold opacity-80">
+                {selectedCustomer.total_remaining_debt > 0
+                  ? 'المتبقي كدين بذمة الزبون (الذمة الحالية)'
+                  : selectedCustomer.total_remaining_debt < 0
+                    ? 'رصيد زائد لصالح الزبون'
+                    : 'حالة الحساب'}
+              </span>
               <div className="flex items-baseline gap-1 pt-1">
                 <span className={`text-2xl font-black ${
-                  selectedCustomer.total_remaining_debt > 0 ? 'text-rose-650' : 'text-emerald-700'
+                  selectedCustomer.total_remaining_debt > 0
+                    ? 'text-rose-650'
+                    : selectedCustomer.total_remaining_debt < 0
+                      ? 'text-sky-700'
+                      : 'text-emerald-700'
                 }`}>
                   {selectedCustomer.total_remaining_debt.toFixed(2)}
                 </span>
                 <span className="text-xs font-bold">ليرة</span>
               </div>
               <p className="text-[11px] font-bold opacity-75">
-                {selectedCustomer.total_remaining_debt > 0 ? 'مجموع الذمم المتبقية' : 'الحساب خالص تماماً ✓'}
+                {selectedCustomer.total_remaining_debt > 0
+                  ? 'مجموع الذمم المتبقية'
+                  : selectedCustomer.total_remaining_debt < 0
+                    ? `لصالح الزبون ${Math.abs(selectedCustomer.total_remaining_debt).toFixed(2)} ليرة تُخصم من مشترياته القادمة`
+                    : 'الحساب خالص تماماً ✓'}
               </p>
             </div>
 
@@ -727,7 +756,7 @@ export default function AdminLedgerPage() {
           <div className="bg-white border border-slate-200 rounded-3xl p-5 sm:p-6 shadow-xs space-y-4">
             <h3 className="text-sm font-black text-slate-800 flex items-center gap-2">
               <Plus className="w-5 h-5 text-[#128C7E]" />
-              <span>تسجيل دفعة جديدة لحساب الزبون (خصم مباشر من إجمالي الدين)</span>
+              <span>تسجيل دفعة جديدة لحساب الزبون (تُحدّث الرصيد مباشرة ويمكن أن يصبح لصالح الزبون)</span>
             </h3>
 
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 pt-1">
@@ -736,7 +765,11 @@ export default function AdminLedgerPage() {
                 <input
                   type="number"
                   step="any"
-                  placeholder={`المتبقي: ${selectedCustomer.total_remaining_debt.toFixed(2)}`}
+                  placeholder={
+                    selectedCustomer.total_remaining_debt < 0
+                      ? `رصيد لصالح الزبون: ${Math.abs(selectedCustomer.total_remaining_debt).toFixed(2)}`
+                      : `المتبقي: ${selectedCustomer.total_remaining_debt.toFixed(2)}`
+                  }
                   value={directPaymentAmount}
                   onChange={(e) => setDirectPaymentAmount(e.target.value)}
                   className="w-full bg-slate-50 border border-slate-250 rounded-xl px-3.5 py-2.5 text-xs font-bold text-slate-800 outline-none focus:bg-white focus:border-[#128C7E]"
