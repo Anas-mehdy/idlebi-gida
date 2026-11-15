@@ -88,7 +88,8 @@ export default function AdminDashboard() {
   const [printType, setPrintType] = useState<'aggregation' | 'invoice' | 'receipt' | 'aggregation_receipt'>('aggregation');
   const [activePrintOrder, setActivePrintOrder] = useState<Order | null>(null);
   const [expandedOrders, setExpandedOrders] = useState<Record<string, boolean>>({});
-  const [excludedAggregatedBreakdowns, setExcludedAggregatedBreakdowns] = useState<Record<string, boolean>>({});
+  const [excludedAggregatedItems, setExcludedAggregatedItems] = useState<Record<string, boolean>>({});
+  const [selectedAggregatedBreakdowns, setSelectedAggregatedBreakdowns] = useState<Record<string, boolean>>({});
   const [aggregationExpanded, setAggregationExpanded] = useState(true);
 
   // States for adding custom products not in the store
@@ -174,72 +175,48 @@ export default function AdminDashboard() {
   const getAggregatedBreakdownKey = (productName: string, customerName: string) =>
     `${productName}::${customerName}`;
 
+  // Customer details are opt-in for printing: nothing is selected by default.
   const isBreakdownSelected = (productName: string, customerName: string) =>
-    !excludedAggregatedBreakdowns[getAggregatedBreakdownKey(productName, customerName)];
+    selectedAggregatedBreakdowns[getAggregatedBreakdownKey(productName, customerName)] === true;
 
   const toggleAggregatedBreakdown = (productName: string, customerName: string) => {
     const key = getAggregatedBreakdownKey(productName, customerName);
-    setExcludedAggregatedBreakdowns(prev => ({
+    setSelectedAggregatedBreakdowns(prev => ({
       ...prev,
       [key]: !prev[key]
     }));
   };
 
-  const isAggregatedItemFullySelected = (item: AggregatedItem) =>
-    item.customerBreakdown.length > 0 &&
-    item.customerBreakdown.every(customer => isBreakdownSelected(item.productName, customer.customerName));
-
-  const isAggregatedItemPartiallySelected = (item: AggregatedItem) => {
-    const selectedCount = item.customerBreakdown.filter(customer =>
-      isBreakdownSelected(item.productName, customer.customerName)
-    ).length;
-    return selectedCount > 0 && selectedCount < item.customerBreakdown.length;
-  };
-
-  const toggleAggregatedItem = (item: AggregatedItem) => {
-    const shouldExcludeAll = isAggregatedItemFullySelected(item);
-    setExcludedAggregatedBreakdowns(prev => {
-      const next = { ...prev };
-      item.customerBreakdown.forEach(customer => {
-        const key = getAggregatedBreakdownKey(item.productName, customer.customerName);
-        if (shouldExcludeAll) {
-          next[key] = true;
-        } else {
-          delete next[key];
-        }
-      });
-      return next;
-    });
+  // Product selection remains independent from customer-detail selection.
+  const toggleAggregatedItem = (productName: string) => {
+    setExcludedAggregatedItems(prev => ({
+      ...prev,
+      [productName]: !prev[productName]
+    }));
   };
 
   const printedAggregatedItems = aggregatedItems
-    .map(item => {
-      const selectedCustomerBreakdown = item.customerBreakdown.filter(customer =>
+    .filter(item => !excludedAggregatedItems[item.productName])
+    .map(item => ({
+      ...item,
+      selectedCustomerBreakdown: item.customerBreakdown.filter(customer =>
         isBreakdownSelected(item.productName, customer.customerName)
-      );
-      return {
-        ...item,
-        customerBreakdown: selectedCustomerBreakdown,
-        totalQty: selectedCustomerBreakdown.reduce((sum, customer) => sum + customer.quantity, 0)
-      };
-    })
-    .filter(item => item.totalQty > 0);
+      )
+    }));
 
   const allSelected =
     aggregatedItems.length > 0 &&
-    aggregatedItems.every(item => isAggregatedItemFullySelected(item));
+    aggregatedItems.every(item => !excludedAggregatedItems[item.productName]);
 
   const toggleSelectAllAggregatedItems = () => {
     if (allSelected) {
       const newExcluded: Record<string, boolean> = {};
       aggregatedItems.forEach(item => {
-        item.customerBreakdown.forEach(customer => {
-          newExcluded[getAggregatedBreakdownKey(item.productName, customer.customerName)] = true;
-        });
+        newExcluded[item.productName] = true;
       });
-      setExcludedAggregatedBreakdowns(newExcluded);
+      setExcludedAggregatedItems(newExcluded);
     } else {
-      setExcludedAggregatedBreakdowns({});
+      setExcludedAggregatedItems({});
     }
   };
 
@@ -2005,11 +1982,10 @@ export default function AdminDashboard() {
             <div className="space-y-4">
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 {aggregatedItems.map((item, idx) => {
-                  const isChecked = isAggregatedItemFullySelected(item);
-                  const isPartiallyChecked = isAggregatedItemPartiallySelected(item);
-                  const selectedQty = item.customerBreakdown
-                    .filter(customer => isBreakdownSelected(item.productName, customer.customerName))
-                    .reduce((sum, customer) => sum + customer.quantity, 0);
+                  const isChecked = !excludedAggregatedItems[item.productName];
+                  const selectedCustomersCount = item.customerBreakdown.filter(customer =>
+                    isBreakdownSelected(item.productName, customer.customerName)
+                  ).length;
 
                   return (
                     <div 
@@ -2021,10 +1997,7 @@ export default function AdminDashboard() {
                           <input
                             type="checkbox"
                             checked={isChecked}
-                            ref={(el) => {
-                              if (el) el.indeterminate = isPartiallyChecked;
-                            }}
-                            onChange={() => toggleAggregatedItem(item)}
+                            onChange={() => toggleAggregatedItem(item.productName)}
                             className="w-4 h-4 rounded text-[#128C7E] focus:ring-[#128C7E] border-slate-350 cursor-pointer shrink-0"
                           />
                           {item.imageUrl ? (
@@ -2053,9 +2026,9 @@ export default function AdminDashboard() {
                           <span className="bg-white text-emerald-600 font-extrabold px-3 py-1.5 rounded-xl text-sm border border-slate-200">
                             {item.totalQty} علبة / صندوق
                           </span>
-                          {selectedQty !== item.totalQty && (
-                            <span className="text-[10px] font-bold text-amber-700">
-                              المحدد للطباعة: {selectedQty}
+                          {selectedCustomersCount > 0 && (
+                            <span className="text-[10px] font-bold text-blue-700">
+                              تفاصيل مطبوعة: {selectedCustomersCount} زبون
                             </span>
                           )}
                         </div>
@@ -2074,8 +2047,8 @@ export default function AdminDashboard() {
                                 key={customer.customerName}
                                 className={`flex items-center justify-between gap-3 rounded-xl border px-3 py-2 text-xs cursor-pointer transition-colors ${
                                   customerChecked
-                                    ? 'bg-white border-slate-200/80'
-                                    : 'bg-slate-100/70 border-slate-200 text-slate-400'
+                                    ? 'bg-blue-50/70 border-blue-200 text-slate-700'
+                                    : 'bg-white border-slate-200/80 text-slate-600'
                                 }`}
                               >
                                 <span className="flex items-center gap-2 min-w-0">
@@ -2087,7 +2060,7 @@ export default function AdminDashboard() {
                                   />
                                   <span className="font-semibold truncate">{customer.customerName}</span>
                                 </span>
-                                <span className={`font-black whitespace-nowrap ${customerChecked ? 'text-[#128C7E]' : 'text-slate-400'}`}>
+                                <span className={`font-black whitespace-nowrap ${customerChecked ? 'text-blue-700' : 'text-slate-500'}`}>
                                   {customer.quantity} علبة / صندوق
                                 </span>
                               </label>
@@ -2887,7 +2860,18 @@ export default function AdminDashboard() {
               {printedAggregatedItems.map((item, idx) => (
                 <tr key={idx} className="hover:bg-slate-50/50">
                   <td className="border border-slate-300 px-4 py-2.5 font-bold font-mono">{idx + 1}</td>
-                  <td className="border border-slate-300 px-4 py-2.5 font-bold">{item.productName}</td>
+                  <td className="border border-slate-300 px-4 py-2.5 font-bold">
+                    <div>{item.productName}</div>
+                    {item.selectedCustomerBreakdown.length > 0 && (
+                      <div className="mt-1.5 space-y-0.5 text-[11px] font-bold text-slate-600">
+                        {item.selectedCustomerBreakdown.map((customer) => (
+                          <div key={customer.customerName}>
+                            ↳ {customer.customerName}: {customer.quantity} علبة / صندوق
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </td>
                   <td className="border border-slate-300 px-4 py-2.5 text-center font-black text-slate-800 text-base">{item.totalQty} علبة / صندوق</td>
                 </tr>
               ))}
@@ -3223,7 +3207,18 @@ export default function AdminDashboard() {
               {printedAggregatedItems.map((item, idx) => (
                 <tr key={idx} className="border-b border-dashed border-black/30">
                   <td className="py-2 font-bold font-mono text-[13px]">{idx + 1}</td>
-                  <td className="py-2 font-bold text-[13px]">{item.productName}</td>
+                  <td className="py-2 font-bold text-[13px]">
+                    <div>{item.productName}</div>
+                    {item.selectedCustomerBreakdown.length > 0 && (
+                      <div className="mt-1 space-y-0.5 text-[10px] font-bold leading-snug">
+                        {item.selectedCustomerBreakdown.map((customer) => (
+                          <div key={customer.customerName}>
+                            ↳ {customer.customerName}: {customer.quantity}
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </td>
                   <td className="py-2 text-center font-black text-sm font-mono whitespace-nowrap">{item.totalQty} علبة</td>
                 </tr>
               ))}
